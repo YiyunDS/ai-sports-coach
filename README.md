@@ -64,6 +64,12 @@ This branch shows skating form in **3D**. A blue "pro" skater stands in a good h
 
 ### How to open it
 
+**The easy way: open the website.** <https://yiyunds.github.io/ai-sports-coach/>
+
+It is the same app, hosted for free by GitHub Pages. Your video is still analyzed inside your own browser and is never uploaded: the website only hands your browser the page.
+
+Or run it from your own computer:
+
 1. Download or clone this branch.
 2. Double-click **`index.html`**. It opens in your browser (Chrome, Edge, Firefox or Safari). You need the internet the first time, because the page downloads the 3D library and the pose-finding AI.
 3. No install and no server are needed.

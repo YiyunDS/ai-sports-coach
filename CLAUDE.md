@@ -37,6 +37,16 @@ team leader) for the Presidential SI Challenge. All work happens on the
   after. Do not call a phase done until you have looked at it.
 - Small commits on `3d-coach`. Do not push until the team leader says so.
 
+## The website
+
+- The app is online at https://yiyunds.github.io/ai-sports-coach/
+  (GitHub Pages, free). GitHub serves whatever is on the `gh-pages`
+  branch, exactly as it is (`.nojekyll`).
+- To update the website after the team leader says to push:
+  `git push origin main:gh-pages`. It takes about a minute to show.
+- Everything on `gh-pages` is public. The same rule as for the repo:
+  no real videos and no pictures of them.
+
 ## How to look at the page
 
 - Serve the folder: `python3 -m http.server 8123` (or the `coach` entry
