@@ -468,6 +468,52 @@ puck only about twice per shift unless you call for it. Most shifts end
 with a line change, not a whistle. No goalies to control, no penalties,
 no icing, no line changes on the fly. On a phone the markers are small.
 
+### Phase 13 and 14: plan (phone-friendly app, and a referee game)
+
+The team leader asked for another educational hockey game, researched
+by us, and for the whole app to work well on a phone.
+
+What the research said (links in `SOURCES.md`):
+- USA Hockey, 12U and younger: IMMEDIATE offside (no "tag-up"). What
+  counts is where the skates and the puck are when the puck completely
+  crosses the blue line; the stick does not count.
+- USA Hockey icing: the puck is shot from the shooter's own half
+  (the center red line splits the rink), crosses the far goal line
+  untouched, and is not a goal. Icing is immediate (no race). No icing
+  when an opponent other than the goalie could have played it. At 14U
+  and younger a shorthanded team is NOT allowed to ice the puck (in the
+  NHL it is).
+- The NHL's own school game (Future Goals "Hockey Scholar", grades 4-7)
+  teaches with short interactive rounds and instant feedback.
+- Phones: touch targets should be about 44 px or bigger (Apple 44 pt,
+  Android 48 dp, WCAG 2.5.5 says 44 px, 2.5.8 says 24 px at least).
+
+Two ideas were compared:
+- A. "You make the call": watch a short play, then be the referee:
+  offside, icing, or a good play? Teaches the two rules new players
+  find hardest. Tap-only, so it suits a phone. CHOSEN.
+- B. "Cut the angle": be the goalie and learn with geometry why goalies
+  come out of the net. Good math, kept as the next idea.
+
+Phase 13, phone-friendly (every tab):
+1. Every button, chooser and tab at least 44 px tall on touch screens.
+2. The tab bar never wraps or pushes the page sideways.
+3. Game tab: "Your move" becomes a sheet fixed to the bottom of the
+   screen, choices two to a row, so rink and buttons are seen together.
+4. The same bottom sheet for the new game's answer buttons.
+5. Check all tabs at 375 px wide, with screenshots.
+
+Phase 14, the referee game "You make the call":
+1. `js/refplays.js`: makes plays (who skates where, where the puck
+   goes) and judges them straight from the rules, with tests that the
+   judge agrees with what each play was built to show.
+2. `js/rink.js`: one rink drawing shared by the Game and the new tab.
+3. `js/ref.js` + a fourth tab: watch the play, pick Offside / Icing /
+   Good play, then see the frozen key moment (zoomed in on the skates
+   and the line) with the reason. Three levels, score and streak.
+4. Play it on a phone-size and a desktop-size screen, screenshots,
+   docs, small commits.
+
 ### Phase 5: Check the pro against a real skater (needs a video)
 
 - Run a good side-view video of a strong skater through the Phase 1
