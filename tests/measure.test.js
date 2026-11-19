@@ -91,4 +91,38 @@ test("too few pushes: we say so instead of guessing", function () {
   assert.strictEqual(r.numbers, null);
 });
 
+test("pushes are found from the knees alone (when left and right are mixed up)", function () {
+  // 60 pictures per second, like our measuring mode.
+  var rows = [];
+  for (var i = 0; i < 9 * 60; i++) {
+    var p = St.makeStridePose((i / 60) / St.STRIDE.secondsPerCycle, KNOWN).pose;
+    var l = M.angleAt(p.lHip, p.lKnee, p.lAnkle), r = M.angleAt(p.rHip, p.rKnee, p.rAnkle);
+    rows.push([i / 60, Math.min(l, r), Math.max(l, r), M.measurePose(p).forwardLean]);
+  }
+  var found = Me.pushesFromKnees(rows);
+  assert.ok(found.pushes.length >= 7, "found " + found.pushes.length);
+  assert.ok(Math.abs(found.pushKnee.value - 168) < 3, "push knee " + found.pushKnee.value);
+  assert.ok(found.glideKnee.value > 105 && found.glideKnee.value < 125, "glide knee " + found.glideKnee.value);
+  assert.ok(found.pushKnee.spread < 1);
+  // A skater who only glides has no pushes.
+  assert.strictEqual(Me.pushesFromKnees(rows.map(function (r) { return [r[0], 150, 155, 20]; })).pushes.length, 0);
+});
+
+test("the saved McDavid numbers give four pushes that agree", function () {
+  var data = require("../data/pro-stride-measured.json");
+  var found = Me.pushesFromKnees(data.rows);
+  assert.strictEqual(found.pushes.length, 4);
+  // The pushing knee: all four within a few degrees of each other.
+  assert.ok(found.pushKnee.value > 158 && found.pushKnee.value < 168, "push knee " + found.pushKnee.value);
+  assert.ok(found.pushKnee.spread <= 4, "spread " + found.pushKnee.spread);
+  // The standing knee: deeper than our old guess of 110, but the pushes disagree more.
+  assert.ok(found.glideKnee.value > 85 && found.glideKnee.value < 105, "glide knee " + found.glideKnee.value);
+  // The lean readings disagree a lot (the camera angle changes), so we do not use them.
+  assert.ok(found.lean.spread > 8, "lean spread " + found.lean.spread);
+  // The pro's target ranges in targets.json come from these numbers.
+  var pro = require("../js/default-targets.js").pro;
+  assert.ok(pro.strideExtension.min <= found.pushKnee.value && found.pushKnee.value <= pro.strideExtension.max);
+  assert.ok(pro.kneeBend.min <= found.glideKnee.value && found.glideKnee.value <= pro.kneeBend.max);
+});
+
 console.log("All measuring tests passed!");

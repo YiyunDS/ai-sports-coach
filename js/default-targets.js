@@ -16,14 +16,15 @@
       "forwardLean: how far your back tips forward. 0 = standing tall, 90 = flat like a table.",
       "strideExtension: the knee angle of your pushing leg at the end of the push. Close to 180 = a full push.",
       "yellowZone: if you are outside the range by this many degrees or less, the joint is yellow. More than that is red.",
-      "IMPORTANT: these numbers are STARTER GUESSES. Replace them with angles you measure from the clips in SOURCES.md.",
+      "The 'pro' knee bend and push were MEASURED from a clip of Connor McDavid (see SOURCES.md and data/pro-stride-measured.json). The pro's lean is still a guess.",
+      "IMPORTANT: the numbers for the age bands are still STARTER GUESSES.",
       "If you change this file, also copy it into js/default-targets.js (or use 'Edit target angles > Load targets.json' on the page)."
     ],
     "yellowZone": 10,
     "pro": {
-      "kneeBend": { "min": 105, "max": 115 },
+      "kneeBend": { "min": 90, "max": 105 },
       "forwardLean": { "min": 40, "max": 50 },
-      "strideExtension": { "min": 165, "max": 180 }
+      "strideExtension": { "min": 158, "max": 168 }
     },
     "bands": {
       "6-8": {

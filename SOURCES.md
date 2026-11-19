@@ -4,7 +4,25 @@ Every video clip we use to measure "good skater" angles goes here.
 
 | Player | Where the clip came from (link) | What we measured | Date added |
 |---|---|---|---|
-| | | | |
+| Connor McDavid | "How to Skate Like Connor McDavid. Skating Stride in Slow Motion." uploaded by Satoshi Takano, https://www.youtube.com/watch?v=B4TOqFktwBg , the slow-motion shot from 2:45 to 3:02. The footage itself belongs to the NHL and its broadcasters. | Four pushes. Pushing knee at its straightest: 163° (the four pushes gave 160° to 165°). Standing knee during the push: 97° (91° to 105°). | 2026-11-19 |
+
+How we measured: our own coach in measuring mode (`?dev`) read the clip, and
+`pushesFromKnees` in `js/measure.js` found the pushes. The numbers for every
+picture are in `data/pro-stride-measured.json`. **We did not keep the video in
+this project**, only the numbers.
+
+What we could NOT measure from this clip, and why:
+- Forward lean: the readings jumped between 21° and 50° as the camera angle
+  changed, so we kept our estimate (40° to 50°).
+- Real timing: the clip is slow motion and we do not know by how much.
+- The push out to the side, edges and arm swing: the camera is not side-on and
+  not from behind.
+- One thing we noticed but have not copied yet: his pushing leg stays almost
+  straight for about a fifth of each stride. Our pro's does for much less.
+
+We also looked at the NHL's 2024 Fastest Skater video
+(https://www.youtube.com/watch?v=pYmOtDU35DE). The camera changes every second
+or two and never shows him from the side for long, so we could not measure it.
 
 # Skating studies behind the pro's stride
 
@@ -12,7 +30,7 @@ Every video clip we use to measure "good skater" angles goes here.
 |---|---|
 | The phases of a stride (glide, push out to the side, recovery) and that strong skaters differ from weaker ones in hip and knee movement | Upjohn, Turcotte, Pearsall & Loh (2008), "Three-dimensional kinematics of the lower limbs during forward ice hockey skating", Sports Biomechanics 7(2), 206-221, https://doi.org/10.1080/14763140701841621 (we read the summary, not the full paper yet) |
 | Both skates on the ice about 15-25% of the stride at full speed | Marino, "Biomechanics of power skating", summarized at https://ojs.ub.uni-konstanz.de/cpa/article/view/2985 |
-| Forward lean of about 40-50° | Matches our pro target in targets.json; still needs a better source |
+| Forward lean of about 40-50° | Our estimate; the McDavid clip could not confirm it (see the top of this file) |
 
 The stride width, push direction, edge angles and arm swing in
 `js/stride.js` are our own estimates. We plan to check them against a

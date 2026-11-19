@@ -103,7 +103,7 @@ The spots come from common youth-hockey coverage, and coaches use different syst
 
 The goal angles live in [`targets.json`](targets.json). There is one set for each age band (6-8, 9-10, 11-12) and each level, plus one for the pro. To try your own numbers, edit the file and use **Edit target angles > Load targets.json** on the page. To make them the new normal, also copy the file into `js/default-targets.js`.
 
-**The numbers in `targets.json` are starter guesses.** We still need to measure real clips and write down where they came from in [`SOURCES.md`](SOURCES.md).
+**The pro's knee bend and push in `targets.json` were measured** from a slow-motion clip of Connor McDavid; [`SOURCES.md`](SOURCES.md) says where it came from and what we could not measure. The numbers for each age band are still starter guesses.
 
 ### What is in this branch
 

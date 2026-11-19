@@ -45,7 +45,10 @@
   var MAX_FRAMES = DEV ? 900 : 400;     // never look at more pictures than this
   var FRAME_GAP = DEV ? 1 / 60 : 0.05;  // seconds between pictures (normally 20 per second)
   var DEMO_GAP = 0.1;       // the sample session has 10 poses per second
-  var MIN_VISIBILITY = 0.5; // how sure the AI must be that it sees a joint
+  // How sure the AI must be that it sees a joint. (In measuring mode we
+  // accept less: the smoothing and the "throw away broken pushes" step
+  // in measure.js deal with the wobblier poses.)
+  var MIN_VISIBILITY = DEV ? 0.3 : 0.5;
   var CROP = 512;           // the zoomed-in picture we hand to the AI is 512 x 512 dots
   var SMALL_SKATER = 0.18;  // skater shorter than this part of the picture = "far away"
 
@@ -562,8 +565,8 @@
             baseOptions: { modelAssetPath: model, delegate: delegate },
             runningMode: "IMAGE",  // we hand it one still picture at a time
             numPoses: 3,           // it may find up to 3 people; the tracker picks ours
-            minPoseDetectionConfidence: 0.35,
-            minPosePresenceConfidence: 0.35
+            minPoseDetectionConfidence: DEV ? 0.2 : 0.35,
+            minPosePresenceConfidence: DEV ? 0.2 : 0.35
           });
         }
         // Try the accurate AI on the fast graphics chip first, then the

@@ -356,6 +356,27 @@ drops broken ones, and reports each number with its spread. Open the
 page with `?dev` for a "Copy stride measurements" button. Waiting for
 the clip in `local-videos/` (see CLAUDE.md for the rule on NHL footage).
 
+### Phase 9: The pro's angles measured from Connor McDavid (done, in part)
+
+- Looked at the NHL's 2024 Fastest Skater video: the camera cuts every
+  second or two and never shows him side-on for long. Not usable.
+- Found a slow-motion ice-level shot (17 s) in a stride-breakdown video
+  and ran it through our coach in measuring mode. 436 of 899 pictures
+  were clear enough; four pushes could be read.
+- Measured: pushing knee 163° (160-165), standing knee 97° (91-105).
+  `targets.json` pro ranges are now 158-168 and 90-105 (they were the
+  guesses 165-178 and 105-115). The blue pro stands deeper and pushes a
+  little less straight than before.
+- Not measurable from this clip: lean (readings jump with the camera
+  angle), real timing (slow motion), side push, edges, arm swing. The
+  stride keyframes in `js/stride.js` are unchanged and still estimates.
+- Noticed, not copied yet: his push leg stays nearly straight for about
+  a fifth of the stride; our model's for about a twentieth. Matching it
+  needs a rethink of the foot path so the skate still does not skid.
+- Numbers only in the repo: `data/pro-stride-measured.json`. The videos
+  are in `local-videos/` (ignored by git).
+Still wanted: a true side-on clip and one from behind (Phase 5).
+
 ### Phase 5: Check the pro against a real skater (needs a video)
 
 - Run a good side-view video of a strong skater through the Phase 1

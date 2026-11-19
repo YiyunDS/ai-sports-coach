@@ -119,7 +119,8 @@ test("analyzing the pretend kid finds the slips", () => {
   assert.ok(r.worstFrame > 36, "the biggest slip is near the tired end, got " + r.worstFrame);
   assert.strictEqual(r.perFrame[r.worstFrame].scores.kneeBend.grade, "far");
   // The pro, compared with pro targets, is all green.
-  const pro = [M.makeStancePose({ kneeBend: 110, forwardLean: 45, strideExtension: 171, push: 1 })];
+  const mid = (r) => (r.min + r.max) / 2;
+  const pro = [M.makeStancePose({ kneeBend: mid(targets.pro.kneeBend), forwardLean: mid(targets.pro.forwardLean), strideExtension: mid(targets.pro.strideExtension), push: 1 })];
   const rp = M.analyzeFrames(pro, targets.pro, targets.yellowZone);
   for (const c of Object.keys(rp.summary)) assert.strictEqual(rp.summary[c].grade, "good", c);
 });

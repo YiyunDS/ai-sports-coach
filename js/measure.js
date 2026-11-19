@@ -158,9 +158,46 @@
     return { used: cut.strides.length, dropped: cut.dropped, numbers: numbers, curves: curves, middle: middle };
   }
 
+  // ---------- When left and right cannot be trusted --------------------
+  // A TV camera rarely films from exactly the side. Then the AI mixes up
+  // the left and the right leg, and the careful method above does not
+  // work. But one thing is still easy to see: in a strong push, one knee
+  // is very straight while the other is clearly bent. So we look for
+  // those moments.
+  //   rows = [[seconds, the more bent knee, the straighter knee, lean], ...]
+  // A "push" is a run of pictures where the straighter knee is at least
+  // 150 degrees and the other knee is at most 125. We ignore knees of
+  // 179-180: that is the clean-up forcing a leg straight, not a real reading.
+  // Returns the pushes, and the middle value and spread of each number.
+  function pushesFromKnees(rows) {
+    var runs = [], run = null;
+    rows.forEach(function (r) {
+      var isPush = r[2] >= 150 && r[1] <= 125;
+      if (isPush && run && r[0] - run.to <= 0.4) { run.rows.push(r); run.to = r[0]; }
+      else if (isPush) { run = { from: r[0], to: r[0], rows: [r] }; runs.push(run); }
+    });
+    var pushes = runs.filter(function (u) { return u.rows.length >= 4; }).map(function (u) {
+      var real = u.rows.filter(function (r) { return r[2] < 179; });
+      function col(k, list) { return (list || u.rows).map(function (r) { return r[k]; }); }
+      return {
+        from: u.from, to: u.to, pictures: u.rows.length,
+        pushKnee: M.percentile(col(2, real), 0.75),   // near its straightest
+        glideKnee: M.percentile(col(1), 0.5),
+        lean: M.percentile(col(3), 0.5)
+      };
+    });
+    function sum(name) {
+      var v = pushes.map(function (p) { return p[name]; });
+      if (!v.length) return null;
+      return { value: M.percentile(v, 0.5), spread: (Math.max.apply(null, v) - Math.min.apply(null, v)) / 2 };
+    }
+    return { pushes: pushes, pushKnee: sum("pushKnee"), glideKnee: sum("glideKnee"), lean: sum("lean") };
+  }
+
   var api = {
     STEPS: STEPS, splitStrides: splitStrides, resampleStride: resampleStride, mirrorPose: mirrorPose,
-    averageStrides: averageStrides, numbersOf: numbersOf, measureStride: measureStride
+    averageStrides: averageStrides, numbersOf: numbersOf, measureStride: measureStride,
+    pushesFromKnees: pushesFromKnees
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.CoachMeasure = api;
