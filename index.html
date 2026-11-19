@@ -16,19 +16,74 @@
     js/default-targets.js  a copy of targets.json the page can always read
     js/figure.js           draws one 3D skater out of balls, tubes and boxes
     js/scene.js            the rink, the lights, the camera and the PRO skater
+    js/coach.js            reads your video, finds your pose, makes the report
   -->
   <header class="top">
     <div class="logo" aria-hidden="true">🏒</div>
     <div>
       <h1>AI Sports Coach <span class="tag">3D Visual Coach</span></h1>
-      <p>See good skating form in 3D. Spin it around and look from every side!</p>
+      <p>See good skating form in 3D, then put your own pose right next to it.</p>
     </div>
   </header>
 
   <main class="layout">
     <!-- LEFT SIDE: the steps and what to look for -->
     <aside class="side">
-      <!--COACH-PANEL-->
+      <section class="card steps">
+        <h2>Try it with your skating</h2>
+        <ol>
+          <li>
+            <label class="file-btn">📹 Pick a skating video
+              <input type="file" id="video-file" accept="video/*">
+            </label>
+            <div id="file-name" class="small">No video yet</div>
+            <div class="small">Best: filmed from the side, with your whole body in the picture.</div>
+          </li>
+          <li>
+            <label for="age">How old are you?</label>
+            <select id="age">
+              <option>6</option><option>7</option><option>8</option><option selected>9</option>
+              <option>10</option><option>11</option><option>12</option>
+            </select>
+          </li>
+          <li>
+            <fieldset class="level">
+              <legend>How long have you skated?</legend>
+              <label><input type="radio" name="level" value="beginner" checked> Beginner</label>
+              <label><input type="radio" name="level" value="experienced"> Experienced</label>
+            </fieldset>
+          </li>
+        </ol>
+        <div class="go">
+          <button type="button" id="analyze-btn" class="primary" disabled>🔍 Find my pose</button>
+          <button type="button" id="demo-btn">🤖 Try a pretend skater</button>
+        </div>
+        <div id="progress" hidden><progress id="progress-bar" max="1"></progress></div>
+        <p id="status" class="status" role="status" aria-live="polite"></p>
+        <p class="pick">
+          <label for="ref-mode">The blue skater shows</label>
+          <select id="ref-mode">
+            <option value="pro">a pro</option>
+            <option value="goal">the goal for my age</option>
+          </select>
+        </p>
+        <details>
+          <summary>Goal numbers (targets.json)</summary>
+          <p id="target-info" class="small"></p>
+          <p class="small">Want different goals? Edit <code>targets.json</code>, then load it here:</p>
+          <label class="file-btn small-btn">Load my targets.json
+            <input type="file" id="targets-file" accept=".json,application/json">
+          </label>
+        </details>
+      </section>
+      <section class="card">
+        <h2>Joint colors</h2>
+        <ul class="legend">
+          <li><span class="dot good"></span> Green: inside the goal</li>
+          <li><span class="dot close"></span> Yellow: almost there</li>
+          <li><span class="dot far"></span> Red: work on this one</li>
+        </ul>
+      </section>
       <section class="card">
         <h2>What to look for</h2>
         <ul class="look">
@@ -55,7 +110,35 @@
           <button type="button" id="stride-btn" class="primary" aria-pressed="false">▶ Show the stride</button>
         </div>
       </div>
-      <!--COACH-RESULTS-->
+      <section id="results" class="card" hidden>
+        <div class="results-head">
+          <h2>Your coach report <span id="stars" class="stars"></span></h2>
+        </div>
+        <div class="results-body">
+          <div id="cards" class="cards"></div>
+          <video id="preview" class="preview" muted playsinline preload="auto" hidden></video>
+        </div>
+        <div class="replay">
+          <h3>Replay: where does the form slip?</h3>
+          <div class="replay-controls">
+            <button type="button" id="play-btn">▶ Play replay</button>
+            <label>Speed
+              <select id="speed">
+                <option value="1">normal</option>
+                <option value="0.5" selected>slow</option>
+                <option value="0.25">super slow</option>
+              </select>
+            </label>
+            <button type="button" id="worst-btn">⚠️ Jump to the biggest slip</button>
+            <span id="frame-info" class="small"></span>
+          </div>
+          <div class="timeline-wrap">
+            <div class="timeline-names" aria-hidden="true"><span>Knees</span><span>Lean</span><span>Pushes</span></div>
+            <canvas id="timeline" tabindex="0" role="slider" aria-label="Replay timeline. Use the left and right arrow keys to step through moments."></canvas>
+          </div>
+          <p class="small">Each little block is one moment of your video. Click or drag on the stripes to jump there. The Pushes stripe is only colored at the top of each push.</p>
+        </div>
+      </section>
     </section>
   </main>
 
@@ -71,6 +154,6 @@
   <script src="js/default-targets.js"></script>
   <script src="js/figure.js"></script>
   <script src="js/scene.js"></script>
-  <!--COACH-SCRIPT-->
+  <script src="js/coach.js"></script>
 </body>
 </html>

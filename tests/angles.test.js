@@ -106,15 +106,18 @@ test("normalizeFrames turns the kid to face +x and keeps the angles", () => {
 
 test("analyzing the pretend kid finds the slips", () => {
   const frames = M.normalizeFrames(M.makeDemoFrames());
-  const target = M.getTarget(targets, 9, "experienced");
+  const target = M.getTarget(targets, 9, "beginner");
   const r = M.analyzeFrames(frames, target, targets.yellowZone);
   assert.strictEqual(r.perFrame.length, 60);
-  assert.strictEqual(r.summary.kneeBend.grade, "good");       // about 128 in 110-135
-  assert.strictEqual(r.summary.forwardLean.grade, "close");   // a bit too tall
+  assert.strictEqual(r.summary.kneeBend.grade, "close");      // knees a bit too straight
+  assert.ok(r.summary.kneeBend.off > 0);
+  assert.strictEqual(r.summary.forwardLean.grade, "close");   // standing a bit too tall
   assert.ok(r.summary.forwardLean.off < 0);
-  near(r.summary.strideExtension.value, 158, 3, "best push");
-  assert.ok(r.peaks.length >= 3 && r.peaks.length <= 5, "about 4 stride peaks, got " + r.peaks.length);
+  assert.strictEqual(r.summary.strideExtension.grade, "good"); // nice full pushes
+  near(r.summary.strideExtension.value, 168, 3, "best push");
+  assert.ok(r.peaks.length >= 2 && r.peaks.length <= 4, "a few stride peaks, got " + r.peaks.length);
   assert.ok(r.worstFrame > 36, "the biggest slip is near the tired end, got " + r.worstFrame);
+  assert.strictEqual(r.perFrame[r.worstFrame].scores.kneeBend.grade, "far");
   // The pro, compared with pro targets, is all green.
   const pro = [M.makeStancePose({ kneeBend: 110, forwardLean: 45, strideExtension: 171, push: 1 })];
   const rp = M.analyzeFrames(pro, targets.pro, targets.yellowZone);

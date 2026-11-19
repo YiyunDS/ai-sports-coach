@@ -151,7 +151,9 @@
         if (j < 0 || j >= ext.length || k === 0) continue;
         if (ext[j] > ext[i] || (ext[j] === ext[i] && j < i)) isTop = false;
       }
-      if (isTop && ext[i] >= bestExt - 8) { peaks.push(i); perFrame[i].isPeak = true; }
+      // It only counts as a push if one leg is clearly straighter than the other.
+      var legsDiffer = ext[i] - perFrame[i].m.kneeBend >= 12;
+      if (isTop && legsDiffer && ext[i] >= bestExt - 8) { peaks.push(i); perFrame[i].isPeak = true; }
     }
 
     // One number per check for the whole video.
@@ -356,8 +358,8 @@
 
   // ---------- A pretend kid, for trying the page without a video -----
 
-  // Makes a short "video" of poses: a skater who stands a bit too tall,
-  // and gets tired (straighter knees) near the end.
+  // Makes a short "video" of poses: a skater who stands too tall,
+  // and gets tired (even straighter knees) near the end. The pushes are good.
   function makeDemoFrames() {
     var frames = [], n = 60;
     for (var i = 0; i < n; i++) {
@@ -366,9 +368,9 @@
       var stride = (t * 4) % 1;                       // 4 strides
       var push = Math.pow(Math.sin(stride * Math.PI), 2);
       var pose = makeStancePose({
-        kneeBend: 128 + 22 * tired + 4 * Math.sin(i),
-        forwardLean: 24 - 12 * tired + 2 * Math.cos(i * 1.7),
-        strideExtension: 158,
+        kneeBend: 148 + 12 * tired + 3 * Math.sin(i),
+        forwardLean: 16 - 8 * tired + 2 * Math.cos(i * 1.7),
+        strideExtension: 168,
         push: push,
         pushSide: Math.floor(t * 4) % 2 ? "l" : "r"
       });
