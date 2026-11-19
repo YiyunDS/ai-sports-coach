@@ -74,7 +74,31 @@ the phase done. Small commits on `3d-coach`, no push.
 - Baseline screenshots in `docs/screenshots/before/`.
 - Test video copied to `local-videos/` (ignored by git).
 
-### Phase 1: Trustworthy kid pose (area c)
+### Phase 1: Trustworthy kid pose (area c) (done, option 1A)
+
+Results on the test clip (same click, skater in black at 1.0 s).
+"Per step" means between two frames 0.05 s apart.
+
+| Measure | Before | After |
+|---|---|---|
+| Thigh length over the clip | 0.12 to 0.47 m | one fixed length |
+| Left and right thigh | different | the same |
+| Skates on the ice | floating, sliding | one skate always on the ice, flat |
+| Knee angle change per step | 14.6° | 6.9° |
+| Lean change per step | 6.6° | 2.7° |
+| Steps with a skate jumping over 25 cm | about 15 | 4 (all next to gaps in the tracking) |
+| Frames from the wrong kid after the camera swing | yes (from 10.1 s on) | none, stops at 10.1 s |
+| Frames with the skater cut off by the picture edge | measured | skipped (5) |
+| Pose model | full | heavy (full and lite as backups) |
+
+Knee bend and lean now come from the flat picture when the skater is
+seen from the side (37 of 112 frames in this clip). The report says so,
+and the signs on the 3D skater show the same numbers as the cards.
+Screenshots: `docs/screenshots/phase1/sheet-phase1-before-after.png`.
+
+What is still rough: this clip is mostly filmed from behind and in
+front, so the 3D depth guess is weak, and the frames around gaps in the
+tracking still jump. A side-view clip is the next big improvement.
 
 **Option 1A: Keep MediaPipe, clean up the numbers properly (recommended)**
 - Switch to the `pose_landmarker_heavy` model (Apache 2.0, about 30 MB,

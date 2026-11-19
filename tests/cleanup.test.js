@@ -82,6 +82,24 @@ test("legs swapped in one pose get swapped back", function () {
   assert.ok(meanError(fixed.frames, clip.frames) < 1e-9);
 });
 
+test("a pose turned the wrong way for a moment gets turned back", function () {
+  var clip = cleanClip(), frames = clip.frames.slice();
+  var f = frames[25], hip = M.mid(f.lHip, f.rHip), a = 60 / 180 * Math.PI;
+  frames[25] = M.mapPose(f, function (q) {
+    var d = M.sub(q, hip);
+    return M.add(hip, M.pt(d.x * Math.cos(a) + d.z * Math.sin(a), d.y, -d.x * Math.sin(a) + d.z * Math.cos(a)));
+  });
+  var fixed = M.fixLegSwaps(frames, clip.times);
+  assert.ok(meanError([fixed.frames[25]], [clip.frames[25]]) < 1e-6);
+});
+
+test("left and right bones get the same length", function () {
+  var p = M.makeStancePose({ kneeBend: 115, forwardLean: 35, strideExtension: 165 });
+  p.rKnee = M.add(p.rHip, M.scale(M.sub(p.rKnee, p.rHip), 0.8)); // right thigh 20% short
+  var g = M.fixBoneLengths([p])[0];
+  assert.ok(Math.abs(boneLength(g, "lHip", "lKnee") - boneLength(g, "rHip", "rKnee")) < 1e-9);
+});
+
 test("every bone keeps one length, and the angles do not change", function () {
   var clip = cleanClip();
   // Stretch each pose by a different amount, like the AI does.

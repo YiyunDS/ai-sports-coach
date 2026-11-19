@@ -65,6 +65,11 @@ assert.strictEqual(T.cameraJumped([0.116, 0.05, 0.12], 0.05), false);
 assert.strictEqual(T.cameraJumped([0.18], 0.05), true);
 assert.strictEqual(T.cameraJumped([0.18], 0.2), false);
 
+// --- A skater cut off by the edge of the picture is not measured ---
+assert.strictEqual(T.touchesEdge({ cx: 640, cy: 360, w: 100, h: 300 }, 1280, 720), false);
+assert.strictEqual(T.touchesEdge({ cx: 40, cy: 360, w: 100, h: 300 }, 1280, 720), true);   // off the left side
+assert.strictEqual(T.touchesEdge({ cx: 640, cy: 600, w: 100, h: 300 }, 1280, 720), true);  // feet below the bottom
+
 // --- A skater who turns around during the clip still faces forward ---
 function spin(pose, angle) {
   var c = Math.cos(angle), s = Math.sin(angle), out = {};

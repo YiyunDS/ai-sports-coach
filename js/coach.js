@@ -30,8 +30,10 @@
   var MP_VERSION = "0.10.14";
   var MP_CODE = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@" + MP_VERSION + "/vision_bundle.mjs";
   var MP_WASM = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@" + MP_VERSION + "/wasm";
-  // Two sizes of the AI. "full" is more accurate; "lite" is the backup.
+  // Three sizes of the AI. "heavy" is the most accurate (and the slowest),
+  // "full" and "lite" are the backups if heavy will not start.
   var MP_MODELS = [
+    "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task",
     "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",
     "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task"
   ];
@@ -95,6 +97,7 @@
     times: null,      // the time in the video of each pose (seconds)
     track: null,      // what the AI saw in each pose: joints and box, in video pixels
     rhythm: null,     // the stride rhythm of each pose (which leg pushes, how far)
+    flat: null,       // knee and lean measured on the flat picture (side views only)
     span: 2,          // how many poses on each side count as "near" a push
     seed: null,       // where you clicked: { t, x, y } (x and y go from 0 to 1)
     analysis: null,   // scores for every pose
@@ -104,6 +107,9 @@
     hasVideo: false,
     busy: false
   };
+
+  // Lets us look inside from the browser's console while testing.
+  window.CoachState = state;
 
   function say(text) { el.status.textContent = text; }
 
@@ -149,7 +155,7 @@
       ", push " + rangeText(target.strideExtension) + ".";
 
     if (state.frames) {
-      state.analysis = M.analyzeFrames(state.frames, target, state.targets.yellowZone, state.span);
+      state.analysis = M.analyzeFrames(state.frames, target, state.targets.yellowZone, state.span, state.flat);
       drawCards(target);
       drawTimeline();
       showFrame(state.index);
@@ -190,7 +196,7 @@
       knee: COLORS[f.scores.kneeBend.grade],
       lean: COLORS[f.scores.forwardLean.grade],
       push: COLORS[f.scores.strideExtension.grade]
-    }, peak);
+    }, peak, f.m); // f.m = the numbers the report uses, so the signs match the cards
 
     // Tell the pro where the kid is in the stride, so they move together.
     var r = state.rhythm[i], next = state.rhythm[Math.min(n - 1, i + 1)];
@@ -372,8 +378,13 @@
 
   // rawFrames = poses straight from the AI. times = seconds for each.
   // track = what the AI saw in the video for each pose (or null for the sample).
-  function startReport(rawFrames, times, hasVideo, track) {
-    state.frames = M.normalizeFrames(rawFrames, { smooth: hasVideo });
+  // extra = { weights, flat } from a real video: how sure the AI was
+  //         about each joint, and the flat-picture angles (or null).
+  function startReport(rawFrames, times, hasVideo, track, extra) {
+    extra = extra || {};
+    state.frames = M.normalizeFrames(rawFrames, { smooth: hasVideo, times: times, weights: extra.weights });
+    state.raw = { frames: rawFrames, weights: extra.weights || null }; // kept so we can check the clean-up in the browser
+    state.flat = extra.flat || null;
     state.rhythm = M.strideSignal(state.frames);
     state.times = times;
     // "Near the top of a push" means within about 0.2 seconds. How many
@@ -555,6 +566,18 @@
     updateAnalyzeButton();
   }
 
+  // A tiny gray copy of the whole picture, used to notice when the
+  // camera cuts or swings away (see cameraJumped in tracker.js).
+  var thumbCanvas = document.createElement("canvas");
+  thumbCanvas.width = 32; thumbCanvas.height = 18;
+  var thumbContext = thumbCanvas.getContext("2d", { willReadFrequently: true });
+  function tinyPicture(video) {
+    thumbContext.drawImage(video, 0, 0, 32, 18);
+    var d = thumbContext.getImageData(0, 0, 32, 18).data, gray = [];
+    for (var i = 0; i < d.length; i += 4) gray.push((d[i] + d[i + 1] + d[i + 2]) / 3);
+    return gray;
+  }
+
   // The zoomed-in picture we hand to the AI.
   var cropCanvas = document.createElement("canvas");
   cropCanvas.width = cropCanvas.height = CROP;
@@ -564,6 +587,7 @@
   // Returns a list of people: { pts, box, world, clear }.
   //   pts   = joints in whole-video pixels      box = the box around them
   //   world = joints in 3D (meters)             clear = can we trust the legs?
+  //   sure  = how sure the AI is about each joint, by name
   function lookIn(finder, video, win) {
     cropContext.drawImage(video, win.x, win.y, win.size, win.size, 0, 0, CROP, CROP);
     var result = finder.detect(cropCanvas);
@@ -575,7 +599,11 @@
       var pts = flat.map(function (l) {
         return { x: win.x + l.x * win.size, y: win.y + l.y * win.size, v: l.visibility === undefined ? 1 : l.visibility };
       });
-      people.push({ pts: pts, box: T.boxOf(pts, 0.4), world: world, clear: M.poseIsClear(flat, MIN_VISIBILITY) });
+      people.push({
+        pts: pts, box: T.boxOf(pts, 0.4), world: world,
+        clear: M.poseIsClear(flat, MIN_VISIBILITY),
+        sure: M.mediapipeConfidence(flat) // how sure the AI is about each joint
+      });
     }
     return people;
   }
@@ -597,11 +625,22 @@
 
   // Follow the skater through the pictures listed in "order"
   // (forward in time, or backward), starting from where they were found.
-  async function follow(finder, video, times, order, start, W, H, found, onStep) {
+  //   startPicture = the tiny gray picture at the moment you clicked.
+  // Stops early if the camera cuts or swings away, and returns the time
+  // where it stopped (or null if it went all the way).
+  async function follow(finder, video, times, order, start, W, H, found, onStep, startPicture, gap) {
     var cur = start.box, prev = null, misses = 0;
+    var lastPicture = startPicture, changes = [];
     for (var k = 0; k < order.length; k++) {
       var i = order[k];
       await seek(video, times[i]);
+      var picture = tinyPicture(video);
+      changes.push(T.pictureChange(lastPicture, picture));
+      lastPicture = picture;
+      if (T.cameraJumped(changes, gap)) {
+        for (var rest = k; rest < order.length; rest++) onStep(); // keep the progress bar honest
+        return times[i];
+      }
       var guess = T.predict(prev, cur);
       var win = T.cropWindow(guess.cx, guess.cy, T.windowSize(cur, misses, H), W, H);
       var people = lookIn(finder, video, win);
@@ -624,6 +663,7 @@
       drawOverlay(found[i] || null, win);
       onStep();
     }
+    return null;
   }
 
   async function analyzeVideo() {
@@ -647,6 +687,7 @@
       if (!start) {
         throw new Error("No skater was found where you clicked. Slide to a frame where the skater is easier to see and click the middle of their body.");
       }
+      var startPicture = tinyPicture(video); // the video is still at the moment you clicked
 
       // Every moment we will look at. The click moment is one of them.
       var gap = Math.max(FRAME_GAP, duration / MAX_FRAMES);
@@ -661,20 +702,26 @@
       var forward = [], backward = [];
       for (var f = plan.seedIndex + 1; f < n; f++) forward.push(f);
       for (var b = plan.seedIndex - 1; b >= 0; b--) backward.push(b);
-      await follow(finder, video, times, forward, start, W, H, found, onStep);
-      await follow(finder, video, times, backward, start, W, H, found, onStep);
+      var stopLater = await follow(finder, video, times, forward, start, W, H, found, onStep, startPicture, gap);
+      var stopEarlier = await follow(finder, video, times, backward, start, W, H, found, onStep, startPicture, gap);
 
       // Keep the moments where we found the skater AND can trust the legs.
-      var raw = [], keptTimes = [], track = [], tracked = 0, heights = [];
+      var raw = [], keptTimes = [], track = [], tracked = 0, heights = [], weights = [], flat = [], sideCount = 0, cutOff = 0;
       for (var i = 0; i < n; i++) {
         if (!found[i]) continue;
         tracked++;
         var pose = M.mediapipeToPose(found[i].world);
         if (!found[i].clear || !M.limbsLookRight(pose)) continue;
+        if (T.touchesEdge(found[i].box, W, H)) { cutOff++; continue; } // part of the skater is outside the picture
         raw.push(pose);
         keptTimes.push(times[i]);
         track.push({ pts: found[i].pts, box: found[i].box });
         heights.push(found[i].box.h / H);
+        weights.push(found[i].sure);
+        // Filmed from the side? Then knee and lean from the flat picture.
+        var side = M.seenFromSide(pose);
+        flat.push(side ? M.measureFlat(found[i].pts) : null);
+        if (side) sideCount++;
       }
       el.trackInfo.textContent = "Followed in " + tracked + " of " + n + " frames · " + raw.length + " clear enough to measure";
 
@@ -682,10 +729,17 @@
         throw new Error("The skater was followed in " + tracked + " of " + n + " frames, but only " + raw.length +
           " were clear enough to measure. Try a clip filmed closer and from the side.");
       }
-      startReport(raw, keptTimes, true, track);
+      startReport(raw, keptTimes, true, track, { weights: weights, flat: flat });
 
       // Be honest about how much to trust these numbers.
       var notes = [];
+      if (stopLater !== null || stopEarlier !== null) {
+        notes.push("The camera cut or swung away" +
+          (stopEarlier !== null ? " at " + stopEarlier.toFixed(1) + " s" : "") +
+          (stopEarlier !== null && stopLater !== null ? " and" : "") +
+          (stopLater !== null ? " at " + stopLater.toFixed(1) + " s" : "") +
+          ", so the coach stopped following there.");
+      }
       var typical = M.percentile(heights, 0.5);
       if (typical < SMALL_SKATER) {
         notes.push("The skater is small in this video (about " + Math.round(typical * 100) +
@@ -693,6 +747,13 @@
       }
       if (raw.length < n * 0.5) {
         notes.push("Only " + raw.length + " of " + n + " frames could be measured. The skater was hidden, blurry or too far away in the rest.");
+      }
+      if (cutOff > 0) {
+        notes.push(cutOff + " frames were skipped because part of the skater was outside the picture.");
+      }
+      if (sideCount > 0) {
+        notes.push("Knee bend and lean were measured on the flat picture in " + sideCount + " of " + raw.length +
+          " frames, where the skater was seen from the side.");
       }
       notes.push("Angles are most accurate when the skater is filmed from the side.");
       el.qualityNote.textContent = notes.join(" ");

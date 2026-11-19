@@ -156,8 +156,12 @@
   // Add the angle signs and "pizza slices" to a skater.
   //   colors = { knee: "...", lean: "...", push: "..." }
   //   showPush = also label the pushing leg?
-  function decorate(fig, pose, colors, showPush) {
+  //   shown    = (optional) the numbers to print on the signs. The report
+  //              sometimes measures on the flat video picture, and the
+  //              signs should say the same numbers as the report.
+  function decorate(fig, pose, colors, showPush, shown) {
     var m = M.measurePose(pose), g = m.glideSide, p = m.pushSide;
+    if (shown) { m.kneeBend = shown.kneeBend; m.forwardLean = shown.forwardLean; m.strideExtension = shown.strideExtension; }
 
     // Knee angle of the glide leg.
     var knee = pose[g + "Knee"];

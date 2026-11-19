@@ -465,26 +465,52 @@
   // fit better with the poses around it as they are, or swapped?
   // If swapped fits much better, we swap them back.
   //   Returns { frames, swapped } where swapped[i] = true if we swapped.
+  //
+  // The AI also sometimes guesses the whole body turned the wrong way for
+  // a moment (most of all when it sees the skater from behind). So we
+  // also try turning the pose a little left or right around the hips,
+  // and keep the turn that fits the poses around it best.
   function fixLegSwaps(frames, times, reach) {
     reach = reach || 0.2;
     var swapped = [];
+    // Each joint measured from the middle of the hips, so a skater who
+    // moves across the ice still lines up with the poses around it.
+    function fromHips(pose) {
+      var hipMid = mid(pose.lHip, pose.rHip);
+      return mapPose(pose, function (q) { return sub(q, hipMid); });
+    }
+    function turnAroundHips(pose, angle) {
+      var hipMid = mid(pose.lHip, pose.rHip), c = Math.cos(angle), s = Math.sin(angle);
+      return mapPose(pose, function (q) {
+        var d = sub(q, hipMid);
+        return add(hipMid, pt(d.x * c + d.z * s, d.y, -d.x * s + d.z * c));
+      });
+    }
+    var centered = frames.map(fromHips);
     var out = frames.map(function (f, i) {
       var near = neighbors(times, i, reach, true);
       swapped.push(false);
       if (near.length < 2) return f;
+      var guess = {};
+      Object.keys(f).forEach(function (k) {
+        guess[k] = middlePoint(near.map(function (j) { return centered[j][k]; }));
+      });
       function misfit(pose) {
-        var total = 0;
-        ["l", "r"].forEach(function (s) {
-          LEG_PARTS.forEach(function (part) {
-            var k = s + part;
-            if (!pose[k]) return;
-            total += len(sub(pose[k], middlePoint(near.map(function (j) { return frames[j][k]; }))));
-          });
-        });
+        var c = fromHips(pose), total = 0;
+        Object.keys(c).forEach(function (k) { total += len(sub(c[k], guess[k])); });
         return total;
       }
-      var flipped = swapLegs(f);
-      if (misfit(flipped) < 0.6 * misfit(f)) { swapped[i] = true; return flipped; }
+      var best = f, bestMisfit = misfit(f), bestSwapped = false;
+      [false, true].forEach(function (legs) {
+        for (var deg = -90; deg <= 90; deg += 15) {
+          if (!legs && deg === 0) continue;
+          var tryPose = turnAroundHips(legs ? swapLegs(f) : f, deg / DEG);
+          var m = misfit(tryPose);
+          if (m < bestMisfit) { best = tryPose; bestMisfit = m; bestSwapped = legs; }
+        }
+      });
+      // Only change the pose if the fix fits MUCH better.
+      if (bestMisfit < 0.6 * misfit(f)) { swapped[i] = bestSwapped; return best; }
       return f;
     });
     return { frames: out, swapped: swapped };
@@ -579,8 +605,20 @@
       g.neck = mid(f.lShoulder, f.rShoulder); // the neck sits between the shoulders
       return g;
     });
+    var middle = {};
+    BONE_CHAIN.forEach(function (b) {
+      middle[b.join(">")] = percentile(withMid.map(function (f) { return len(sub(f[b[1]], f[b[0]])); }), 0.5);
+    });
+    // Your left arm is as long as your right arm, so each left bone and
+    // its right twin get the same length (the average of the two).
+    function twin(name) {
+      if (/^l[A-Z]/.test(name)) return "r" + name.slice(1);
+      if (/^r[A-Z]/.test(name)) return "l" + name.slice(1);
+      return name;
+    }
     var lengths = BONE_CHAIN.map(function (b) {
-      return percentile(withMid.map(function (f) { return len(sub(f[b[1]], f[b[0]])); }), 0.5);
+      var other = middle[twin(b[0]) + ">" + twin(b[1])];
+      return other === undefined ? middle[b.join(">")] : (middle[b.join(">")] + other) / 2;
     });
     return withMid.map(function (f) {
       var out = mapPose(f, function (q) { return q; });

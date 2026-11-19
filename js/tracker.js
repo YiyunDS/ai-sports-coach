@@ -142,10 +142,20 @@
     return (changes[n - 1] + changes[n - 2] + changes[n - 3]) / 3 > 0.11 * more;
   }
 
+  // Is part of the skater outside the picture? Then the AI is guessing
+  // where the hidden joints are, and we should not measure this moment.
+  // We say yes if the box around them touches the edge of the picture.
+  //   margin = how close to the edge counts as touching (part of the picture)
+  function touchesEdge(box, W, H, margin) {
+    var m = (margin === undefined ? 0.01 : margin) * Math.min(W, H);
+    return box.cx - box.w / 2 < m || box.cx + box.w / 2 > W - m ||
+           box.cy - box.h / 2 < m || box.cy + box.h / 2 > H - m;
+  }
+
   var api = {
     clamp: clamp, boxOf: boxOf, cropWindow: cropWindow, windowSize: windowSize,
     predict: predict, pickCandidate: pickCandidate, pickClicked: pickClicked, sampleTimes: sampleTimes,
-    pictureChange: pictureChange, cameraJumped: cameraJumped
+    pictureChange: pictureChange, cameraJumped: cameraJumped, touchesEdge: touchesEdge
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.CoachTracker = api;
