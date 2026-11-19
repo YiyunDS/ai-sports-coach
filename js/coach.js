@@ -427,7 +427,11 @@
       console.error(err);
       var msg = err && err.message ? err.message : String(err);
       if (/import|fetch|network|load/i.test(msg) && !/video|skater/i.test(msg)) {
-        msg = "The pose-detection model could not load. Check the internet connection and try again.";
+        // A page shared online is not allowed to download the model, so video
+        // analysis only works when the page is opened from your own computer.
+        msg = location.protocol === "file:" || /^(localhost|127\.0\.0\.1)$/.test(location.hostname)
+          ? "The pose-detection model could not load. Check the internet connection and try again."
+          : "Video analysis is blocked in this online preview. Download the project and open index.html on your computer, or use Load sample session here.";
       }
       say(msg);
     } finally {
