@@ -5,7 +5,7 @@
 //    1. You pick a video, your age, and Beginner or Experienced.
 //    2. You click the skater you want. The tracker (tracker.js) follows
 //       that one skater, and a pose-finding AI (MediaPipe) looks at a
-//       zoomed-in picture of them about 10 times per second to find
+//       zoomed-in picture of them about 20 times per second to find
 //       their joints.
 //    3. We measure your angles (the math is in angles.js).
 //    4. We compare them with the goal numbers from targets.json.
@@ -36,8 +36,9 @@
     "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task"
   ];
 
-  var MAX_FRAMES = 150;     // never look at more pictures than this
-  var FRAME_GAP = 0.1;      // seconds between pictures (10 per second)
+  var MAX_FRAMES = 400;     // never look at more pictures than this
+  var FRAME_GAP = 0.05;     // seconds between pictures (20 per second)
+  var DEMO_GAP = 0.1;       // the sample session has 10 poses per second
   var MIN_VISIBILITY = 0.5; // how sure the AI must be that it sees a joint
   var CROP = 512;           // the zoomed-in picture we hand to the AI is 512 x 512 dots
   var SMALL_SKATER = 0.18;  // skater shorter than this part of the picture = "far away"
@@ -93,6 +94,8 @@
     frames: null,     // the kid's poses, turned to face the same way as the pro
     times: null,      // the time in the video of each pose (seconds)
     track: null,      // what the AI saw in each pose: joints and box, in video pixels
+    rhythm: null,     // the stride rhythm of each pose (which leg pushes, how far)
+    span: 2,          // how many poses on each side count as "near" a push
     seed: null,       // where you clicked: { t, x, y } (x and y go from 0 to 1)
     analysis: null,   // scores for every pose
     index: 0,         // which pose we are showing now
@@ -146,7 +149,7 @@
       ", push " + rangeText(target.strideExtension) + ".";
 
     if (state.frames) {
-      state.analysis = M.analyzeFrames(state.frames, target, state.targets.yellowZone);
+      state.analysis = M.analyzeFrames(state.frames, target, state.targets.yellowZone, state.span);
       drawCards(target);
       drawTimeline();
       showFrame(state.index);
@@ -157,15 +160,24 @@
 
   // Is this moment at (or right next to) the top of a push?
   function nearPeak(i) {
-    var f = state.analysis.perFrame;
-    return !!(f[i].isPeak || (f[i - 1] && f[i - 1].isPeak) || (f[i + 1] && f[i + 1].isPeak));
+    var f = state.analysis.perFrame, reach = Math.ceil(state.span / 2);
+    for (var j = i - reach; j <= i + reach; j++) if (f[j] && f[j].isPeak) return true;
+    return false;
   }
 
-  function showFrame(i) {
+  // Draw one moment.
+  //   i     = which pose
+  //   blend = how far along we are toward the NEXT pose (0 to 1). This
+  //           is what makes the replay smooth: we draw the in-between.
+  //   fromVideo = true while the video itself is playing (then we must
+  //           not tell the video to jump, it is already moving)
+  function render(i, blend, fromVideo) {
     var n = state.frames.length;
     i = M.clamp(i, 0, n - 1);
+    if (i >= n - 1) blend = 0;
     state.index = i;
-    var pose = state.frames[i], f = state.analysis.perFrame[i], peak = nearPeak(i);
+    var f = state.analysis.perFrame[i], peak = nearPeak(i);
+    var pose = blend > 0 ? M.lerpPose(state.frames[i], state.frames[i + 1], blend) : state.frames[i];
 
     // Pick the traffic-light color for each joint.
     var grades = {};
@@ -180,19 +192,29 @@
       push: COLORS[f.scores.strideExtension.grade]
     }, peak);
 
-    el.frameInfo.textContent = "Frame " + (i + 1) + " / " + n + "  ·  " + state.times[i].toFixed(1) + " s";
+    // Tell the pro where the kid is in the stride, so they move together.
+    var r = state.rhythm[i], next = state.rhythm[Math.min(n - 1, i + 1)];
+    var push = blend > 0 && next.side === r.side ? M.lerpNum(r.push, next.push, blend) : r.push;
+    // Turn "how far out is the leg" into "how far through the stride":
+    // 0 to 0.5 while the leg goes out, 0.5 to 1 while it comes back.
+    var part = Math.asin(Math.sqrt(M.clamp(push / r.peak, 0, 1))) / Math.PI;
+    C.setSync({ push: push, side: r.side, phase: r.rising ? part : 1 - part, stride: r.stride });
+
+    var now = blend > 0 ? M.lerpNum(state.times[i], state.times[i + 1], blend) : state.times[i];
+    el.frameInfo.textContent = "Frame " + (i + 1) + " / " + n + "  ·  " + now.toFixed(1) + " s";
     drawTimeline();
 
     // Show the same moment in the video, with what the AI saw drawn on top.
     if (state.hasVideo) {
-      if (!el.preview.seeking) {
+      if (!fromVideo && !el.preview.seeking) {
         try { el.preview.currentTime = state.times[i]; } catch (e) { /* video not ready - no problem */ }
       }
       if (state.track && state.track[i]) drawOverlay(state.track[i], null);
-      el.pickTime.value = String(state.times[i]);
-      el.pickOut.textContent = state.times[i].toFixed(1) + " s";
+      el.pickTime.value = String(now);
+      el.pickOut.textContent = now.toFixed(1) + " s";
     }
   }
+  function showFrame(i) { render(i, 0, false); }
 
   // ---------- The report cards ----------------------------------------
 
@@ -297,16 +319,29 @@
   // ---------- Playing the replay ---------------------------------------
 
   function setPlaying(on) {
-    if (on && state.frames) {
+    on = !!(on && state.frames);
+    if (on) {
       // If we are at the end, start over.
       if (state.index >= state.frames.length - 1) state.index = 0;
       state.playClock = state.times[state.index];
       showFrame(state.index);
+      // Play the real video too, at the chosen speed. The 3D skaters
+      // then follow the video's own clock, so everything moves together.
+      if (state.hasVideo) {
+        el.preview.playbackRate = Number(el.speed.value);
+        var started = el.preview.play();
+        if (started && started.catch) started.catch(function () { /* the 3D replay still runs on its own clock */ });
+      }
+    } else if (state.hasVideo && !el.preview.paused) {
+      el.preview.pause();
     }
-    state.playing = !!(on && state.frames);
+    state.playing = on;
     el.play.textContent = state.playing ? "Pause" : "Play";
   }
   el.play.addEventListener("click", function () { setPlaying(!state.playing); });
+  el.speed.addEventListener("change", function () {
+    if (state.playing && state.hasVideo) el.preview.playbackRate = Number(el.speed.value);
+  });
   el.worst.addEventListener("click", function () {
     if (!state.analysis) return;
     setPlaying(false);
@@ -316,11 +351,21 @@
   // scene.js calls this about 60 times a second.
   C.onTick.push(function (dt) {
     if (!state.playing) return;
-    state.playClock += dt * Number(el.speed.value);
+    var videoRuns = state.hasVideo && !el.preview.paused && !el.preview.seeking;
+    if (videoRuns) state.playClock = el.preview.currentTime;      // follow the video
+    else if (!state.hasVideo) state.playClock += dt * Number(el.speed.value); // sample session: our own clock
+    else if (el.preview.paused && !el.preview.ended) state.playClock += dt * Number(el.speed.value); // video would not play
     var i = state.index, last = state.frames.length - 1;
     while (i < last && state.times[i + 1] <= state.playClock) i++;
-    if (i !== state.index) showFrame(i);
-    if (i >= last) setPlaying(false);
+    // How far are we between this pose and the next one?
+    var blend = 0;
+    if (i < last) {
+      var gap = state.times[i + 1] - state.times[i];
+      // (If the skater was lost for a while, the gap is long: hold still instead of sliding.)
+      if (gap > 0 && gap <= 0.3) blend = M.clamp((state.playClock - state.times[i]) / gap, 0, 1);
+    }
+    render(i, blend, videoRuns);
+    if (i >= last || (state.hasVideo && el.preview.ended)) setPlaying(false);
   });
 
   // ---------- Starting a new report ------------------------------------
@@ -329,7 +374,12 @@
   // track = what the AI saw in the video for each pose (or null for the sample).
   function startReport(rawFrames, times, hasVideo, track) {
     state.frames = M.normalizeFrames(rawFrames, { smooth: hasVideo });
+    state.rhythm = M.strideSignal(state.frames);
     state.times = times;
+    // "Near the top of a push" means within about 0.2 seconds. How many
+    // poses that is depends on how many poses per second we have.
+    var perPose = times.length > 1 ? (times[times.length - 1] - times[0]) / (times.length - 1) : DEMO_GAP;
+    state.span = Math.round(M.clamp(0.2 / Math.max(0.01, perPose), 2, 6));
     state.hasVideo = hasVideo;
     state.track = track || null;
     state.index = 0;
@@ -343,7 +393,7 @@
   el.demo.addEventListener("click", function () {
     if (state.busy) return;
     var raw = M.makeDemoFrames();
-    startReport(raw, raw.map(function (_, i) { return i * FRAME_GAP; }), false, null);
+    startReport(raw, raw.map(function (_, i) { return i * DEMO_GAP; }), false, null);
     say("Sample session loaded: a skater who stands a little too tall and tires near the end.");
   });
 

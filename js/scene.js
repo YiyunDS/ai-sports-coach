@@ -181,18 +181,55 @@
     return m;
   }
 
+  // ---- Making the pro move like a real person ----
+  // "sync" is set by coach.js when there is a kid on the ice: it tells
+  // the pro which leg the kid is pushing with and how far, so both
+  // skaters stride in step.  null = the pro skates on its own clock.
+  var sync = null;
+  // The angles the pro is showing right now. They drift toward the
+  // angles it "wants", so nothing ever snaps.
+  var live = { knee: reference.kneeBend, lean: reference.forwardLean, ext: reference.strideExtension };
+
+  // Nobody skates every stride exactly the same. wobble() gives a
+  // number from -1 to 1 that is different for every stride number,
+  // but always the same for the same stride (so nothing flickers).
+  function wobble(strideNumber, which) {
+    var x = Math.sin(strideNumber * 12.9898 + which * 78.233) * 43758.5453;
+    return (x - Math.floor(x)) * 2 - 1;
+  }
+
   // Build the blue skater's pose for this moment and draw it.
-  function drawReference() {
-    var push = 0, side = "r";
-    if (strideOn) {
+  //   dt = seconds since the last picture
+  function drawReference(dt) {
+    var push = 0, side = "r", phase = 0, stride = 0, moving = false;
+    if (sync) {
+      push = sync.push; side = sync.side; phase = sync.phase; stride = sync.stride; moving = true;
+    } else if (strideOn) {
       // One push takes 1.6 seconds. Right leg, then left leg, and so on.
       var cycle = strideClock / 1.6;
-      side = Math.floor(cycle) % 2 ? "l" : "r";
-      push = Math.pow(Math.sin((cycle % 1) * Math.PI), 2);
+      stride = Math.floor(cycle);
+      side = stride % 2 ? "l" : "r";
+      phase = cycle % 1;
+      push = Math.pow(Math.sin(phase * Math.PI), 2);
+      moving = true;
     }
+    // What the pro is aiming for on THIS stride: a little deeper or
+    // taller, a little more or less lean, and not always a full push.
+    // The left leg is a touch weaker, like most real skaters' off side.
+    var want = { knee: reference.kneeBend, lean: reference.forwardLean, ext: reference.strideExtension };
+    if (moving) {
+      want.knee += 4 * wobble(stride, 1);
+      want.lean += 3 * wobble(stride, 2);
+      want.ext -= 5 * Math.abs(wobble(stride, 3)) + (side === "l" ? 2 : 0);
+    }
+    var ease = 1 - Math.exp(-(dt || 0) / 0.25); // drift there over about a quarter second
+    live.knee += (want.knee - live.knee) * ease;
+    live.lean += (want.lean - live.lean) * ease;
+    live.ext += (want.ext - live.ext) * ease;
+
     var pose = M.makeStancePose({
-      kneeBend: reference.kneeBend, forwardLean: reference.forwardLean,
-      strideExtension: reference.strideExtension, push: push, pushSide: side, withStick: true
+      kneeBend: live.knee, forwardLean: live.lean, strideExtension: live.ext,
+      push: push, pushSide: side, phase: phase, natural: moving, withStick: true
     });
     refFigure.update(pose);
     decorate(refFigure, pose, { knee: BLUE, lean: BLUE, push: BLUE }, push > 0.35);
@@ -268,8 +305,10 @@
     var dt = Math.min(0.1, (now - lastTime) / 1000); // seconds since last picture
     lastTime = now;
     if (strideOn) strideClock += dt;
-    drawReference();
+    // Other files go first (coach.js picks the kid's pose and tells the
+    // pro where in the stride to be), then we draw the pro to match.
     onTick.forEach(function (fn) { fn(dt); });
+    drawReference(dt);
     controls.update();
     renderer.render(scene, camera);
     requestAnimationFrame(tick);
@@ -282,6 +321,7 @@
   });
   var strideBtn = document.getElementById("stride-btn");
   strideBtn.addEventListener("click", function () {
+    if (sync) return; // while synced, the kid's stride drives the pro
     strideOn = !strideOn;
     strideClock = 0;
     strideBtn.textContent = strideOn ? "Hold stance" : "Play stride";
@@ -395,6 +435,18 @@
     setReference: function (angles, name) {
       reference = angles;
       refFigure.name = name;
+    },
+    // Make the pro stride in step with the kid.
+    //   s = { push, side, phase, stride }   or null to stop syncing
+    setSync: function (s) {
+      var was = !!sync;
+      sync = s;
+      if (was !== !!s) {
+        strideOn = false;
+        strideBtn.disabled = !!s;
+        strideBtn.setAttribute("aria-pressed", "false");
+        strideBtn.textContent = s ? "Pro synced to skater" : "Play stride";
+      }
     }
   };
 })();

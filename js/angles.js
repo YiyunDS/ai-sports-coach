@@ -123,7 +123,10 @@
 
   // frames = a list of poses, one for each moment of the video.
   // target = the three ranges from getTarget().
-  function analyzeFrames(frames, target, yellowZone) {
+  // span   = how many poses to each side we compare when looking for the
+  //          top of a push (2 is right for 10 poses per second).
+  function analyzeFrames(frames, target, yellowZone, span) {
+    span = span || 2;
     var CHECKS = ["kneeBend", "forwardLean", "strideExtension"];
     var perFrame = frames.map(function (pose) {
       var m = measurePose(pose);
@@ -146,7 +149,7 @@
     var peaks = [];
     for (var i = 0; i < ext.length; i++) {
       var isTop = true;
-      for (var k = -2; k <= 2; k++) {
+      for (var k = -span; k <= span; k++) {
         var j = i + k;
         if (j < 0 || j >= ext.length || k === 0) continue;
         if (ext[j] > ext[i] || (ext[j] === ext[i] && j < i)) isTop = false;
@@ -207,11 +210,22 @@
   // opts.push            0 = both feet under you, 1 = full push
   // opts.pushSide        "r" or "l" = which leg pushes
   // opts.withStick       true = also add a hockey stick
+  // opts.natural         true = move like a real skater, not a robot:
+  //                      sink into the push, turn the shoulders, sway the
+  //                      stick, and lift the skate while bringing it back
+  // opts.phase           where we are in one push, from 0 to 1.
+  //                      0 to 0.5 = pushing out, 0.5 to 1 = bringing the leg back
   // The skater faces +x. Their LEFT side is -z, RIGHT side is +z.
   function makeStancePose(opts) {
-    var knee = opts.kneeBend, lean = opts.forwardLean / DEG;
     var push = clamp(opts.push || 0, 0, 1);
     var pushSide = opts.pushSide || "r";
+    var real = opts.natural ? 1 : 0;
+    var side = pushSide === "l" ? -1 : 1;   // -1 = left leg pushes, +1 = right
+    // "back" goes 0 -> 1 -> 0 while the pushing leg is coming back in.
+    var back = real && opts.phase > 0.5 ? Math.sin((opts.phase - 0.5) * 2 * Math.PI) : 0;
+    // A real skater sinks a little deeper and leans a little more as they push.
+    var knee = opts.kneeBend - real * 4 * push;
+    var lean = (opts.forwardLean + real * 3 * push) / DEG;
     var B = BODY, p = {};
 
     // --- Glide leg: stack shin, then thigh, from the skate up. ---
@@ -238,36 +252,44 @@
     if (push > 0) {
       var s = pushSide, out = s === "l" ? -1 : 1;
       var hip = p[s + "Hip"];
-      var pushKnee = lerpNum(knee, opts.strideExtension, push) / DEG;
+      // Coming back, the knee folds a bit more and the skate lifts off the ice.
+      var pushKnee = (lerpNum(knee, opts.strideExtension, push) - 18 * back) / DEG;
+      var lift = 0.07 * back;
       // How far is the skate from the hip when the knee is this straight?
       var reach = Math.sqrt(B.thigh * B.thigh + B.shin * B.shin -
         2 * B.thigh * B.shin * Math.cos(pushKnee));
-      var drop = hip.y - B.ankleHeight; // the skate stays on the ice
+      var drop = hip.y - B.ankleHeight - lift; // the skate stays on the ice while pushing
       var flat = Math.sqrt(Math.max(0, reach * reach - drop * drop));
       var swing = (125 * push) / DEG;    // 0 = straight ahead, 125 = out and back
-      var ankle = pt(hip.x + flat * Math.cos(swing), B.ankleHeight, hip.z + out * flat * Math.sin(swing));
+      var ankle = pt(hip.x + flat * Math.cos(swing), B.ankleHeight + lift, hip.z + out * flat * Math.sin(swing));
       var leg = solveTwoBone(hip, ankle, B.thigh, B.shin, pt(1, 0, out * 0.3 * push));
       p[s + "Knee"] = leg.mid;
       p[s + "Ankle"] = leg.end;
       // The pushing skate turns outward.
       var turn = (50 * push) / DEG;
       var fx = Math.cos(turn), fz = out * Math.sin(turn);
-      p[s + "Toe"] = pt(leg.end.x + B.footFront * fx, 0.03, leg.end.z + B.footFront * fz);
-      p[s + "Heel"] = pt(leg.end.x - B.footBack * fx, 0.03, leg.end.z - B.footBack * fz);
+      p[s + "Toe"] = pt(leg.end.x + B.footFront * fx, 0.03 + lift * 0.6, leg.end.z + B.footFront * fz);
+      p[s + "Heel"] = pt(leg.end.x - B.footBack * fx, 0.03 + lift * 1.3, leg.end.z - B.footBack * fz);
     }
 
     // --- Upper body: tip the back forward by the lean angle. ---
     var hipMid = pt(hipX, hipY, 0);
     var neck = add(hipMid, pt(B.trunk * Math.sin(lean), B.trunk * Math.cos(lean), 0));
     p.neck = neck;
-    p.lShoulder = add(neck, pt(0, 0, -B.shoulderHalf));
-    p.rShoulder = add(neck, pt(0, 0, B.shoulderHalf));
+    // The shoulders turn against the legs: when the right leg pushes
+    // back, the right shoulder comes forward. That keeps you balanced.
+    var twist = (real * side * push * 14) / DEG;
+    var across = pt(B.shoulderHalf * Math.sin(twist), 0, B.shoulderHalf * Math.cos(twist));
+    p.lShoulder = sub(neck, across);
+    p.rShoulder = add(neck, across);
     // The head looks up the ice, so it tips only half as much as the back.
     p.head = add(neck, pt(B.neckToHead * Math.sin(lean * 0.5), B.neckToHead * Math.cos(lean * 0.5), 0));
 
     // --- Arms and stick: both hands in front, blade on the ice. ---
-    var topHand = add(hipMid, pt(0.22, 0.02, -0.02));       // left hand, top of the stick
-    var blade = pt(hipX + 0.85, 0.02, 0.45);                // where the blade touches the ice
+    // With each push the hands and the stick blade sway a little to the side.
+    var sway = real * side * push;
+    var topHand = add(hipMid, pt(0.22, 0.02, -0.02 - 0.07 * sway));  // left hand, top of the stick
+    var blade = pt(hipX + 0.85, 0.02, 0.45 - 0.22 * sway);           // where the blade touches the ice
     var lArm = solveTwoBone(p.lShoulder, topHand, B.upperArm, B.foreArm, pt(-0.3, -0.5, -0.6));
     var stickDir = norm(sub(blade, lArm.end));
     var lowHand = add(lArm.end, scale(stickDir, 0.28));     // right hand, lower on the stick
@@ -432,6 +454,17 @@
         });
         return calm;
       });
+      // ...and then blends a little with its neighbors (half itself,
+      // a quarter of each neighbor) so the motion flows.
+      var sharp = out;
+      out = sharp.map(function (f, i) {
+        if (i === 0 || i === n - 1) return f;
+        var soft = {};
+        Object.keys(f).forEach(function (k) {
+          soft[k] = add(scale(f[k], 0.5), scale(add(sharp[i - 1][k], sharp[i + 1][k]), 0.25));
+        });
+        return soft;
+      });
     }
 
     // Stand each pose on the ice with the hips over the middle.
@@ -441,6 +474,60 @@
       var shift = pt(-hipMid.x, 0.03 - lowest, -hipMid.z);
       return mapPose(turned, function (q) { return add(q, shift); });
     });
+  }
+
+  // ---------- Moving smoothly, and finding the rhythm of the stride ---
+
+  // A pose part-way between pose a (t = 0) and pose b (t = 1).
+  // We use this to draw the moments BETWEEN two pictures of the video,
+  // so the 3D skater glides instead of jumping.
+  function lerpPose(a, b, t) {
+    var out = {};
+    Object.keys(a).forEach(function (k) { out[k] = b[k] ? lerp(a[k], b[k], t) : a[k]; });
+    return out;
+  }
+
+  // For every pose (already turned to face +x by normalizeFrames), work
+  // out the RHYTHM of the stride, so the pro can skate in step with the kid:
+  //   side   = which leg is pushing ("l" or "r")
+  //   push   = how far into the push, 0 (feet together) to 1 (full push)
+  //   rising = true while the leg is going out, false while it comes back
+  //   stride = a counter that goes up by 1 with every new push
+  //   peak   = how big the push gets at its farthest point in this stride
+  // We look at how far each skate is from under the hips. The skate
+  // that is farther away is the one pushing.
+  function strideSignal(frames) {
+    var n = frames.length;
+    if (!n) return [];
+    var diff = frames.map(function (f) {
+      var hipMid = mid(f.lHip, f.rHip);
+      var l = len(flat(sub(f.lAnkle, hipMid))), r = len(flat(sub(f.rAnkle, hipMid)));
+      return l - r; // plus = left skate is farther out, minus = right skate
+    });
+    // Smooth it a little so one wobbly pose does not look like a stride.
+    var smooth = diff.map(function (d, i) {
+      return (diff[Math.max(0, i - 1)] + 2 * d + diff[Math.min(n - 1, i + 1)]) / 4;
+    });
+    // A full push = about the biggest gap we see (but never less than
+    // 25 cm, so a skater who is only gliding does not look like striding).
+    var full = Math.max(0.25, percentile(smooth.map(Math.abs), 0.9));
+    var side = smooth[0] >= 0 ? "l" : "r", stride = 0;
+    var out = smooth.map(function (d) {
+      var push = clamp(Math.abs(d) / full, 0, 1);
+      var now = d >= 0 ? "l" : "r";
+      // Only switch legs when the new leg is clearly out (not on a wobble).
+      if (now !== side && push > 0.15) { side = now; stride++; }
+      return { side: side, push: now === side ? push : 0, rising: true, stride: stride };
+    });
+    // In each stride, the leg goes OUT until its farthest point, then
+    // comes BACK. Find the farthest point of every stride.
+    var top = {};
+    out.forEach(function (o, i) { if (top[o.stride] === undefined || o.push > out[top[o.stride]].push) top[o.stride] = i; });
+    out.forEach(function (o, i) {
+      o.rising = i <= top[o.stride];
+      o.peak = Math.max(0.05, out[top[o.stride]].push); // how big this stride's push gets
+    });
+    return out;
   }
 
   // ---------- A pretend kid, for trying the page without a video -----
@@ -481,6 +568,7 @@
     MP: MP, mediapipeToPose: mediapipeToPose, poseIsClear: poseIsClear,
     facingAngle: facingAngle, normalizeFrames: normalizeFrames,
     forwardVote: forwardVote, swapSides: swapSides, limbsLookRight: limbsLookRight,
+    lerpPose: lerpPose, lerpNum: lerpNum, strideSignal: strideSignal,
     makeDemoFrames: makeDemoFrames
   };
 

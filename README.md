@@ -76,7 +76,7 @@ This branch shows skating form in **3D**. A blue "pro" skater stands in a good h
 4. **Pick your age** (6 to 12) and **Beginner** or **Experienced**.
 5. Press **Analyze video**. The coach zooms in on your skater about 10 times per second and draws a white skeleton on the video. **Check that the skeleton sits on the right skater.** If it does not, the numbers mean nothing: click the skater again on a clearer frame.
 6. **Read your report.** The orange skater is you. Joints turn green (inside the goal), yellow (almost) or red (work on this one). Each check gets a tip.
-7. **Watch the replay.** The colored stripes show every moment of your video. Press **Jump to the biggest slip** to see where your form slipped the most.
+7. **Watch the replay.** The video, your orange skater and the blue pro all move together: when you push with your right leg, the pro pushes with the right leg too, so you can compare the same moment of the stride. The coach looks at about 20 pictures per second and draws the moments in between, so the motion is smooth. The pro is not a robot: every stride is a little different, the shoulders turn, the stick sways and the skate lifts as the leg comes back. The colored stripes show every moment of your video. Press **Jump to the biggest slip** to see where your form slipped the most.
 
 No video handy? Press **Load sample session** to see how it works.
 
