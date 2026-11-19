@@ -58,6 +58,22 @@ Paste the matching starter prompt from [`prompts/`](prompts/) into each one.
 - How long did it take to build, and how many fixes did it need?
 - Which one do we like best? **The team votes**, and the winner gets merged into `main`.
 
+## Health & Dryland Coach (branch `health-coach`)
+
+A single web page that checks skating, compares it with Fitbit heart-rate readings, and checks dryland squats and lunges. No server and nothing to install. Videos and heart-rate numbers stay on your device.
+
+**Open it:** in the `coach-health` folder run `python3 -m http.server 8000`, then visit `http://localhost:8000` in Chrome. (Double-clicking `index.html` also works, but then `targets.json` can't be read and built-in default targets are used.) You need internet the first time so the browser can download the AI (MediaPipe) and Chart.js.
+
+**Use it:**
+1. Choose **Skating** or **Dryland**, pick a video, and pick your age (6-12).
+2. Skating: pick Beginner or Experienced. Dryland: pick Squat or Lunge.
+3. Press **Check my video**. Wait for the AI to look through the clip, then press play to see your skeleton.
+4. Skating only: type Fitbit readings (time in the video like `1:30`, and beats per minute) and press Add. You will see the score graph next to the heart-rate graph, and a note (with a rest-break suggestion) if your form got sloppy when your heart was racing. "Try example" fills in practice numbers.
+
+**Change the targets:** open `targets.json` in a text editor and change the numbers (angles in degrees). Keep the same numbers in `FALLBACK_TARGETS` at the top of `app.js` if you want the double-click version to match.
+
+**Files:** `index.html` (page), `style.css` (looks), `app.js` (video, AI, charts), `angles.js` (angle math), `targets.json` (good-form numbers), `tests/angles.test.js` (run with `node tests/angles.test.js`).
+
 ## Ideas for later
 
 - **Shooting**: weight shift and stick follow-through.
