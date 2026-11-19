@@ -58,6 +58,51 @@ Paste the matching starter prompt from [`prompts/`](prompts/) into each one.
 - How long did it take to build, and how many fixes did it need?
 - Which one do we like best? **The team votes**, and the winner gets merged into `main`.
 
+## 3D Visual Coach (branch `3d-coach`)
+
+This branch shows skating form in **3D**. A blue "pro" skater stands in a good hockey stance, and an orange skater copies **your** pose from a video so you can compare them side by side.
+
+### How to open it
+
+1. Download or clone this branch.
+2. Double-click **`index.html`**. It opens in your browser (Chrome, Edge, Firefox or Safari). You need the internet the first time, because the page downloads the 3D library and the pose-finding AI.
+3. No install and no server are needed.
+
+### How to use it
+
+1. **Look at the pro.** Drag to spin the view, scroll or pinch to zoom. The signs show the knee angle and the forward lean. Press **Show the stride** to watch a push.
+2. **Pick a skating video.** It works best filmed from the side with your whole body in the picture. One skater at a time.
+3. **Pick your age** (6 to 12) and **Beginner** or **Experienced**.
+4. Press **Find my pose**. The AI looks at about 10 pictures per second of your video.
+5. **Read your report.** The orange skater is you. Joints turn green (inside the goal), yellow (almost) or red (work on this one). Each check gets a tip.
+6. **Watch the replay.** The colored stripes show every moment of your video. Press **Jump to the biggest slip** to see where your form slipped the most.
+
+No video handy? Press **Try a pretend skater** to see how it works.
+
+### Changing the goal angles
+
+The goal angles live in [`targets.json`](targets.json). There is one set for each age band (6-8, 9-10, 11-12) and each level, plus one for the pro. To try your own numbers, edit the file and use **Goal numbers > Load my targets.json** on the page. To make them the new normal, also copy the file into `js/default-targets.js`.
+
+**The numbers in `targets.json` are starter guesses.** We still need to measure real clips and write down where they came from in [`SOURCES.md`](SOURCES.md).
+
+### What is in this branch
+
+| File | What it does |
+|---|---|
+| `index.html`, `style.css` | The page and its colors |
+| `targets.json` | The goal angles (kids can edit) |
+| `js/angles.js` | The math: measures angles and scores them |
+| `js/figure.js` | Draws one 3D skater from balls, tubes and boxes |
+| `js/scene.js` | The rink, lights, camera and the pro skater |
+| `js/coach.js` | Reads your video, finds your pose, makes the report and replay |
+| `tests/angles.test.js` | Checks the math. Run `node tests/angles.test.js` |
+
+### Good to know
+
+- **Your video stays on your computer.** The page only downloads code: three.js from cdnjs and jsDelivr, MediaPipe from jsDelivr, and the pose model from Google's MediaPipe storage.
+- The orange skater has no stick, because the AI finds body joints, not sticks.
+- The AI has to guess how deep things are from a flat video, so the 3D pose can wobble. Angles are most trustworthy from a clear side view.
+
 ## Ideas for later
 
 - **Shooting**: weight shift and stick follow-through.
