@@ -891,8 +891,9 @@
       console.error(err);
       var msg = err && err.message ? err.message : String(err);
       if (/import|fetch|network|load/i.test(msg) && !/video|skater|frames/i.test(msg)) {
-        // A page shared online is not allowed to download the model, so video
-        // analysis only works when the page is opened from your own computer.
+        // The pose-finding model is downloaded from the internet the first
+        // time. On our website and on your own computer that works; a few
+        // "preview" windows inside other apps block it.
         msg = "The pose-detection model could not load. Check the internet connection and try again. " +
           "(Some online previews block it. If so, download the project and open index.html on your computer.)";
       }
