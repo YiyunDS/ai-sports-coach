@@ -320,6 +320,66 @@ details[open] summary { margin-bottom: 8px; }
 }
 
 /* ---------- Small screens: stack everything ---------- */
+/* ---------- Simulation game ---------- */
+#game-rink { display: block; width: 100%; touch-action: none; cursor: crosshair; }
+#game-rink .ice { fill: var(--ice); stroke: #55667a; stroke-width: 0.6; }
+#game-rink .line-red { stroke: #c8243a; fill: none; }
+#game-rink .line-blue { stroke: #1f56b5; fill: none; }
+#game-rink .wide { stroke-width: 1; }
+#game-rink .thin { stroke-width: 0.35; }
+#game-rink .dot-red { fill: #c8243a; }
+#game-rink .crease { fill: #bcd9f2; stroke: #c8243a; stroke-width: 0.3; }
+#game-rink .net { fill: none; stroke: #55667a; stroke-width: 0.4; }
+#game-rink .rink-note { font-family: var(--display); font-size: 2.3px; font-weight: 600; letter-spacing: 0.25px; fill: #7b8a9c; text-anchor: middle; }
+#game-rink .rink-note.end { text-anchor: end; }
+#game-rink .puck { fill: #0b0f14; }
+#game-rink .marker text { font-family: var(--display); font-size: 2.7px; font-weight: 700; text-anchor: middle; pointer-events: none; }
+#game-rink .marker.mate circle { fill: #1c3f6e; stroke: #fff; stroke-width: 0.35; }
+#game-rink .marker.mate text { fill: #fff; }
+#game-rink .marker.opp circle { fill: #fff; stroke: #c8243a; stroke-width: 0.6; }
+#game-rink .marker.opp text { fill: #c8243a; }
+#game-rink .marker.you { cursor: grab; }
+#game-rink .marker.you circle { fill: #ff9f43; stroke: #0b0f14; stroke-width: 0.6; r: 3.5px; }
+#game-rink .marker.you text { fill: #0b0f14; }
+#game-rink .zone-good { fill: rgba(47, 191, 113, 0.3); stroke: #1e9457; stroke-width: 0.35; }
+#game-rink .zone-close { fill: rgba(230, 180, 34, 0.16); stroke: #b98d0a; stroke-width: 0.3; stroke-dasharray: 1.2 1; }
+#game-rink .measure { stroke: #0b0f14; stroke-width: 0.3; stroke-dasharray: 0.8 0.8; }
+#game-rink .goalie { stroke: #0b0f14; stroke-width: 0.3; }
+#game-rink .goalie.ours { fill: #1c3f6e; }
+#game-rink .goalie.theirs { fill: #c8243a; }
+#game-rink .marker.has-puck circle { stroke: #0b0f14; stroke-width: 1.1; }
+#game-rink .reach { fill: none; stroke: #c9731a; stroke-width: 0.35; stroke-dasharray: 1.6 1.4; pointer-events: none; }
+#game-rink .preview { stroke: #0b0f14; stroke-width: 0.5; stroke-dasharray: 1.2 1.2; pointer-events: none; }
+.key.reach { background: none; border: 1px dashed var(--you); }
+.scorebar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.score { display: flex; align-items: baseline; gap: 10px; }
+.score .team { font-family: var(--display); font-weight: 600; letter-spacing: 0.08em; color: var(--muted); }
+.score-mid { display: flex; flex-direction: column; align-items: center; text-align: center; color: var(--muted); }
+.choices { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.choice { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; text-align: left; border-left: 3px solid var(--muted); }
+.choice.good { border-left-color: var(--good); }
+.choice.close { border-left-color: var(--close); }
+.choice.far { border-left-color: var(--far); }
+.choice.shot { border-left-color: var(--ref); }
+.choice .odds { color: var(--muted); white-space: nowrap; }
+.game-story { align-self: stretch; width: 100%; margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+.game-story h2 { margin: 0 0 6px; font-family: var(--display); font-size: 0.86rem; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
+.game-log { list-style: none; margin: 0; padding: 0; max-height: 230px; overflow-y: auto; font-size: 0.92rem; }
+.game-log li { padding: 5px 0; border-bottom: 1px solid var(--line); }
+.game-log li:last-child { border-bottom: 0; }
+.game-log li.shift { color: var(--muted); font-family: var(--display); letter-spacing: 0.04em; text-transform: uppercase; font-size: 0.82rem; }
+.game-log li.goal-us { color: var(--good); font-weight: 600; }
+.game-log li.goal-them { color: var(--far); font-weight: 600; }
+.game-log li.whistle, .game-log li.change, .game-log li.offside { color: var(--close); }
+/* On a phone the rink stands up. Keep it short enough that the buttons
+   under it are on the screen too, and put "Your move" first. */
+@media (max-width: 700px) {
+  #game-rink { width: auto; max-width: 100%; height: 56vh; margin: 0 auto; }
+  .game-layout .panel.move { order: -1; }
+  .game-layout .board-key { display: none; }
+  .game-log { max-height: 84px; }
+}
+
 @media (max-width: 900px) {
   .layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "stage" "side" "report"; }
   .pos-layout { grid-template-areas: "stage" "side"; }

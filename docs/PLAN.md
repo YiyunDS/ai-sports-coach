@@ -435,6 +435,39 @@ skating). The first moment of the second piece (2.90 s) still stands a
 little too upright. A beginner whose pushes are all tiny gets every
 side-view moment (the push rule is dropped), and the note says so.
 
+### Phase 12: A simulation game on the whole rink (done, first version)
+
+The team leader's idea: keep the Positioning tab as it is, and add a new
+game where the play keeps going. You pick how it starts; with the puck
+you choose to pass or stickhandle; then the simulation plays it out with
+chances, like real hockey (a pass to the other defense can end in a goal
+for us, or in a missed shot, a rebound and a rush at our net).
+
+- `js/gamesim.js` (rules, no drawing; 21 tests in
+  `tests/gamesim.test.js`): a shift is played in beats; in every beat
+  one thing happens to the puck. A playbook for any puck position (five
+  patterns are the Positioning tab's own, plus the rush, backcheck,
+  forecheck and two more), mirrored for the right side and for the other
+  team. Chances for passes (distance, a defender in the lane, across our
+  own slot), stickhandling (how close the nearest defender is), shots
+  (distance, angle, screen) and loose pucks (who is closer). Offside is
+  called. Dice with a seed, so tests replay thousands of shifts.
+- `js/game.js` + a third tab "Game": the whole rink from above (lying
+  down on a wide screen, standing up on a phone), score, choices with
+  their chances, drag your marker within how far you can skate, "Call
+  for a pass", spot feedback with the job tip, "Show my best spot" hint,
+  play-by-play, animated puck and skaters.
+- Checked by playing thousands of shifts: starting at their blue line we
+  score in about 20% of shifts and they in about 1%; from a center
+  faceoff about 5% each. A player who never gets to the right spot gives
+  up about twice as many goals; one who always stickhandles scores far
+  less.
+Pictures: `docs/screenshots/phase12/`.
+Limits: all chances are our own estimates, not measured. You have the
+puck only about twice per shift unless you call for it. Most shifts end
+with a line change, not a whistle. No goalies to control, no penalties,
+no icing, no line changes on the fly. On a phone the markers are small.
+
 ### Phase 5: Check the pro against a real skater (needs a video)
 
 - Run a good side-view video of a strong skater through the Phase 1

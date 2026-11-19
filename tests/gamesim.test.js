@@ -202,6 +202,22 @@ test("being open gets you the puck; being out of position does not", function ()
   assert.ok(theirShot("far") > theirShot("close") && theirShot("close") > theirShot("good"));
 });
 
+test("you can call for a pass, and an open spot makes it more likely to arrive", function () {
+  var s = G.newShift("oz-corner", "C", G.makeDice(9));        // our left wing has the puck in the corner
+  var open = G.callChance(s, s.us.C), lost = G.callChance(s, pt(70, 130));
+  assert.ok(open > 0.6 && open > lost + 0.2, open + " vs " + lost);
+  // Calling makes your teammate pass to you (with lucky dice it arrives).
+  var r = G.step(s, { call: true }, function () { return 0; });
+  assert.ok(G.youHavePuck(r.state));
+  assert.ok(/passes to you/.test(r.events[0].text));
+  // With unlucky dice the same pass is picked off.
+  var bad = G.step(s, { call: true }, function () { return 0.999; });
+  assert.strictEqual(bad.state.owner, "them");
+  // You cannot call for it when they have the puck, or when you have it.
+  assert.strictEqual(G.callChance(G.newShift("dz-corner", "C", G.makeDice(9))), null);
+  assert.strictEqual(G.callChance(G.newShift("rush", "C", G.makeDice(9))), null);
+});
+
 test("offside: you may not be inside their blue line before the puck", function () {
   var s = G.newShift("rush", "LW", G.makeDice(9));
   var always = function () { return 0; };       // dice that make everything work

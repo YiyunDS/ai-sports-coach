@@ -380,9 +380,28 @@
   // In the middle of a sentence: "you", "our center", "their center".
   function inside(who) { return who.charAt(0).toLowerCase() + who.slice(1); }
 
+  // You skate to a spot (as far as you can get in one beat), and we
+  // check how good that spot is for where the puck is right now.
+  function skate(s, moveTo) {
+    var best = ideals(s).us[s.you];
+    s.us[s.you] = toward(s.us[s.you], onIce(moveTo || s.us[s.you]), REACH);
+    var g = gradeSpot(s.us[s.you], best);
+    s.lastSpot = { grade: g.grade, feet: g.feet, tip: best.tip, ideal: pt(best.a, best.d) };
+  }
+
+  // If you skated to this spot and called for the puck, what is the
+  // chance the pass would reach you? (null when you cannot call for it)
+  function callChance(state, moveTo) {
+    if (state.over || state.owner !== "us" || youHavePuck(state)) return null;
+    var s = copy(state);
+    skate(s, moveTo);
+    return options(s).filter(function (o) { return o.to === s.you; })[0].chance;
+  }
+
   // Play one beat.
   //   input = { action: "pass-C" }      when you have the puck
   //           { moveTo: { a, d } }      when you do not (leave it out to stay)
+  //           { moveTo, call: true }    the same, and you call for a pass
   // Returns { state: the new state, events: [{ text, puck }] }: what
   // happened, step by step, and where the puck went each time.
   function step(before, input, dice) {
@@ -400,13 +419,15 @@
       s.lastSpot = null;
       s.stats.choices++;
     } else {
-      var best = ideals(s).us[s.you];
-      s.us[s.you] = toward(s.us[s.you], onIce(input.moveTo || s.us[s.you]), REACH);
-      var g = gradeSpot(s.us[s.you], best);
-      s.lastSpot = { grade: g.grade, feet: g.feet, tip: best.tip, ideal: pt(best.a, best.d) };
+      skate(s, input.moveTo);
       s.stats.spots++;
-      if (g.grade === "good") s.stats.onTarget++;
-      choice = pickForComputer(s, options(s), dice);
+      if (s.lastSpot.grade === "good") s.stats.onTarget++;
+      // You can CALL for the puck (tap your stick on the ice): then your
+      // teammate passes to you. Otherwise the computer picks the play.
+      var list = options(s);
+      choice = input.call && s.owner === "us"
+        ? list.filter(function (o) { return o.to === s.you; })[0]
+        : pickForComputer(s, list, dice);
     }
 
     // 2. Roll the dice for what the puck carrier does.
@@ -512,7 +533,7 @@
     attackSpots: attackSpots, defendSpots: defendSpots, ideals: ideals,
     passChance: passChance, carryChance: carryChance, shotChance: shotChance, looseChance: looseChance, gradeSpot: gradeSpot,
     newShift: newShift, youHavePuck: youHavePuck, options: options, pickForComputer: pickForComputer,
-    carryTarget: carryTarget, step: step
+    carryTarget: carryTarget, callChance: callChance, step: step
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.CoachGame = api;

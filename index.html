@@ -27,6 +27,8 @@
     js/coach.js            reads your video, finds your pose, makes the report
     js/positions.js        the playbook: where each position should stand
     js/board.js            the positioning board you drag your marker on
+    js/gamesim.js          the simulation game: the rules and the chances
+    js/game.js             the simulation game: the rink, the buttons, the play-by-play
   -->
   <header class="bar">
     <div class="bar-in">
@@ -38,6 +40,7 @@
       <nav class="tabs" aria-label="Sections">
         <button type="button" data-tab="form" aria-pressed="true">Form analysis</button>
         <button type="button" data-tab="position" aria-pressed="false">Positioning</button>
+        <button type="button" data-tab="game" aria-pressed="false">Game</button>
       </nav>
       <div class="bar-meta">Team PHL</div>
     </div>
@@ -270,6 +273,81 @@
     </aside>
   </main>
 
+  <!-- ================= SECTION 3: THE SIMULATION GAME ================= -->
+  <main id="view-game" class="layout pos-layout game-layout" hidden>
+    <section class="board-wrap" aria-label="Simulation game">
+      <div class="scorebar" role="status" aria-live="polite">
+        <div class="score"><span class="team">US</span><span id="game-us" class="num big">0</span></div>
+        <div class="score-mid">
+          <span id="game-info" class="small"></span>
+          <span id="game-tally" class="small num"></span>
+        </div>
+        <div class="score"><span id="game-them" class="num big">0</span><span class="team">THEM</span></div>
+      </div>
+      <svg id="game-rink" viewBox="0 0 200 85" role="group" tabindex="0"
+           aria-label="The whole rink seen from above. Without the puck, drag your marker or use the arrow keys, then press Enter."></svg>
+      <ul class="board-key">
+        <li><span class="key you"></span>You</li>
+        <li><span class="key mate"></span>Teammates</li>
+        <li><span class="key opp"></span>Other team</li>
+        <li><span class="key puck"></span>Puck</li>
+        <li><span class="key reach"></span>How far you can skate in one beat</li>
+      </ul>
+      <div class="game-story">
+        <h2>Play-by-play</h2>
+        <ol id="game-log" class="game-log" aria-live="polite"></ol>
+      </div>
+    </section>
+
+    <aside class="side">
+      <section class="panel">
+        <h2>Start a shift</h2>
+        <div class="field">
+          <label for="game-start" class="sr">How the shift starts</label>
+          <select id="game-start" class="wide"></select>
+        </div>
+        <div class="field">
+          <span class="field-label">Your position</span>
+          <div class="seg" role="group" aria-label="Your position in the game">
+            <button type="button" data-grole="LW">LW</button>
+            <button type="button" data-grole="C">C</button>
+            <button type="button" data-grole="RW">RW</button>
+            <button type="button" data-grole="LD">LD</button>
+            <button type="button" data-grole="RD">RD</button>
+          </div>
+        </div>
+        <div class="go">
+          <button type="button" id="game-new" class="primary">Start shift</button>
+          <button type="button" id="game-reset" class="ghost-btn">Reset score</button>
+        </div>
+      </section>
+
+      <section class="panel move">
+        <h2>Your move</h2>
+        <p id="game-prompt" class="small" role="status" aria-live="polite"></p>
+        <div id="game-choices" class="choices"></div>
+        <div class="go">
+          <button type="button" id="game-go" class="primary" hidden>Play on</button>
+          <button type="button" id="game-call" hidden>Call for a pass</button>
+          <label class="inline"><input type="checkbox" id="game-hint"> Show my best spot</label>
+        </div>
+        <div id="game-result" class="pos-result" role="status" aria-live="polite" hidden></div>
+        <div id="game-spot" class="pos-result" hidden>
+          <div class="pos-result-head">
+            <span id="game-spot-grade" class="chip"></span>
+            <span id="game-spot-feet" class="num"></span>
+          </div>
+          <p id="game-spot-tip"></p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>How the chances work</h2>
+        <p class="small">Nobody knows if one play will work. The game rolls dice, like real hockey: a short pass to an open teammate works almost every time, a long pass past a defender often does not. A shot from the slot scores far more often than a shot from the corner. Being in the right spot makes you open for a pass, and makes their shots harder. The numbers can be changed in <code>js/gamesim.js</code>.</p>
+      </section>
+    </aside>
+  </main>
+
   <footer class="foot">
     Team PHL &middot; Presidential SI Challenge &middot; Video is analyzed in the browser and never uploaded.
   </footer>
@@ -288,7 +366,7 @@
   <script type="module">
     // Our own code, in the order it needs to load.
     var OURS = ["js/angles.js", "js/stride.js", "js/measure.js", "js/retarget.js", "js/tracker.js", "js/default-targets.js",
-                "js/figure.js", "js/rigged-figure.js", "js/scene.js", "js/coach.js", "js/positions.js", "js/board.js"];
+                "js/figure.js", "js/rigged-figure.js", "js/scene.js", "js/coach.js", "js/positions.js", "js/board.js", "js/gamesim.js", "js/game.js"];
     // Load one of our .js files and wait until it has run.
     function load(src) {
       return new Promise(function (done, fail) {
@@ -331,10 +409,11 @@
     });
   </script>
   <script>
-    // The two tabs at the top: show one section, hide the other.
+    // The tabs at the top: show one section, hide the others.
     (function () {
       var tabs = document.querySelectorAll("[data-tab]");
-      var views = { form: document.getElementById("view-form"), position: document.getElementById("view-position") };
+      var views = { form: document.getElementById("view-form"), position: document.getElementById("view-position"),
+                    game: document.getElementById("view-game") };
       Array.prototype.forEach.call(tabs, function (tab) {
         tab.addEventListener("click", function () {
           var name = tab.getAttribute("data-tab");

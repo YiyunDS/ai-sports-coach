@@ -99,6 +99,23 @@ Skating well is only half of hockey. The **Positioning** tab is a coach's board 
 
 The spots come from common youth-hockey coverage, and coaches use different systems. To change them, edit the numbers in `js/positions.js`, then run `node tests/positions.test.js` to make sure nothing broke. This tab is a quiz you answer by hand; it does not find players in a video yet.
 
+### Game (the third tab)
+
+The **Game** tab is the positioning board brought to life: a whole shift on the whole rink, where what happens next is decided by **chance**, like in real hockey.
+
+1. Pick **how the shift starts** (for example "Their blue line: our defense has the puck") and **your position**, then press **Start shift**.
+2. **When you have the puck**, pick a play: pass to a teammate, stickhandle, shoot, or dump it in. Every play shows its chance to work. You can also tap a teammate on the rink to pass.
+3. **When you do not have the puck**, drag your orange marker to where you should be (the dashed circle is how far you can skate in one beat), then press **Play on**. If a teammate has the puck and you are open, you can **Call for a pass** instead.
+4. Watch the play and read the **play-by-play**. After every beat the game tells you how good your spot was and what your job is.
+
+A shift ends with a goal, a whistle (the goalie covers the puck, or offside) or a line change after 12 beats. The score carries on to the next shift.
+
+Why chance? Nobody can know if one shot will go in. But over many tries, a short pass to an open teammate works much more often than a long pass past a defender, and a shot from the slot scores much more often than a shot from the corner. Good hockey is picking the play with the best chance. The same pass from the blue line can end with our forward scoring, or with a missed shot, a rebound to the other team and a rush at our net.
+
+- Where everybody should be comes from the same playbook as the Positioning tab (`js/positions.js`), plus patterns for the rush, the backcheck and the forecheck.
+- Being in the right spot matters: you are open for passes, and the other team's shots get harder.
+- The chances are our own estimates, not measured from real games. They are in `js/gamesim.js` and are easy to change. `node tests/gamesim.test.js` plays thousands of shifts to check that the game stays fair and that good positioning and passing really pay off.
+
 ### Changing the goal angles
 
 The goal angles live in [`targets.json`](targets.json). There is one set for each age band (6-8, 9-10, 11-12) and each level, plus one for the pro. To try your own numbers, edit the file and use **Edit target angles > Load targets.json** on the page. To make them the new normal, also copy the file into `js/default-targets.js`.
@@ -122,11 +139,14 @@ The goal angles live in [`targets.json`](targets.json). There is one set for eac
 | `js/scene.js` | The rink (real size, with boards and glass), lights, camera, the pro skater, and moving the skaters |
 | `js/tracker.js` | Follows the one skater you clicked through the video |
 | `js/coach.js` | Reads your video, finds your pose, makes the report and replay |
+| `js/gamesim.js` | The simulation game: where everyone should be for any puck position, and the chances for passes, stickhandling and shots |
+| `js/game.js` | The simulation game on the page: the rink, your choices, the play-by-play |
 | `js/positions.js` | The playbook: where each position should stand in each situation |
 | `js/board.js` | The positioning board you drag your marker on |
 | `tests/angles.test.js` | Checks the math. Run `node tests/angles.test.js` |
 | `js/stride.js` | How the pro skates: the stride keyframes (kids can edit them) and the math that turns them into a pose |
 | `tests/stride.test.js` | Checks the pro's stride (bones keep their length, skates stay on the ice and do not skid). Run `node tests/stride.test.js` |
+| `tests/gamesim.test.js` | Checks the simulation game: the playbook, the chances, and thousands of whole shifts. Run `node tests/gamesim.test.js` |
 | `tests/cleanup.test.js` | Checks the clean-up of video poses (smoothing, fixed bones, skates on the ice). Run `node tests/cleanup.test.js` |
 
 ### Good to know
