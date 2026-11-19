@@ -26,6 +26,10 @@ team leader) for the Presidential SI Challenge. All work happens on the
   never committed or shared. The repo gets only the numbers we measured,
   with the link and who owns the footage, in `SOURCES.md`. The team
   leader saves such clips themself.
+- The GitHub repo is public. A screenshot that shows a frame of a real
+  video (kids on the ice, the rink) is never committed: save it in
+  `local-videos/screenshots/<phase>/`. Only pictures of the 3D view,
+  the report and the sample session go in `docs/screenshots/`.
 - After each phase, open the page, take screenshots, and show before and
   after. Do not call a phase done until you have looked at it.
 - Small commits on `3d-coach`. Do not push until the team leader says so.
@@ -37,7 +41,8 @@ team leader) for the Presidential SI Challenge. All work happens on the
 - Test videos go in `local-videos/` (ignored by git, never committed).
   The main test clip is `local-videos/test.mp4` (copy of
   `~/Downloads/2213_1795050776.mp4`; click the skater in black at 1.0 s).
-- Screenshots for each phase go in `docs/screenshots/<phase>/`.
+- Screenshots for each phase go in `docs/screenshots/<phase>/`
+  (crop out the video panel, or keep the picture in `local-videos/`).
   The starting point is in `docs/screenshots/before/`.
 - The phased plan is in `docs/PLAN.md`.
 

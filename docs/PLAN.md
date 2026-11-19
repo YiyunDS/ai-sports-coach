@@ -2,7 +2,9 @@
 
 Written 2026-11-19 after opening the page in a browser for the first time.
 Screenshots of the starting point are in `docs/screenshots/before/`
-(sheets `sheet-1-pro.png`, `sheet-2-sample.png`, `sheet-3-video.png`).
+(sheets `sheet-1-pro.png`, `sheet-2-sample.png`; `sheet-3-video.png` shows
+the real video, so it is kept only on this computer in
+`local-videos/screenshots/`).
 
 ## What looks wrong (seen in the browser)
 
@@ -94,7 +96,8 @@ Results on the test clip (same click, skater in black at 1.0 s).
 Knee bend and lean now come from the flat picture when the skater is
 seen from the side (37 of 112 frames in this clip). The report says so,
 and the signs on the 3D skater show the same numbers as the cards.
-Screenshots: `docs/screenshots/phase1/sheet-phase1-before-after.png`.
+Screenshots: `local-videos/screenshots/phase1/sheet-phase1-before-after.png`
+(it shows the real video, so it stays on this computer).
 
 What is still rough: this clip is mostly filmed from behind and in
 front, so the 3D depth guess is weak, and the frames around gaps in the
@@ -424,6 +427,9 @@ figure frozen through every hole.
   2.90-3.45 s): the two pushes filmed from the side. All three cards
   now read on target (knee 140°, lean 28°, push 179°).
 Before / after: `docs/screenshots/phase11/`.
+Pictures that show the real video (13 so far, from the baseline and
+phases 1, 8 and 11) were taken out of the repo before the first push
+to GitHub. They are in `local-videos/screenshots/` on this computer.
 Limits: the replay of this clip is now short (about 1 second of
 skating). The first moment of the second piece (2.90 s) still stands a
 little too upright. A beginner whose pushes are all tiny gets every
