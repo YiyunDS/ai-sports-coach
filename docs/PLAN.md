@@ -314,6 +314,48 @@ are a little rounder than real hockey pants.
 About 62,000 triangles, 2.3 MB. Still about 120 frames per second.
 Screenshots: `docs/screenshots/phase7/`.
 
+### Phase 8: Review fixes, and getting ready to measure a pro
+
+An independent code review plus a look at the page on a phone found
+these. Fixed (each checked in the browser or by a test):
+- Knee bend was "the more bent knee", so it sometimes read the folded
+  push leg. It is now always the standing leg (from the stride rhythm).
+- The push number was the straightest knee seen anywhere, so a skater
+  who only glided got "full extension". It now comes from real pushes;
+  with none, the card says "Not seen".
+- The summary mixed side-view and rough frames. With 8 or more side-view
+  frames it now uses only those; the rest are dimmed in the replay bar.
+- A fully straight push leg (179-180°) was graded yellow. Now on target.
+- Moments next to a push showed their own grade, not the push's.
+- A lifted skate was pressed onto the ice by stretching the leg, which
+  made pushes look fuller. Now it is only pressed down if that takes
+  less than 1.5 cm of stretch.
+- Choosing a new video kept the old report; the sample session left a
+  video replay running; replay controls were live during analysis;
+  changing age mid-replay made the video jump; quick timeline drags
+  could leave the video on the wrong frame.
+- Any window resize reset the camera; switching Side/Front moved
+  skaters the user had dragged.
+- The sample skater moved with the old robot formula; it now uses the
+  real stride. Skaters who stand tall keep their skates on the ice.
+- New: "Loading the 3D skaters..." message, an "Angles" switch, the
+  Compare bar under the 3D view on phones, the camera stays inside the
+  rink, the 3D view pauses on the Positioning tab.
+- Positioning: pressing Check again no longer inflates the score.
+- README and tips corrected (20 pictures per second, button names).
+On our test clip the report changed from knee 114° ("very deep bend")
+to 139° (on target), because it now reads the standing leg in the
+side-view frames.
+
+Not done, on purpose or for later: a stick for the orange skater,
+"Save picture", the timeline redraw and sign-texture costs, picking the
+skater with the keyboard, small rink labels on phones, unused exports.
+
+Ready for the pro: `js/measure.js` (tested) cuts a clip into pushes,
+drops broken ones, and reports each number with its spread. Open the
+page with `?dev` for a "Copy stride measurements" button. Waiting for
+the clip in `local-videos/` (see CLAUDE.md for the rule on NHL footage).
+
 ### Phase 5: Check the pro against a real skater (needs a video)
 
 - Run a good side-view video of a strong skater through the Phase 1

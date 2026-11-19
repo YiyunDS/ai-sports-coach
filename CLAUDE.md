@@ -15,7 +15,8 @@ team leader) for the Presidential SI Challenge. All work happens on the
   `node tests/motion.test.js`, `node tests/positions.test.js`,
   `node tests/cleanup.test.js` (added in Phase 1),
   `node tests/stride.test.js` (added in Phase 3),
-  `node tests/retarget.test.js` (added in Phase 6).
+  `node tests/retarget.test.js` (added in Phase 6),
+  `node tests/measure.test.js` (added in Phase 8).
   Add tests for new math.
 - Do not break the Positioning tab.
 - Any outside asset must be free to use and listed in `SOURCES.md` with

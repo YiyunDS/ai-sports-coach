@@ -16,6 +16,7 @@
     targets.json           the "good skater" angles - kids can edit these!
     js/angles.js           the math: measures angles from joint positions
     js/stride.js           how the pro skates: the stride keyframes (and the sample skater)
+    js/measure.js          measures a strong skater's stride from a video (for the pro's numbers)
     js/default-targets.js  a copy of targets.json the page can always read
     js/figure.js           draws the simpler 3D skater, built from shaped pieces (the backup)
     js/rigged-figure.js    draws the realistic 3D skater (the model made in Blender)
@@ -285,7 +286,7 @@
   </script>
   <script type="module">
     // Our own code, in the order it needs to load.
-    var OURS = ["js/angles.js", "js/stride.js", "js/retarget.js", "js/tracker.js", "js/default-targets.js",
+    var OURS = ["js/angles.js", "js/stride.js", "js/measure.js", "js/retarget.js", "js/tracker.js", "js/default-targets.js",
                 "js/figure.js", "js/rigged-figure.js", "js/scene.js", "js/coach.js", "js/positions.js", "js/board.js"];
     // Load one of our .js files and wait until it has run.
     function load(src) {

@@ -115,6 +115,7 @@ The goal angles live in [`targets.json`](targets.json). There is one set for eac
 | `js/rigged-figure.js` | Draws the realistic 3D hockey player: a model with a skeleton inside, made in Blender |
 | `js/skater-model.js` | That 3D model, packed as text so the page works when you double-click it (made by `tools/pack_model.py`) |
 | `js/retarget.js` | Turns the model's bones so it takes our pose |
+| `js/measure.js` | Measures a strong skater's stride from a video: cuts it into pushes, throws away broken ones, and takes the middle value. Run `node tests/measure.test.js` |
 | `js/figure.js` | The simpler skater built in code from shaped pieces. The page uses it if the realistic one cannot load |
 | `tools/blender/build_skater.py` | The recipe that builds the 3D model in Blender (body from MPFB2, gear modeled by the script) |
 | `tests/retarget.test.js` | Checks that the model's bones point where our pose says. Run `node tests/retarget.test.js` |

@@ -791,7 +791,7 @@
       var legs = fixLegSwaps(out, times);
       out = legs.frames;
       if (weights) weights = weights.map(function (w, i) { return w && legs.swapped[i] ? swapLegs(w) : w; });
-      out = smoothTrack(out, times, weights);
+      out = smoothTrack(out, times, weights, { blur: opts.blur });
     }
 
     // Steps D and E: fixed bone lengths, skates on the ice.

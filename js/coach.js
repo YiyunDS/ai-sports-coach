@@ -38,8 +38,12 @@
     "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task"
   ];
 
-  var MAX_FRAMES = 400;     // never look at more pictures than this
-  var FRAME_GAP = 0.05;     // seconds between pictures (20 per second)
+  // "?dev" at the end of the address = the team's measuring mode. A pro
+  // at full speed pushes about 3 times a second, so to measure one we
+  // look at many more pictures (60 per second) and smooth less.
+  var DEV = /[?&]dev\b/.test(location.search);
+  var MAX_FRAMES = DEV ? 900 : 400;     // never look at more pictures than this
+  var FRAME_GAP = DEV ? 1 / 60 : 0.05;  // seconds between pictures (normally 20 per second)
   var DEMO_GAP = 0.1;       // the sample session has 10 poses per second
   var MIN_VISIBILITY = 0.5; // how sure the AI must be that it sees a joint
   var CROP = 512;           // the zoomed-in picture we hand to the AI is 512 x 512 dots
@@ -412,7 +416,7 @@
   //         about each joint, and the flat-picture angles (or null).
   function startReport(rawFrames, times, hasVideo, track, extra) {
     extra = extra || {};
-    state.frames = M.normalizeFrames(rawFrames, { smooth: hasVideo, times: times, weights: extra.weights });
+    state.frames = M.normalizeFrames(rawFrames, { smooth: hasVideo, times: times, weights: extra.weights, blur: DEV ? 0.035 : undefined });
     state.raw = { frames: rawFrames, weights: extra.weights || null }; // kept so we can check the clean-up in the browser
     state.flat = extra.flat || null;
     state.rhythm = M.strideSignal(state.frames);
@@ -878,6 +882,31 @@
       try { el.preview.currentTime = want; } catch (e) { /* fine */ }
     }
   });
+
+  // ---- For the team only: measuring a pro's stride ----
+  // Open the page with "?dev" at the end of the address. After analyzing
+  // a clip of a strong skater, the "Copy stride measurements" button
+  // copies the numbers (see measure.js) so we can save them in
+  // data/pro-stride-measured.json. Only numbers are copied, never video.
+  if (DEV && window.CoachMeasure) {
+    var copyBtn = make("button", null, "Copy stride measurements");
+    copyBtn.type = "button";
+    document.querySelector(".replay-controls").appendChild(copyBtn);
+    copyBtn.addEventListener("click", function () {
+      if (!state.frames) return;
+      var r = window.CoachMeasure.measureStride(state.frames, state.times, state.rhythm);
+      var out = {
+        clip: el.fileName.textContent, measuredOn: new Date().toISOString().slice(0, 10),
+        posesUsed: state.frames.length, sideViewPoses: state.analysis.sideOn,
+        pushesUsed: r.used, pushesDropped: r.dropped, numbers: r.numbers, curves: r.curves
+      };
+      window.CoachStrideMeasured = out;
+      var text = JSON.stringify(out, function (k, v) { return typeof v === "number" ? Math.round(v * 1000) / 1000 : v; }, 1);
+      if (navigator.clipboard) navigator.clipboard.writeText(text).catch(function () { /* still in window.CoachStrideMeasured */ });
+      say(r.numbers ? "Copied the measurements of " + r.used + " pushes (" + r.dropped + " thrown away)."
+                    : "Only " + r.used + " whole pushes found. That is too few to measure a stride.");
+    });
+  }
 
   el.age.addEventListener("change", refresh);
   el.refMode.addEventListener("change", refresh);
