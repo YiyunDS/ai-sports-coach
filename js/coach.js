@@ -33,36 +33,36 @@
   var FRAME_GAP = 0.1;      // seconds between pictures (10 per second)
   var MIN_VISIBILITY = 0.5; // how sure the AI must be that it sees a joint
 
-  var COLORS = { good: "#22c55e", close: "#eab308", far: "#ef4444", none: "#cbd5e1" };
+  var COLORS = { good: "#2fbf71", close: "#e6b422", far: "#ef5350", none: "#263344" };
 
   // The three checks, with the words we show for each one.
   var CHECKS = [
     {
-      id: "kneeBend", icon: "🦵", name: "Knee bend", low: 60, high: 180,
+      id: "kneeBend", name: "Knee bend", low: 60, high: 180,
       tip: function (off) {
-        if (off === 0) return "Awesome knee bend! That is where your power comes from.";
-        if (off > 0) return "Bend your knees about " + off + "° more. Pretend you are sitting down on a little chair.";
-        return "Wow, super low! You can come up about " + (-off) + "° and still be strong.";
+        if (off === 0) return "Knee bend is in the target range. That is where your power comes from.";
+        if (off > 0) return "Bend your knees about " + off + "° more. Sit back as if lowering onto a chair.";
+        return "Very deep bend. You can rise about " + (-off) + "° and still keep your power.";
       }
     },
     {
-      id: "forwardLean", icon: "🏃", name: "Forward lean", low: 0, high: 90,
+      id: "forwardLean", name: "Forward lean", low: 0, high: 90,
       tip: function (off) {
-        if (off === 0) return "Nice lean! Chest forward, eyes up.";
-        if (off < 0) return "Lean your chest forward about " + (-off) + "° more. Think: nose over knees, knees over toes.";
-        return "You are leaning a lot. Lift your chest about " + off + "° so you can see the ice.";
+        if (off === 0) return "Forward lean is in the target range. Chest forward, eyes up.";
+        if (off < 0) return "Lean your chest forward about " + (-off) + "° more. Nose over knees, knees over toes.";
+        return "Too much lean. Lift your chest about " + off + "° so you can see the ice.";
       }
     },
     {
-      id: "strideExtension", icon: "⛸️", name: "Stride extension", low: 90, high: 180,
+      id: "strideExtension", name: "Stride extension", low: 90, high: 180,
       tip: function (off) {
-        if (off === 0) return "Great push! Your leg goes almost all the way straight.";
-        if (off < 0) return "Push your leg out about " + (-off) + "° more, until it is almost straight. Push all the way to your toes!";
-        return "Big push! Keep a tiny bend so your knee does not lock.";
+        if (off === 0) return "Full extension. The pushing leg gets almost straight.";
+        if (off < 0) return "Extend the pushing leg about " + (-off) + "° more, until it is almost straight. Finish the push through your toes.";
+        return "Strong push. Keep a slight bend so the knee does not lock.";
       }
     }
   ];
-  var GRADE_WORDS = { good: "Great!", close: "Almost!", far: "Keep working" };
+  var GRADE_WORDS = { good: "On target", close: "Close", far: "Needs work" };
 
   // Short way to grab a thing on the page by its id.
   function $(id) { return document.getElementById(id); }
@@ -128,7 +128,7 @@
       strideExtension: middle(shown.strideExtension)
     }, el.refMode.value === "goal" ? "GOAL" : "PRO");
 
-    el.targetInfo.textContent = "Goal for ages " + band + ", " + s.level + ": knee " +
+    el.targetInfo.textContent = "Target for ages " + band + ", " + s.level + ": knee " +
       rangeText(target.kneeBend) + ", lean " + rangeText(target.forwardLean) +
       ", push " + rangeText(target.strideExtension) + ".";
 
@@ -167,7 +167,7 @@
       push: COLORS[f.scores.strideExtension.grade]
     }, peak);
 
-    el.frameInfo.textContent = "Moment " + (i + 1) + " of " + n + " • " + state.times[i].toFixed(1) + " s";
+    el.frameInfo.textContent = "Frame " + (i + 1) + " / " + n + "  ·  " + state.times[i].toFixed(1) + " s";
     drawTimeline();
 
     // Show the same moment in the little video.
@@ -193,13 +193,12 @@
       if (s.grade === "good") stars++;
       var card = make("div", "check " + s.grade);
       var head = make("div", "check-head");
-      head.appendChild(make("span", "check-icon", check.icon));
       head.appendChild(make("span", "check-name", check.name));
       head.appendChild(make("span", "chip", GRADE_WORDS[s.grade]));
       card.appendChild(head);
       var nums = make("div", "check-nums");
       nums.appendChild(make("span", "big", Math.round(s.value) + "°"));
-      nums.appendChild(make("span", "goal", "Goal: " + rangeText(range)));
+      nums.appendChild(make("span", "goal", "Target " + rangeText(range)));
       card.appendChild(nums);
 
       // A little ruler: the green part is the goal, the dot is you.
@@ -216,8 +215,7 @@
       card.appendChild(make("p", "tip", check.tip(Math.round(s.off))));
       el.cards.appendChild(card);
     });
-    el.stars.textContent = "⭐".repeat(stars) + "☆".repeat(CHECKS.length - stars);
-    el.stars.setAttribute("aria-label", stars + " out of " + CHECKS.length + " stars");
+    el.stars.textContent = stars + " of " + CHECKS.length + " on target";
   }
 
   // ---------- The replay timeline --------------------------------------
@@ -243,15 +241,15 @@
       var rows = [
         COLORS[f.scores.kneeBend.grade],
         COLORS[f.scores.forwardLean.grade],
-        nearPeak(i) ? COLORS[f.scores.strideExtension.grade] : "#e2e8f0"
+        nearPeak(i) ? COLORS[f.scores.strideExtension.grade] : COLORS.none
       ];
       for (var r = 0; r < 3; r++) {
         g.fillStyle = rows[r];
         g.fillRect(x, r * (ROW_H + ROW_GAP), Math.ceil(cell), ROW_H);
       }
     }
-    // A dark box around the moment we are showing now.
-    g.strokeStyle = "#0f2540"; g.lineWidth = 3;
+    // A bright box around the moment we are showing now.
+    g.strokeStyle = "#ffffff"; g.lineWidth = 2;
     g.strokeRect(state.index * cell + 1.5, 1.5, Math.max(cell - 3, 3), h - 3);
   }
 
@@ -288,7 +286,7 @@
       showFrame(state.index);
     }
     state.playing = !!(on && state.frames);
-    el.play.textContent = state.playing ? "⏸ Pause" : "▶ Play replay";
+    el.play.textContent = state.playing ? "Pause" : "Play";
   }
   el.play.addEventListener("click", function () { setPlaying(!state.playing); });
   el.worst.addEventListener("click", function () {
@@ -326,7 +324,7 @@
     if (state.busy) return;
     var raw = M.makeDemoFrames();
     startReport(raw, raw.map(function (_, i) { return i * FRAME_GAP; }), false);
-    say("This is a pretend skater who stands a little too tall and gets tired at the end. Watch the colors change!");
+    say("Sample session loaded: a skater who stands a little too tall and tires near the end.");
   });
 
   // ---------- The pose-finding AI (MediaPipe) --------------------------
@@ -391,14 +389,14 @@
     setPlaying(false);
     el.progressBar.removeAttribute("value"); // "thinking" look
     try {
-      say("Waking up the pose-finding AI... (the first time takes a little while)");
+      say("Loading the pose-detection model. The first run takes a little while.");
       var finder = await loadPoseFinder();
 
       var video = el.preview;
       if (video.readyState < 2) await waitFor(video, "loadeddata", 8000);
       var duration = video.duration;
       if (!isFinite(duration) || duration <= 0 || !video.videoWidth) {
-        throw new Error("I could not open that video. Try an MP4 or MOV file.");
+        throw new Error("That video could not be opened. Try an MP4 or MOV file.");
       }
 
       var gap = Math.max(FRAME_GAP, duration / MAX_FRAMES);
@@ -416,22 +414,22 @@
           times.push(t);
         }
         el.progressBar.value = t / duration;
-        say("Looking at your video... " + Math.round(t / duration * 100) + "%");
+        say("Analyzing video: " + Math.round(t / duration * 100) + "%");
       }
 
       if (raw.length < 5) {
-        throw new Error("I could not see a whole skater in this video (found " + raw.length + " of " + looked +
-          " pictures). Try a video filmed from the side, with your whole body in the picture.");
+        throw new Error("A full skater was visible in only " + raw.length + " of " + looked +
+          " frames. Try a video filmed from the side, with the whole body in the frame.");
       }
       startReport(raw, times, true);
-      say("Done! I found your pose in " + raw.length + " of " + looked + " pictures. Spin the 3D view to compare!");
+      say("Analysis complete. Pose found in " + raw.length + " of " + looked + " frames.");
     } catch (err) {
       console.error(err);
       var msg = err && err.message ? err.message : String(err);
       if (/import|fetch|network|load/i.test(msg) && !/video|skater/i.test(msg)) {
-        msg = "The pose-finding AI could not load. Check your internet and try again.";
+        msg = "The pose-detection model could not load. Check the internet connection and try again.";
       }
-      say("Oops! " + msg);
+      say(msg);
     } finally {
       setBusy(false);
     }
@@ -443,14 +441,14 @@
   el.videoFile.addEventListener("change", function () {
     var file = el.videoFile.files[0];
     el.analyze.disabled = !file;
-    el.fileName.textContent = file ? file.name : "No video yet";
+    el.fileName.textContent = file ? file.name : "No video selected";
     if (!file) return;
     // Show the video in the little player. It stays on this computer.
     if (videoUrl) URL.revokeObjectURL(videoUrl);
     videoUrl = URL.createObjectURL(file);
     el.preview.src = videoUrl;
     el.preview.load();
-    say("Video ready. Now press \"Find my pose\"!");
+    say("Video ready. Press Analyze video.");
   });
   el.analyze.addEventListener("click", analyzeVideo);
 
@@ -469,9 +467,9 @@
       if (!targetsLookRight(t)) throw new Error("missing numbers");
       state.targets = t;
       refresh();
-      say("Loaded your goal numbers from " + file.name + ".");
+      say("Loaded target angles from " + file.name + ".");
     }).catch(function () {
-      say("Oops! That targets file has a mistake in it. Check the commas, quotes and numbers.");
+      say("That targets file has a mistake in it. Check the commas, quotes and numbers.");
     });
   });
 

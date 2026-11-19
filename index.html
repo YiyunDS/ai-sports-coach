@@ -2,8 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="claude:viewport-fit-sides" content="cover">
   <title>AI Sports Coach - 3D Visual Coach</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -15,135 +17,230 @@
     js/angles.js           the math: measures angles from joint positions
     js/default-targets.js  a copy of targets.json the page can always read
     js/figure.js           draws one 3D skater out of balls, tubes and boxes
-    js/scene.js            the rink, the lights, the camera and the PRO skater
+    js/scene.js            the rink, the lights, the camera, moving the skaters
     js/coach.js            reads your video, finds your pose, makes the report
+    js/positions.js        the playbook: where each position should stand
+    js/board.js            the positioning board you drag your marker on
   -->
-  <header class="top">
-    <div class="logo" aria-hidden="true">🏒</div>
-    <div>
-      <h1>AI Sports Coach <span class="tag">3D Visual Coach</span></h1>
-      <p>See good skating form in 3D, then put your own pose right next to it.</p>
+  <header class="bar">
+    <div class="bar-in">
+      <div class="brand">
+        <span class="mark" aria-hidden="true"></span>
+        <span class="brand-name">AI Sports Coach</span>
+        <span class="brand-sub">Skating Lab</span>
+      </div>
+      <nav class="tabs" aria-label="Sections">
+        <button type="button" data-tab="form" aria-pressed="true">Form analysis</button>
+        <button type="button" data-tab="position" aria-pressed="false">Positioning</button>
+      </nav>
+      <div class="bar-meta">Team PHL</div>
     </div>
   </header>
 
-  <main class="layout">
-    <!-- LEFT SIDE: the steps and what to look for -->
+  <!-- ================= SECTION 1: FORM ANALYSIS (3D) ================= -->
+  <main id="view-form" class="layout">
+    <!-- The 3D picture -->
+    <section class="stage-wrap" aria-label="3D view">
+      <div id="stage" aria-label="3D view of a hockey skater. Drag the ice to orbit. Drag a skater to move it."></div>
+      <div id="stage-problem" class="stage-problem" hidden></div>
+      <div class="stage-top">
+        <div class="seg" role="group" aria-label="Camera view">
+          <button type="button" data-view="side">Side</button>
+          <button type="button" data-view="front">Front</button>
+          <button type="button" data-view="top">Top</button>
+        </div>
+        <button type="button" id="stride-btn" class="ghost-btn" aria-pressed="false">Play stride</button>
+      </div>
+      <div class="stage-bottom">
+        <div class="tool">
+          <span class="tool-label">Compare</span>
+          <div class="seg" role="group" aria-label="How to compare the two skaters">
+            <button type="button" data-compare="side" aria-pressed="true" disabled>Side by side</button>
+            <button type="button" data-compare="overlay" aria-pressed="false" disabled>Overlay</button>
+          </div>
+        </div>
+        <div class="tool">
+          <label class="tool-label" for="gap">Spacing</label>
+          <input type="range" id="gap" min="1" max="5" step="0.1" value="2.5" disabled>
+          <output id="gap-out" for="gap">2.5 m</output>
+        </div>
+        <button type="button" id="reset-pos" class="ghost-btn">Reset positions</button>
+        <span class="hint">Drag a skater to move it &middot; drag the ice to orbit &middot; scroll to zoom</span>
+      </div>
+    </section>
+
+    <!-- The controls -->
     <aside class="side">
-      <section class="card steps">
-        <h2>Try it with your skating</h2>
-        <ol>
-          <li>
-            <label class="file-btn">📹 Pick a skating video
-              <input type="file" id="video-file" accept="video/*">
-            </label>
-            <div id="file-name" class="small">No video yet</div>
-            <div class="small">Best: filmed from the side, with your whole body in the picture.</div>
-          </li>
-          <li>
-            <label for="age">How old are you?</label>
-            <select id="age">
-              <option>6</option><option>7</option><option>8</option><option selected>9</option>
-              <option>10</option><option>11</option><option>12</option>
-            </select>
-          </li>
-          <li>
-            <fieldset class="level">
-              <legend>How long have you skated?</legend>
-              <label><input type="radio" name="level" value="beginner" checked> Beginner</label>
-              <label><input type="radio" name="level" value="experienced"> Experienced</label>
-            </fieldset>
-          </li>
-        </ol>
+      <section class="panel">
+        <h2>Session</h2>
+        <div class="field">
+          <label class="file-btn">Choose skating video
+            <input type="file" id="video-file" accept="video/*">
+          </label>
+          <div id="file-name" class="small">No video selected</div>
+          <div class="small">Film from the side with the whole body in the frame.</div>
+        </div>
+        <div class="field row">
+          <label for="age">Age</label>
+          <select id="age">
+            <option>6</option><option>7</option><option>8</option><option selected>9</option>
+            <option>10</option><option>11</option><option>12</option>
+          </select>
+        </div>
+        <fieldset class="field level">
+          <legend>Experience</legend>
+          <div class="seg radio">
+            <label><input type="radio" name="level" value="beginner" checked><span>Beginner</span></label>
+            <label><input type="radio" name="level" value="experienced"><span>Experienced</span></label>
+          </div>
+        </fieldset>
         <div class="go">
-          <button type="button" id="analyze-btn" class="primary" disabled>🔍 Find my pose</button>
-          <button type="button" id="demo-btn">🤖 Try a pretend skater</button>
+          <button type="button" id="analyze-btn" class="primary" disabled>Analyze video</button>
+          <button type="button" id="demo-btn">Load sample session</button>
         </div>
         <div id="progress" hidden><progress id="progress-bar" max="1"></progress></div>
         <p id="status" class="status" role="status" aria-live="polite"></p>
-        <p class="pick">
-          <label for="ref-mode">The blue skater shows</label>
+      </section>
+
+      <section class="panel">
+        <h2>Reference skater</h2>
+        <div class="field row">
+          <label for="ref-mode">Blue skater shows</label>
           <select id="ref-mode">
-            <option value="pro">a pro</option>
-            <option value="goal">the goal for my age</option>
+            <option value="pro">Pro reference</option>
+            <option value="goal">Target for this age</option>
           </select>
-        </p>
+        </div>
+        <p id="target-info" class="small"></p>
         <details>
-          <summary>Goal numbers (targets.json)</summary>
-          <p id="target-info" class="small"></p>
-          <p class="small">Want different goals? Edit <code>targets.json</code>, then load it here:</p>
-          <label class="file-btn small-btn">Load my targets.json
+          <summary>Edit target angles</summary>
+          <p class="small">Change the numbers in <code>targets.json</code>, then load the file here.</p>
+          <label class="file-btn small-btn">Load targets.json
             <input type="file" id="targets-file" accept=".json,application/json">
           </label>
         </details>
       </section>
-      <section class="card">
-        <h2>Joint colors</h2>
+
+      <section class="panel">
+        <h2>Reading the view</h2>
         <ul class="legend">
-          <li><span class="dot good"></span> Green: inside the goal</li>
-          <li><span class="dot close"></span> Yellow: almost there</li>
-          <li><span class="dot far"></span> Red: work on this one</li>
+          <li><span class="dot good"></span>In the target range</li>
+          <li><span class="dot close"></span>Close to the target</li>
+          <li><span class="dot far"></span>Outside the target</li>
         </ul>
-      </section>
-      <section class="card">
-        <h2>What to look for</h2>
-        <ul class="look">
-          <li><b>Knees bent.</b> The blue slice at the knee shows the knee angle. Smaller number = more bend = more power.</li>
-          <li><b>Lean forward a little.</b> The slice at the hips shows how far the back tips forward.</li>
-          <li><b>Stick on the ice.</b> The blade stays down, ready for a pass.</li>
-          <li><b>Push all the way.</b> Press <i>Show the stride</i> and watch the pushing leg get almost straight.</li>
-        </ul>
+        <dl class="glossary">
+          <dt>Knee</dt><dd>Angle at the glide knee. A smaller number means a deeper bend and more power.</dd>
+          <dt>Lean</dt><dd>How far the back tips forward from straight up.</dd>
+          <dt>Push</dt><dd>Angle of the pushing leg at full stride. Close to 180° is a full extension.</dd>
+        </dl>
       </section>
     </aside>
 
-    <!-- RIGHT SIDE: the 3D picture -->
-    <section class="main">
-      <div class="stage-wrap">
-        <div id="stage" aria-label="3D view of a hockey skater. Drag to spin it."></div>
-        <div id="stage-problem" class="stage-problem" hidden></div>
-        <div class="stage-top">
-          <span class="hint">🖱️ Drag to spin &nbsp;•&nbsp; Scroll or pinch to zoom</span>
-        </div>
-        <div class="stage-buttons">
-          <button type="button" data-view="side">Side view</button>
-          <button type="button" data-view="front">Front view</button>
-          <button type="button" data-view="top">Top view</button>
-          <button type="button" id="stride-btn" class="primary" aria-pressed="false">▶ Show the stride</button>
-        </div>
-      </div>
-      <section id="results" class="card" hidden>
+    <!-- The report (appears after a session is analyzed) -->
+    <section class="report">
+      <section id="results" class="panel" hidden>
         <div class="results-head">
-          <h2>Your coach report <span id="stars" class="stars"></span></h2>
+          <h2>Session report</h2>
+          <span id="stars" class="score"></span>
         </div>
         <div class="results-body">
           <div id="cards" class="cards"></div>
           <video id="preview" class="preview" muted playsinline preload="auto" hidden></video>
         </div>
         <div class="replay">
-          <h3>Replay: where does the form slip?</h3>
           <div class="replay-controls">
-            <button type="button" id="play-btn">▶ Play replay</button>
-            <label>Speed
+            <h3>Replay</h3>
+            <button type="button" id="play-btn">Play</button>
+            <label class="inline">Speed
               <select id="speed">
-                <option value="1">normal</option>
-                <option value="0.5" selected>slow</option>
-                <option value="0.25">super slow</option>
+                <option value="1">1&times;</option>
+                <option value="0.5" selected>0.5&times;</option>
+                <option value="0.25">0.25&times;</option>
               </select>
             </label>
-            <button type="button" id="worst-btn">⚠️ Jump to the biggest slip</button>
-            <span id="frame-info" class="small"></span>
+            <button type="button" id="worst-btn">Jump to biggest slip</button>
+            <span id="frame-info" class="small num"></span>
           </div>
           <div class="timeline-wrap">
-            <div class="timeline-names" aria-hidden="true"><span>Knees</span><span>Lean</span><span>Pushes</span></div>
-            <canvas id="timeline" tabindex="0" role="slider" aria-label="Replay timeline. Use the left and right arrow keys to step through moments."></canvas>
+            <div class="timeline-names" aria-hidden="true"><span>Knee</span><span>Lean</span><span>Push</span></div>
+            <canvas id="timeline" tabindex="0" role="slider" aria-label="Replay timeline. Use the left and right arrow keys to step through frames."></canvas>
           </div>
-          <p class="small">Each little block is one moment of your video. Click or drag on the stripes to jump there. The Pushes stripe is only colored at the top of each push.</p>
+          <p class="small">Each block is one frame of the session. Click or drag to scrub. The Push row is graded only at the top of each stride.</p>
         </div>
       </section>
+      <div class="panel report-empty">
+        <h2>Session report</h2>
+        <p>No session yet. Analyze a skating video, or load the sample session, to see knee bend, forward lean and stride extension graded frame by frame against the target for the skater's age.</p>
+      </div>
     </section>
   </main>
 
+  <!-- ================= SECTION 2: POSITIONING ================= -->
+  <main id="view-position" class="layout pos-layout" hidden>
+    <section class="board-wrap" aria-label="Positioning board">
+      <svg id="board" viewBox="0 0 85 100" role="group" aria-label="Half rink seen from above"></svg>
+      <ul class="board-key">
+        <li><span class="key you"></span>You</li>
+        <li><span class="key mate"></span>Teammates</li>
+        <li><span class="key opp"></span>Opponent with puck</li>
+        <li><span class="key puck"></span>Puck</li>
+      </ul>
+    </section>
+
+    <aside class="side">
+      <section class="panel">
+        <h2>Situation</h2>
+        <div class="field">
+          <label for="pos-situation" class="sr">Situation</label>
+          <select id="pos-situation" class="wide"></select>
+        </div>
+        <p id="pos-summary" class="small"></p>
+        <div class="field">
+          <span class="field-label">Puck side</span>
+          <div class="seg" role="group" aria-label="Puck side">
+            <button type="button" data-side="left">Left</button>
+            <button type="button" data-side="right">Right</button>
+          </div>
+        </div>
+        <div class="field">
+          <span class="field-label">Your position</span>
+          <div class="seg" role="group" aria-label="Your position">
+            <button type="button" data-role="LW">LW</button>
+            <button type="button" data-role="C">C</button>
+            <button type="button" data-role="RW">RW</button>
+            <button type="button" data-role="LD">LD</button>
+            <button type="button" data-role="RD">RD</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Your spot: <span id="pos-role-name"></span></h2>
+        <p class="small">Drag the orange marker to where you should stand, then check it.</p>
+        <div class="go">
+          <button type="button" id="pos-check" class="primary">Check my spot</button>
+          <button type="button" id="pos-answer">Show answer</button>
+          <button type="button" id="pos-next">Next situation</button>
+        </div>
+        <div id="pos-result" class="pos-result" role="status" aria-live="polite" hidden>
+          <div class="pos-result-head">
+            <span id="pos-grade" class="chip"></span>
+            <span id="pos-feet" class="num"></span>
+          </div>
+          <p id="pos-job"></p>
+        </div>
+        <p id="pos-tally" class="small num"></p>
+      </section>
+
+      <section class="panel">
+        <h2>About these positions</h2>
+        <p class="small">The spots follow common youth-hockey coverage. The inner ring is on target (within 8 ft) and the outer ring is close (within 16 ft). Coaches use different systems, so the spots can be edited in <code>js/positions.js</code>.</p>
+      </section>
+    </aside>
+  </main>
+
   <footer class="foot">
-    Made by Team PHL for the Presidential SI Challenge. Your video stays on your own computer.
+    Team PHL &middot; Presidential SI Challenge &middot; Video is analyzed in the browser and never uploaded.
   </footer>
 
   <!-- three.js = the 3D drawing library. OrbitControls = drag-to-spin camera. -->
@@ -155,5 +252,22 @@
   <script src="js/figure.js"></script>
   <script src="js/scene.js"></script>
   <script src="js/coach.js"></script>
+  <script src="js/positions.js"></script>
+  <script src="js/board.js"></script>
+  <script>
+    // The two tabs at the top: show one section, hide the other.
+    (function () {
+      var tabs = document.querySelectorAll("[data-tab]");
+      var views = { form: document.getElementById("view-form"), position: document.getElementById("view-position") };
+      Array.prototype.forEach.call(tabs, function (tab) {
+        tab.addEventListener("click", function () {
+          var name = tab.getAttribute("data-tab");
+          Object.keys(views).forEach(function (k) { views[k].hidden = k !== name; });
+          Array.prototype.forEach.call(tabs, function (t) { t.setAttribute("aria-pressed", String(t === tab)); });
+          window.dispatchEvent(new Event("resize")); // tell the 3D picture to fit its box again
+        });
+      });
+    })();
+  </script>
 </body>
 </html>

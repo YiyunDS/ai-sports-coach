@@ -14,16 +14,17 @@
 (function (root) {
   "use strict";
   var THREE = root.THREE;
+  if (!THREE) return; // the 3D library did not load; scene.js shows a message
 
   // Traffic-light colors for joints.
   var GRADE_COLORS = {
     good: 0x22c55e,   // green  = inside the target range
     close: 0xfacc15,  // yellow = a little bit off
     far: 0xef4444,    // red    = far from the target
-    none: 0xe8eef5    // gray-white = we are not grading this joint now
+    none: 0xc3ccd6    // soft gray = we are not grading this joint now
   };
   // Graded joints get bigger so they are easy to spot.
-  var GRADE_SIZE = { good: 1.15, close: 1.35, far: 1.6, none: 1 };
+  var GRADE_SIZE = { good: 1.1, close: 1.25, far: 1.45, none: 0.92 };
 
   // The joints we draw as balls: name -> ball size in meters.
   var JOINT_BALLS = {
@@ -58,9 +59,15 @@
     return length;
   }
 
+  // When the nice web font finishes loading, repaint every sign once.
+  var fontEpoch = 0;
+  if (root.document && document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () { fontEpoch++; });
+  }
+
   // ---- Paint a little sign (text on a rounded box) onto a picture ----
   function drawLabel(canvas, text, color) {
-    var c = canvas.getContext("2d"), w = canvas.width, h = canvas.height, r = 30;
+    var c = canvas.getContext("2d"), w = canvas.width, h = canvas.height, r = 14;
     c.clearRect(0, 0, w, h);
     c.beginPath();
     c.moveTo(r + 6, 6); c.lineTo(w - r - 6, 6); c.quadraticCurveTo(w - 6, 6, w - 6, r + 6);
@@ -68,12 +75,12 @@
     c.lineTo(r + 6, h - 6); c.quadraticCurveTo(6, h - 6, 6, h - r - 6);
     c.lineTo(6, r + 6); c.quadraticCurveTo(6, 6, r + 6, 6);
     c.closePath();
-    c.fillStyle = "rgba(255,255,255,0.95)"; c.fill();
-    c.lineWidth = 10; c.strokeStyle = color; c.stroke();
-    c.fillStyle = "#0f2540";
-    c.font = "bold 54px ui-rounded, 'Nunito', 'Segoe UI', Arial, sans-serif";
+    c.fillStyle = "rgba(10,14,20,0.9)"; c.fill();      // dark plate
+    c.lineWidth = 5; c.strokeStyle = color; c.stroke();  // thin colored edge
+    c.fillStyle = "#f2f6fa";
+    c.font = "600 50px 'Barlow Condensed', 'Arial Narrow', Arial, sans-serif";
     c.textAlign = "center"; c.textBaseline = "middle";
-    c.fillText(text, w / 2, h / 2 + 3);
+    c.fillText(text.toUpperCase(), w / 2, h / 2 + 3);
   }
 
   // =================== The Figure ====================================
@@ -85,6 +92,7 @@
     this.labels = {};
     this.wedges = {};
     this.name = opts.name;
+    this.labelsOn = true;  // set to false to hide this skater's signs and slices
     this.nameColor = opts.nameColor || "#1d4ed8";
 
     function paint(color, rough) {
@@ -94,12 +102,13 @@
       jersey: paint(opts.jersey), pants: paint(opts.pants || 0x1e293b),
       socks: paint(opts.socks || opts.jersey), skin: paint(0xf2c9a0),
       helmet: paint(opts.helmet || opts.jersey, 0.35), glove: paint(0x334155),
-      boot: paint(0x111827), blade: paint(0xcbd5e1, 0.2), stick: paint(0x8b5a2b),
+      boot: paint(0x111827), holder: paint(0xe5e7eb, 0.5), blade: paint(0xd8dee6, 0.15), stick: paint(0x2b3038, 0.5),
       dark: paint(0x111827)
     };
     function addMesh(geometry, material) {
       var m = new THREE.Mesh(geometry, material);
       m.castShadow = true;
+      m.userData.body = true; // part of the skater's body (used for dragging and ghosting)
       self.group.add(m);
       return m;
     }
@@ -119,21 +128,19 @@
       self.joints[name] = { size: JOINT_BALLS[name], mesh: addMesh(ball, mat) };
     });
 
-    // Head, helmet and two eyes.
+    // Head and helmet.
     this.head = addMesh(ball, paints.skin);
     this.head.scale.setScalar(0.105);
-    this.helmet = addMesh(new THREE.SphereGeometry(0.118, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), paints.helmet);
-    this.eyes = [addMesh(ball, paints.dark), addMesh(ball, paints.dark)];
-    this.eyes.forEach(function (e) { e.scale.setScalar(0.016); e.castShadow = false; });
+    this.helmet = addMesh(new THREE.SphereGeometry(0.118, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.62), paints.helmet);
 
     // Gloves.
     this.gloves = { l: addMesh(ball, paints.glove), r: addMesh(ball, paints.glove) };
     this.gloves.l.scale.setScalar(0.06); this.gloves.r.scale.setScalar(0.06);
 
-    // Skates: a boot (box) with a shiny blade (thin box) under it.
+    // Skates: a boot, a white plastic holder, and a thin steel blade.
     this.skates = {};
     ["l", "r"].forEach(function (s) {
-      self.skates[s] = { boot: addMesh(box, paints.boot), blade: addMesh(box, paints.blade) };
+      self.skates[s] = { boot: addMesh(box, paints.boot), holder: addMesh(box, paints.holder), blade: addMesh(box, paints.blade) };
     });
 
     // Hockey stick (hidden unless the pose has one).
@@ -171,23 +178,24 @@
     this.head.position.copy(P.head);
     this.helmet.position.copy(P.head).addScaledVector(forward, -0.012);
     this.helmet.position.y += 0.012;
-    this.eyes.forEach(function (eye, i) {
-      eye.position.copy(P.head).addScaledVector(forward, 0.098)
-        .addScaledVector(left, i === 0 ? 0.038 : -0.038);
-      eye.position.y -= 0.005;
-    });
 
     // Gloves and skates.
     ["l", "r"].forEach(function (s) {
       self.gloves[s].position.copy(P[s + "Wrist"]);
       var heel = P[s + "Heel"], toe = P[s + "Toe"], sk = self.skates[s];
       var length = placeBetween(sk.boot, heel, toe, Z_AXIS);
-      sk.boot.scale.set(0.085, 0.075, length + 0.03);
+      sk.boot.scale.set(0.078, 0.072, length + 0.03);
       sk.boot.position.y += 0.035;
+      // The holder is the white plastic part between the boot and the steel.
+      sk.holder.position.copy(sk.boot.position);
+      sk.holder.quaternion.copy(sk.boot.quaternion);
+      sk.holder.scale.set(0.016, 0.02, length + 0.02);
+      sk.holder.position.y -= 0.046;
+      // Real skate steel is only about 3 mm wide, so the blade is very thin.
       sk.blade.position.copy(sk.boot.position);
       sk.blade.quaternion.copy(sk.boot.quaternion);
-      sk.blade.scale.set(0.012, 0.035, length + 0.07);
-      sk.blade.position.y -= 0.05;
+      sk.blade.scale.set(0.004, 0.013, length + 0.06);
+      sk.blade.position.y -= 0.0615;
     });
 
     // Stick (only if this pose has one).
@@ -198,9 +206,9 @@
       var dir = new THREE.Vector3().subVectors(P.stickBlade, P.stickTop).normalize();
       var top = P.stickTop.clone().addScaledVector(dir, -0.12);
       var len = placeBetween(this.stick.shaft, top, P.stickBlade, Y_AXIS);
-      this.stick.shaft.scale.set(0.013, len, 0.013);
+      this.stick.shaft.scale.set(0.011, len, 0.011);
       this.stick.blade.position.set(P.stickBlade.x + 0.1, 0.035, P.stickBlade.z);
-      this.stick.blade.scale.set(0.24, 0.065, 0.014);
+      this.stick.blade.scale.set(0.24, 0.06, 0.006);
     }
 
     // The name sign floats above the head.
@@ -213,19 +221,20 @@
   // A "sprite" is a flat picture that always turns to face the camera,
   // so you can read it from any side.
   Figure.prototype.setLabel = function (id, at, text, color) {
+    if (!this.labelsOn) { this.hide(id); return; }
     var L = this.labels[id];
     if (!L) {
       var canvas = document.createElement("canvas");
       canvas.width = 320; canvas.height = 110;
       var texture = new THREE.CanvasTexture(canvas);
       var sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false, transparent: true }));
-      sprite.scale.set(0.52, 0.18, 1);
+      sprite.scale.set(0.46, 0.158, 1);
       sprite.renderOrder = 10; // draw on top of everything
       this.group.add(sprite);
       L = this.labels[id] = { canvas: canvas, texture: texture, sprite: sprite, key: "" };
     }
     // Only repaint the sign when the words or color really changed.
-    var key = text + "|" + color;
+    var key = text + "|" + color + "|" + fontEpoch;
     if (key !== L.key) { drawLabel(L.canvas, text, color); L.texture.needsUpdate = true; L.key = key; }
     L.sprite.position.set(at.x, at.y, at.z);
     L.sprite.visible = true;
@@ -235,6 +244,7 @@
   // center = the joint. dirA and dirB = the two directions that make
   // the angle. radius = how big the slice is.
   Figure.prototype.setWedge = function (id, center, dirA, dirB, radius, color) {
+    if (!this.labelsOn) { this.hide(id); return; }
     var N = 20, W = this.wedges[id];
     if (!W) {
       var geo = new THREE.BufferGeometry();
@@ -272,6 +282,26 @@
   Figure.prototype.hide = function (id) {
     if (this.labels[id]) this.labels[id].sprite.visible = false;
     if (this.wedges[id]) this.wedges[id].visible = false;
+  };
+
+  // Turn the skater into a see-through "ghost" (used for Overlay mode),
+  // or back to solid.
+  Figure.prototype.setGhost = function (on) {
+    this.group.children.forEach(function (m) {
+      if (!m.userData.body) return;
+      m.material.transparent = on;
+      m.material.opacity = on ? 0.3 : 1;
+      m.material.depthWrite = !on;
+      m.material.needsUpdate = true;
+      m.castShadow = !on;
+    });
+  };
+
+  // Hide every sign and slice at once.
+  Figure.prototype.hideAll = function () {
+    var self = this;
+    Object.keys(this.labels).forEach(function (id) { self.hide(id); });
+    Object.keys(this.wedges).forEach(function (id) { self.hide(id); });
   };
 
   root.SkaterFigure = Figure;

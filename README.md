@@ -70,14 +70,33 @@ This branch shows skating form in **3D**. A blue "pro" skater stands in a good h
 
 ### How to use it
 
-1. **Look at the pro.** Drag to spin the view, scroll or pinch to zoom. The signs show the knee angle and the forward lean. Press **Show the stride** to watch a push.
+1. **Look at the pro.** Drag to spin the view, scroll or pinch to zoom. The signs show the knee angle and the forward lean. Press **Play stride** to watch a push.
 2. **Pick a skating video.** It works best filmed from the side with your whole body in the picture. One skater at a time.
 3. **Pick your age** (6 to 12) and **Beginner** or **Experienced**.
-4. Press **Find my pose**. The AI looks at about 10 pictures per second of your video.
+4. Press **Analyze video**. The AI looks at about 10 pictures per second of your video.
 5. **Read your report.** The orange skater is you. Joints turn green (inside the goal), yellow (almost) or red (work on this one). Each check gets a tip.
 6. **Watch the replay.** The colored stripes show every moment of your video. Press **Jump to the biggest slip** to see where your form slipped the most.
 
-No video handy? Press **Try a pretend skater** to see how it works.
+No video handy? Press **Load sample session** to see how it works.
+
+### Moving the skaters
+
+Once there are two skaters on the ice (your pose, or the sample session), you can compare them in different ways:
+
+- **Drag a skater** with the mouse or a finger to slide it anywhere on the ice. Drag the ice itself to spin the camera.
+- **Side by side** puts the two skaters next to each other. The **Spacing** slider moves them closer or farther apart.
+- **Overlay** puts them on the same spot. The blue skater turns see-through, so you can see exactly where your pose is different.
+- **Reset positions** puts everyone back.
+
+### Positioning (the second tab)
+
+Skating well is only half of hockey. The **Positioning** tab is a coach's board that checks whether you know where to stand.
+
+1. Pick a **situation** (for example "Defending: puck in our corner"), the **puck side**, and **your position** (LW, C, RW, LD or RD).
+2. Your teammates are already on their spots. Drag the orange marker to where **you** should be.
+3. Press **Check my spot**. The board measures how many feet you are from the ideal spot: within 8 ft is on target, within 16 ft is close. It also tells you your job in that situation.
+
+The spots come from common youth-hockey coverage, and coaches use different systems. To change them, edit the numbers in `js/positions.js`, then run `node tests/positions.test.js` to make sure nothing broke. This tab is a quiz you answer by hand; it does not find players in a video yet.
 
 ### Changing the goal angles
 
@@ -93,8 +112,10 @@ The goal angles live in [`targets.json`](targets.json). There is one set for eac
 | `targets.json` | The goal angles (kids can edit) |
 | `js/angles.js` | The math: measures angles and scores them |
 | `js/figure.js` | Draws one 3D skater from balls, tubes and boxes |
-| `js/scene.js` | The rink, lights, camera and the pro skater |
+| `js/scene.js` | The rink, lights, camera, the pro skater, and moving the skaters |
 | `js/coach.js` | Reads your video, finds your pose, makes the report and replay |
+| `js/positions.js` | The playbook: where each position should stand in each situation |
+| `js/board.js` | The positioning board you drag your marker on |
 | `tests/angles.test.js` | Checks the math. Run `node tests/angles.test.js` |
 
 ### Good to know

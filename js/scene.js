@@ -6,6 +6,8 @@
 //     * lights and an ice rink
 //     * the PRO skater standing in a good hockey stance
 //     * signs and colored "pizza slices" that show the angles
+//     * tools to MOVE the skaters: drag one across the ice, stand them
+//       side by side, or lay one on top of the other (Overlay)
 //
 //  Other files talk to this one through   window.Coach3D
 // =====================================================================
@@ -18,7 +20,7 @@
   // If the 3D library did not load (no internet?), say so kindly.
   if (!window.THREE || !window.THREE.OrbitControls) {
     problem.hidden = false;
-    problem.textContent = "Oops! The 3D library could not load. Check your internet and reload the page.";
+    problem.textContent = "The 3D library could not load. Check the internet connection and reload the page.";
     return;
   }
   var THREE = window.THREE;
@@ -30,7 +32,7 @@
     renderer = new THREE.WebGLRenderer({ antialias: true });
   } catch (e) {
     problem.hidden = false;
-    problem.textContent = "Oops! This browser cannot draw 3D (WebGL is off). Try Chrome, Edge, Firefox or Safari.";
+    problem.textContent = "This browser cannot draw 3D (WebGL is off). Try Chrome, Edge, Firefox or Safari.";
     return;
   }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -39,8 +41,8 @@
   stage.appendChild(renderer.domElement);
 
   var scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xcdeaff);     // light blue arena air
-  scene.fog = new THREE.Fog(0xcdeaff, 14, 30);      // far things fade out
+  scene.background = new THREE.Color(0x0b0f14);     // a dark arena, like on TV
+  scene.fog = new THREE.Fog(0x0b0f14, 16, 34);      // far things fade out
 
   var camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
 
@@ -52,8 +54,8 @@
   controls.maxDistance = 12;
 
   // ---------- 2. Lights ----------------------------------------------
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x9fc5e8, 0.85)); // soft light from everywhere
-  var sun = new THREE.DirectionalLight(0xffffff, 0.75);           // one bright arena light
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x5b7896, 0.8)); // soft light from everywhere
+  var sun = new THREE.DirectionalLight(0xffffff, 0.8);           // one bright arena light
   sun.position.set(3, 7, 4);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -70,20 +72,20 @@
     var c = document.createElement("canvas");
     c.width = 1024; c.height = 512;
     var g = c.getContext("2d");
-    g.fillStyle = "#f4fbff"; g.fillRect(0, 0, 1024, 512);
+    g.fillStyle = "#e9f0f5"; g.fillRect(0, 0, 1024, 512);
     // Skate marks: lots of faint curvy scratches.
-    g.strokeStyle = "rgba(120,170,210,0.22)"; g.lineWidth = 1.5;
+    g.strokeStyle = "rgba(110,150,185,0.16)"; g.lineWidth = 1.2;
     for (var i = 0; i < 70; i++) {
       var x = (i * 173) % 1024, y = (i * 97) % 512;
       g.beginPath(); g.arc(x, y, 40 + (i * 31) % 120, i, i + 1.2); g.stroke();
     }
     // Blue lines and the red center line.
-    g.fillStyle = "#2563eb"; g.fillRect(300, 0, 14, 512); g.fillRect(710, 0, 14, 512);
-    g.fillStyle = "#e11d48"; g.fillRect(506, 0, 12, 512);
+    g.fillStyle = "#1f56b5"; g.fillRect(302, 0, 10, 512); g.fillRect(712, 0, 10, 512);
+    g.fillStyle = "#c8243a"; g.fillRect(507, 0, 10, 512);
     // Center circle and dot.
-    g.strokeStyle = "#2563eb"; g.lineWidth = 6;
+    g.strokeStyle = "#1f56b5"; g.lineWidth = 4;
     g.beginPath(); g.arc(512, 256, 95, 0, Math.PI * 2); g.stroke();
-    g.fillStyle = "#2563eb"; g.beginPath(); g.arc(512, 256, 10, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "#1f56b5"; g.beginPath(); g.arc(512, 256, 8, 0, Math.PI * 2); g.fill();
     return new THREE.CanvasTexture(c);
   }
 
@@ -109,43 +111,34 @@
   ice.receiveShadow = true;
   scene.add(ice);
 
-  // A yellow-and-white rim around the ice, like the boards.
+  // A dark rim around the ice, like the boards.
   var rim = new THREE.Mesh(
     new THREE.ShapeGeometry(roundedRect(RINK_W + 0.5, RINK_D + 0.5, 2.25), 24),
-    new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.6 })
+    new THREE.MeshStandardMaterial({ color: 0x2a3644, roughness: 0.7 })
   );
   rim.rotation.x = -Math.PI / 2; rim.position.y = -0.03;
   scene.add(rim);
   var floor = new THREE.Mesh(
     new THREE.PlaneGeometry(80, 80),
-    new THREE.MeshStandardMaterial({ color: 0xa9d4f5, roughness: 1 })
+    new THREE.MeshStandardMaterial({ color: 0x0d1218, roughness: 1 })
   );
   floor.rotation.x = -Math.PI / 2; floor.position.y = -0.06;
   scene.add(floor);
 
-  // Fun extras: a puck and three practice cones.
+  // A puck.
   var puck = new THREE.Mesh(
     new THREE.CylinderGeometry(0.038, 0.038, 0.025, 20),
     new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.5 })
   );
   puck.castShadow = true;
   scene.add(puck);
-  [[-3.2, -2.2], [0.4, -2.6], [3.6, -2.0]].forEach(function (xz) {
-    var cone = new THREE.Mesh(
-      new THREE.ConeGeometry(0.11, 0.3, 20),
-      new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.6 })
-    );
-    cone.position.set(xz[0], 0.15, xz[1]);
-    cone.castShadow = true;
-    scene.add(cone);
-  });
 
   // ---------- 4. The skaters -----------------------------------------
   // The blue one is the PRO (or the goal for your age).
-  var refFigure = new window.SkaterFigure({ name: "PRO", nameColor: "#2563eb", jersey: 0x2563eb, helmet: 0x1e3a8a, socks: 0xffffff });
+  var refFigure = new window.SkaterFigure({ name: "PRO", nameColor: "#4da3ff", jersey: 0x2f7fd6, helmet: 0x12335c, socks: 0x2f7fd6 });
   scene.add(refFigure.group);
   // The orange one is YOU. It stays hidden until there is a pose to show.
-  var kidFigure = new window.SkaterFigure({ name: "YOU", nameColor: "#ea580c", jersey: 0xf97316, helmet: 0xffffff, socks: 0xfde68a });
+  var kidFigure = new window.SkaterFigure({ name: "YOU", nameColor: "#ff9f43", jersey: 0xf08a24, helmet: 0xe9edf2, socks: 0xf08a24 });
   kidFigure.group.visible = false;
   scene.add(kidFigure.group);
 
@@ -154,7 +147,11 @@
   var strideOn = false;   // is the blue skater doing a stride right now?
   var strideClock = 0;    // how far we are into the stride movie
   var hasKid = false;
-  var BLUE = "#2563eb";
+  var BLUE = "#4da3ff";
+
+  // Where the skaters stand, and how we compare them.
+  var compareMode = "side";  // "side" = next to each other, "overlay" = on top of each other
+  var gap = 2.5;             // meters between the two skaters in side-by-side mode
 
   // Add the angle signs and "pizza slices" to a skater.
   //   colors = { knee: "...", lean: "...", push: "..." }
@@ -199,15 +196,22 @@
     });
     refFigure.update(pose);
     decorate(refFigure, pose, { knee: BLUE, lean: BLUE, push: BLUE }, push > 0.35);
-    // Park the puck next to the stick blade.
-    puck.position.set(refFigure.group.position.x + pose.stickBlade.x + 0.12, 0.0125, pose.stickBlade.z + 0.1);
+    // Park the puck next to the stick blade, wherever the skater stands.
+    var at = refFigure.group.position;
+    puck.position.set(at.x + pose.stickBlade.x + 0.12, 0.0125, at.z + pose.stickBlade.z + 0.1);
   }
 
   // ---------- 5. Camera views ----------------------------------------
   // Where the camera looks, and how far away it sits.
+  var lastView = "side";
   function setView(name) {
-    var target = new THREE.Vector3(hasKid ? 0.2 : 0.3, 0.7, 0);
-    var dist = hasKid ? 5.6 : 3.6;
+    lastView = name;
+    // Look at the middle of whoever is on the ice.
+    var r = refFigure.group.position, k = kidFigure.group.position;
+    var cx = hasKid ? (r.x + k.x) / 2 : r.x, cz = hasKid ? (r.z + k.z) / 2 : r.z;
+    var spread = hasKid ? Math.sqrt((r.x - k.x) * (r.x - k.x) + (r.z - k.z) * (r.z - k.z)) : 0;
+    var target = new THREE.Vector3(cx + 0.25, 0.7, cz);
+    var dist = 3.6 + spread * 0.8;
     // On a tall, skinny screen (a phone) step back so everything fits.
     var aspect = camera.aspect || 1;
     if (aspect < 1.3) dist *= 1.3 / aspect;
@@ -221,14 +225,27 @@
     controls.update();
   }
 
-  // Put one skater in the middle, or two skaters side by side.
+  // Put the skaters on their starting spots for the current compare mode.
+  //   side by side: blue on the left, orange on the right
+  //   overlay:      both on the same spot, and blue turns into a "ghost"
+  function place() {
+    var overlay = hasKid && compareMode === "overlay";
+    var half = hasKid && !overlay ? gap / 2 : 0;
+    refFigure.group.position.set(-half, 0, 0);
+    kidFigure.group.position.set(half, 0, 0);
+    refFigure.setGhost(overlay);
+    refFigure.labelsOn = !overlay;   // two sets of signs on one spot would be a mess
+    if (overlay) refFigure.hideAll();
+    setView(lastView);
+  }
+
+  // Show one skater, or two.
   function layout(showKid) {
     var changed = showKid !== hasKid;
     hasKid = showKid;
-    refFigure.group.position.x = showKid ? -1.25 : 0;
-    kidFigure.group.position.x = 1.25;
     kidFigure.group.visible = showKid;
-    if (changed) setView("side");
+    syncCompareUi();
+    if (changed) { lastView = "side"; place(); }
   }
 
   // Make the 3D picture fit its box, even when the window changes size.
@@ -267,11 +284,106 @@
   strideBtn.addEventListener("click", function () {
     strideOn = !strideOn;
     strideClock = 0;
-    strideBtn.textContent = strideOn ? "⏸ Back to stance" : "▶ Show the stride";
+    strideBtn.textContent = strideOn ? "Hold stance" : "Play stride";
     strideBtn.setAttribute("aria-pressed", String(strideOn));
   });
 
-  // ---------- 8. What other files can use ----------------------------
+  // ---------- 8. Moving the skaters ----------------------------------
+  var modeButtons = document.querySelectorAll("[data-compare]");
+  var gapInput = document.getElementById("gap");
+  var gapOut = document.getElementById("gap-out");
+  var resetBtn = document.getElementById("reset-pos");
+
+  function syncCompareUi() {
+    Array.prototype.forEach.call(modeButtons, function (b) {
+      b.disabled = !hasKid;
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-compare") === compareMode));
+    });
+    if (gapInput) gapInput.disabled = !hasKid || compareMode !== "side";
+    if (gapOut) gapOut.textContent = gap.toFixed(1) + " m";
+  }
+  Array.prototype.forEach.call(modeButtons, function (b) {
+    b.addEventListener("click", function () {
+      compareMode = b.getAttribute("data-compare");
+      syncCompareUi();
+      place();
+    });
+  });
+  if (gapInput) gapInput.addEventListener("input", function () {
+    gap = Number(gapInput.value);
+    syncCompareUi();
+    place();
+  });
+  if (resetBtn) resetBtn.addEventListener("click", place);
+  syncCompareUi();
+
+  // Dragging: press on a skater and slide it across the ice.
+  // A "ray" is an invisible line from the camera through your pointer.
+  var raycaster = new THREE.Raycaster();
+  var icePlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); // the flat ice at height 0
+  var pointer = new THREE.Vector2();
+  var grabbed = null;                    // the skater we are dragging right now
+  var grabOffset = new THREE.Vector3();  // where on the skater we grabbed it
+  var hitPoint = new THREE.Vector3();
+
+  function aim(ev) {
+    var box = renderer.domElement.getBoundingClientRect();
+    pointer.x = ((ev.clientX - box.left) / box.width) * 2 - 1;
+    pointer.y = -((ev.clientY - box.top) / box.height) * 2 + 1;
+    raycaster.setFromCamera(pointer, camera);
+  }
+  function bodyParts(fig) {
+    return fig.group.children.filter(function (m) { return m.userData.body && m.visible; });
+  }
+  // Which skater is under the pointer? (null = none)
+  function skaterUnderPointer() {
+    var best = null, bestDist = Infinity;
+    [kidFigure, refFigure].forEach(function (fig) {
+      if (!fig.group.visible) return;
+      var hits = raycaster.intersectObjects(bodyParts(fig), false);
+      if (hits.length && hits[0].distance < bestDist) { best = fig; bestDist = hits[0].distance; }
+    });
+    return best;
+  }
+
+  // We listen on the box AROUND the 3D picture, in the "capture" phase,
+  // so we hear the press before the spin-the-camera controls do.
+  stage.addEventListener("pointerdown", function (ev) {
+    if (ev.button !== undefined && ev.button !== 0) return;
+    aim(ev);
+    var fig = skaterUnderPointer();
+    if (!fig || !raycaster.ray.intersectPlane(icePlane, hitPoint)) return;
+    grabbed = fig;
+    grabOffset.copy(fig.group.position).sub(hitPoint);
+    controls.enabled = false;          // do not spin the camera while dragging
+    stage.classList.add("dragging");
+  }, true);
+  window.addEventListener("pointermove", function (ev) {
+    if (!grabbed) {
+      // Show a "grab" hand when the pointer is over a skater.
+      if (ev.target === renderer.domElement) {
+        aim(ev);
+        stage.classList.toggle("can-grab", !!skaterUnderPointer());
+      }
+      return;
+    }
+    aim(ev);
+    if (!raycaster.ray.intersectPlane(icePlane, hitPoint)) return;
+    // Keep the skater on the ice.
+    var x = Math.max(-RINK_W / 2 + 1, Math.min(RINK_W / 2 - 1, hitPoint.x + grabOffset.x));
+    var z = Math.max(-RINK_D / 2 + 0.6, Math.min(RINK_D / 2 - 0.6, hitPoint.z + grabOffset.z));
+    grabbed.group.position.set(x, 0, z);
+  });
+  function letGo() {
+    if (!grabbed) return;
+    grabbed = null;
+    controls.enabled = true;
+    stage.classList.remove("dragging");
+  }
+  window.addEventListener("pointerup", letGo);
+  window.addEventListener("pointercancel", letGo);
+
+  // ---------- 9. What other files can use ----------------------------
   window.Coach3D = {
     refFigure: refFigure,
     kidFigure: kidFigure,
