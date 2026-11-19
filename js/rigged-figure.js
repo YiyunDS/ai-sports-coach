@@ -56,6 +56,58 @@
     return (fabric[kind] = t);
   }
 
+  // ---- Team colors, stripes and the shoulder panel ----
+  // The model stores two "rulers" at every point of the jersey and socks
+  // (see build_skater.py): red tells us where the stripes go, green where
+  // the shoulder panel is. Here we add a few lines to the paint program
+  // (the "shader") that turn those rulers into sharp-edged colors.
+  function teamColors(material, team, trim) {
+    material.onBeforeCompile = function (shader) {
+      shader.uniforms.teamColor = { value: team };
+      shader.uniforms.trimColor = { value: trim };
+      shader.fragmentShader = "uniform vec3 teamColor;\nuniform vec3 trimColor;\n" +
+        shader.fragmentShader.replace("#include <color_fragment>", [
+          "float ruler = vColor.r, yoke = vColor.g;",
+          "float soft = max(fwidth(ruler), 0.002);          // one pixel wide, so edges are smooth",
+          "float softY = max(fwidth(yoke), 0.002);",
+          "vec3 white = vec3(0.9, 0.91, 0.92);",
+          "vec3 paintColor = teamColor;",
+          "// stripes: dark, white, dark while the ruler goes from 0.8 down to 0.2",
+          "float inBand = smoothstep(0.2 - soft, 0.2 + soft, ruler) - smoothstep(0.8 - soft, 0.8 + soft, ruler);",
+          "float inWhite = smoothstep(0.41 - soft, 0.41 + soft, ruler) - smoothstep(0.59 - soft, 0.59 + soft, ruler);",
+          "paintColor = mix(paintColor, trimColor, inBand);",
+          "paintColor = mix(paintColor, white, inWhite);",
+          "// shoulder panel, with a white line along its edge",
+          "paintColor = mix(paintColor, white, smoothstep(0.44 - softY, 0.44 + softY, yoke));",
+          "paintColor = mix(paintColor, trimColor, smoothstep(0.5 - softY, 0.5 + softY, yoke));",
+          "diffuseColor.rgb *= paintColor;"
+        ].join("\n"));
+    };
+  }
+
+  // ---- The number on the back: white digits with a dark outline,
+  //      painted on a see-through picture ----
+  function numberPaint(number, trim) {
+    var c = document.createElement("canvas");
+    c.width = c.height = 256;
+    var g = c.getContext("2d");
+    if (number) {
+      g.font = "700 190px 'Barlow Condensed', 'Arial Narrow', Arial, sans-serif";
+      g.textAlign = "center"; g.textBaseline = "middle";
+      g.lineJoin = "round"; g.lineWidth = 16;
+      g.strokeStyle = "#" + new THREE.Color(trim).getHexString();
+      g.fillStyle = "#eef0f2";
+      g.strokeText(String(number), 128, 136); g.fillText(String(number), 128, 136);
+    }
+    var t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.flipY = false; // 3D model files count picture rows from the top
+    t.anisotropy = 4;
+    var m = new THREE.MeshStandardMaterial({ map: t, transparent: true, alphaTest: 0.35, roughness: 0.75 });
+    m.name = "number";
+    return m;
+  }
+
   // How far the model's ankle is above the bottom of its skate blade.
   var ankleToIce = null;
 
@@ -89,26 +141,17 @@
       if (!paints[name]) {
         var m = o.material.clone();
         m.envMapIntensity = 0.8;
-        if (name === "team") { m.normalMap = fabricMap("knit"); m.normalScale.set(0.22, 0.22); m.roughness = 0.85; }
+        if (name === "team") {
+          m.normalMap = fabricMap("knit"); m.normalScale.set(0.22, 0.22); m.roughness = 0.85;
+          teamColors(m, color(opts.jersey), color(opts.trim === undefined ? 0x0f172a : opts.trim));
+        }
+        if (name === "number") m = numberPaint(opts.number, opts.trim === undefined ? 0x0f172a : opts.trim);
         if (name === "pants") { m.color = color(opts.pants || 0x15181e); m.normalMap = fabricMap("nylon"); m.normalScale.set(0.25, 0.25); m.roughness = 0.5; }
         if (name === "helmet" && opts.helmet !== undefined) m.color = color(opts.helmet);
         if (name === "glove" && opts.glove !== undefined) m.color = color(opts.glove);
         paints[name] = m;
       }
       o.material = paints[name];
-      // Jersey and socks: the model marks each point as team color, white
-      // stripe or dark trim (by how bright it is). Paint in our colors.
-      if (o.geometry.attributes.color) {
-        o.geometry = o.geometry.clone(); // our own copy, so the other skater keeps its colors
-        var col = o.geometry.attributes.color, team = color(opts.jersey), trim = color(opts.trim || 0x0f172a);
-        var white = new THREE.Color(0xf2f4f6);
-        for (var i = 0; i < col.count; i++) {
-          var code = col.getX(i);
-          var c = code > 0.6 ? team : code > 0.08 ? white : trim;
-          col.setXYZ(i, c.r, c.g, c.b);
-        }
-        col.needsUpdate = true;
-      }
     });
 
     // The bones, by name.

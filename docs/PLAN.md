@@ -296,6 +296,24 @@ Honest limits: this is not a console game. No scanned face, no cloth
 simulation, no hand-painted textures; the face is plain and the pants
 are a little rounder than real hockey pants.
 
+### Phase 7: Polishing the model (done)
+
+- Helmet rebuilt to fit the measured head: comes down to the eyebrows in
+  front and over the ears and neck behind, with a raised strip on top, a
+  small brim, air vents and ear covers.
+- Cage curves around the face from the brim to under the chin, with a
+  chin cup and side clips.
+- Face: eyes with iris and pupil, eyebrows, lips and short dark hair.
+- Jersey: longer (hangs over the pants to the hips), looser at the
+  waist, a shoulder panel in the trim color with a white line, a number
+  on the back (14 for the pro, 7 for you).
+- Stripes and the shoulder panel are drawn by the page's paint program
+  from two "rulers" stored in the model, so their edges are sharp.
+- Pants: smoother and wider at the bottom of each leg.
+- Skates: white laces and a shiny toe cap.
+About 62,000 triangles, 2.3 MB. Still about 120 frames per second.
+Screenshots: `docs/screenshots/phase7/`.
+
 ### Phase 5: Check the pro against a real skater (needs a video)
 
 - Run a good side-view video of a strong skater through the Phase 1
