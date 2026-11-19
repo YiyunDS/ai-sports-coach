@@ -7,7 +7,7 @@
     "strideExtension: the knee angle of your pushing leg at the end of the push. Close to 180 = a full push.",
     "yellowZone: if you are outside the range by this many degrees or less, the joint is yellow. More than that is red.",
     "IMPORTANT: these numbers are STARTER GUESSES. Replace them with angles you measure from the clips in SOURCES.md.",
-    "If you change this file, also copy it into js/default-targets.js (or use the 'Load my targets.json' button on the page)."
+    "If you change this file, also copy it into js/default-targets.js (or use 'Edit target angles > Load targets.json' on the page)."
   ],
   "yellowZone": 10,
   "pro": {

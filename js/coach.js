@@ -155,20 +155,22 @@
       ", push " + rangeText(target.strideExtension) + ".";
 
     if (state.frames) {
-      state.analysis = M.analyzeFrames(state.frames, target, state.targets.yellowZone, state.span, state.flat);
+      state.analysis = M.analyzeFrames(state.frames, target, state.targets.yellowZone, state.span, state.flat, state.rhythm);
       drawCards(target);
       drawTimeline();
-      showFrame(state.index);
+      // (While the replay is playing, the next tick redraws by itself.
+      //  Redrawing here would make the video jump back a little.)
+      if (!state.playing) showFrame(state.index);
     }
   }
 
   // ---------- Showing one moment on the orange skater -----------------
 
-  // Is this moment at (or right next to) the top of a push?
-  function nearPeak(i) {
-    var f = state.analysis.perFrame, reach = Math.ceil(state.span / 2);
-    for (var j = i - reach; j <= i + reach; j++) if (f[j] && f[j].isPeak) return true;
-    return false;
+  // Is this moment at (or right next to) the top of a push? Returns
+  // that push's own moment (so they all show the push's grade), or null.
+  function pushAt(i) {
+    var f = state.analysis.perFrame;
+    return f[i].peak >= 0 ? f[f[i].peak] : null;
   }
 
   // Draw one moment.
@@ -182,21 +184,27 @@
     i = M.clamp(i, 0, n - 1);
     if (i >= n - 1) blend = 0;
     state.index = i;
-    var f = state.analysis.perFrame[i], peak = nearPeak(i);
+    var f = state.analysis.perFrame[i], peak = pushAt(i);
     var pose = blend > 0 ? M.lerpPose(state.frames[i], state.frames[i + 1], blend) : state.frames[i];
 
     // Pick the traffic-light color for each joint.
     var grades = {};
     grades[f.m.glideSide + "Knee"] = f.scores.kneeBend.grade;   // knee bend -> glide knee
     grades.lHip = grades.rHip = grades.neck = f.scores.forwardLean.grade; // lean -> hips and neck
-    if (peak) grades[f.m.pushSide + "Knee"] = f.scores.strideExtension.grade; // push -> push knee
+    if (peak) grades[f.m.pushSide + "Knee"] = peak.scores.strideExtension.grade; // push -> push knee
 
     C.kidFigure.update(pose, grades);
     C.decorate(C.kidFigure, pose, {
       knee: COLORS[f.scores.kneeBend.grade],
       lean: COLORS[f.scores.forwardLean.grade],
-      push: COLORS[f.scores.strideExtension.grade]
-    }, peak, f.m); // f.m = the numbers the report uses, so the signs match the cards
+      push: COLORS[(peak || f).scores.strideExtension.grade]
+    }, !!peak, {   // the numbers the report uses, so the signs match the cards
+      kneeBend: f.m.kneeBend, forwardLean: f.m.forwardLean, glideSide: f.m.glideSide, pushSide: f.m.pushSide,
+      strideExtension: (peak || f).m.strideExtension
+    });
+    el.timeline.setAttribute("aria-valuenow", String(i + 1));
+    el.timeline.setAttribute("aria-valuemin", "1");
+    el.timeline.setAttribute("aria-valuemax", String(n));
 
     // Tell the pro where the kid is in the stride, so they move together.
     var r = state.rhythm[i], next = state.rhythm[Math.min(n - 1, i + 1)];
@@ -232,10 +240,26 @@
   }
 
   function drawCards(target) {
-    var summary = state.analysis.summary, stars = 0;
+    var summary = state.analysis.summary, stars = 0, measured = CHECKS.length;
     el.cards.textContent = "";
     CHECKS.forEach(function (check) {
       var s = summary[check.id], range = target[check.id];
+      if (!s) {
+        // We could not measure this one (no clear push in the clip).
+        var none = make("div", "check");
+        var top = make("div", "check-head");
+        top.appendChild(make("span", "check-name", check.name));
+        top.appendChild(make("span", "chip", "Not seen"));
+        none.appendChild(top);
+        var dash = make("div", "check-nums");
+        dash.appendChild(make("span", "big", "–"));
+        dash.appendChild(make("span", "goal", "Target " + rangeText(range)));
+        none.appendChild(dash);
+        none.appendChild(make("p", "tip", "The coach did not see a full push in this clip. Film a few strong strides from the side to measure it."));
+        el.cards.appendChild(none);
+        measured--;
+        return;
+      }
       if (s.grade === "good") stars++;
       var card = make("div", "check " + s.grade);
       var head = make("div", "check-head");
@@ -261,7 +285,7 @@
       card.appendChild(make("p", "tip", check.tip(Math.round(s.off))));
       el.cards.appendChild(card);
     });
-    el.stars.textContent = stars + " of " + CHECKS.length + " on target";
+    el.stars.textContent = stars + " of " + measured + " on target";
   }
 
   // ---------- The replay timeline --------------------------------------
@@ -287,11 +311,17 @@
       var rows = [
         COLORS[f.scores.kneeBend.grade],
         COLORS[f.scores.forwardLean.grade],
-        nearPeak(i) ? COLORS[f.scores.strideExtension.grade] : COLORS.none
+        pushAt(i) ? COLORS[pushAt(i).scores.strideExtension.grade] : COLORS.none
       ];
       for (var r = 0; r < 3; r++) {
         g.fillStyle = rows[r];
         g.fillRect(x, r * (ROW_H + ROW_GAP), Math.ceil(cell), ROW_H);
+      }
+      // Moments NOT seen from the side are dimmed: their knee and lean
+      // numbers are rough, and the summary does not use them.
+      if (state.analysis.sideOn && !f.m.fromPicture) {
+        g.fillStyle = "rgba(11,15,20,0.62)";
+        g.fillRect(x, 0, Math.ceil(cell), 2 * ROW_H + ROW_GAP);
       }
     }
     // A bright box around the moment we are showing now.
@@ -301,7 +331,7 @@
 
   // Click or drag on the timeline to jump to that moment.
   function timelineJump(ev) {
-    if (!state.frames) return;
+    if (!state.frames || state.busy) return;
     var box = el.timeline.getBoundingClientRect();
     var part = (ev.clientX - box.left) / Math.max(1, box.width);
     setPlaying(false);
@@ -313,7 +343,7 @@
   window.addEventListener("pointerup", function () { dragging = false; });
   // Arrow keys work too.
   el.timeline.addEventListener("keydown", function (ev) {
-    if (!state.frames) return;
+    if (!state.frames || state.busy) return;
     if (ev.key === "ArrowLeft" || ev.key === "ArrowRight") {
       ev.preventDefault();
       setPlaying(false);
@@ -401,9 +431,24 @@
     setPlaying(true);
   }
 
+  // Forget the report on screen (used when a new video is chosen).
+  function clearReport() {
+    setPlaying(false);
+    state.frames = state.analysis = state.rhythm = state.flat = state.track = null;
+    state.hasVideo = false;
+    state.index = 0;
+    el.results.hidden = true;
+    el.qualityNote.hidden = true;
+    el.trackInfo.textContent = "";
+    C.layout(false);
+    C.setSync(null);   // the pro skates on its own again ("Play stride" works)
+  }
+
   el.demo.addEventListener("click", function () {
     if (state.busy) return;
-    var raw = M.makeDemoFrames();
+    setPlaying(false);  // stop a video replay that may be running
+    el.trackInfo.textContent = "";
+    var raw = window.CoachStride.makeDemoSession(DEMO_GAP);
     startReport(raw, raw.map(function (_, i) { return i * DEMO_GAP; }), false, null);
     say("Sample session loaded: a skater who stands a little too tall and tires near the end.");
   });
@@ -562,6 +607,10 @@
     el.demo.disabled = on;
     el.videoFile.disabled = on;
     el.pickTime.disabled = on;
+    // The replay must not move the video while the coach is reading it.
+    el.play.disabled = on; el.worst.disabled = on; el.speed.disabled = on;
+    el.age.disabled = on; el.refMode.disabled = on;
+    Array.prototype.forEach.call(document.querySelectorAll('input[name="level"]'), function (r) { r.disabled = on; });
     el.progress.hidden = !on;
     updateAnalyzeButton();
   }
@@ -694,10 +743,13 @@
       var plan = T.sampleTimes(duration, gap, state.seed.t);
       var times = plan.times, n = times.length, found = new Array(n), done = 0;
       found[plan.seedIndex] = start;
+      var lastPercent = -1;
       function onStep() {
         done++;
         el.progressBar.value = done / Math.max(1, n - 1);
-        say("Following the skater: " + Math.round(done / Math.max(1, n - 1) * 100) + "%");
+        // Say it every 5% (not 400 times, which is hard on screen readers).
+        var percent = Math.round(done / Math.max(1, n - 1) * 20) * 5;
+        if (percent !== lastPercent) { lastPercent = percent; say("Following the skater: " + percent + "%"); }
       }
       var forward = [], backward = [];
       for (var f = plan.seedIndex + 1; f < n; f++) forward.push(f);
@@ -706,7 +758,7 @@
       var stopEarlier = await follow(finder, video, times, backward, start, W, H, found, onStep, startPicture, gap);
 
       // Keep the moments where we found the skater AND can trust the legs.
-      var raw = [], keptTimes = [], track = [], tracked = 0, heights = [], weights = [], flat = [], sideCount = 0, cutOff = 0;
+      var raw = [], keptTimes = [], track = [], tracked = 0, heights = [], weights = [], flat = [], sides = [], sideCount = 0, cutOff = 0;
       for (var i = 0; i < n; i++) {
         if (!found[i]) continue;
         tracked++;
@@ -718,11 +770,19 @@
         track.push({ pts: found[i].pts, box: found[i].box });
         heights.push(found[i].box.h / H);
         weights.push(found[i].sure);
-        // Filmed from the side? Then knee and lean from the flat picture.
-        var side = M.seenFromSide(pose);
-        flat.push(side ? M.measureFlat(found[i].pts) : null);
-        if (side) sideCount++;
+        sides.push(M.seenFromSide(pose));
+        flat.push(M.measureFlat(found[i].pts));
       }
+      // Filmed from the side? Then knee and lean come from the flat
+      // picture. One moment on its own can be wrong, so each moment goes
+      // with what most of its neighbors say (2 before, 2 after).
+      flat = flat.map(function (f, i) {
+        var yes = 0, count = 0;
+        for (var j = Math.max(0, i - 2); j <= Math.min(sides.length - 1, i + 2); j++) { count++; if (sides[j]) yes++; }
+        var side = yes * 2 > count;
+        if (side) sideCount++;
+        return side ? f : null;
+      });
       el.trackInfo.textContent = "Followed in " + tracked + " of " + n + " frames · " + raw.length + " clear enough to measure";
 
       if (raw.length < 5) {
@@ -751,9 +811,13 @@
       if (cutOff > 0) {
         notes.push(cutOff + " frames were skipped because part of the skater was outside the picture.");
       }
-      if (sideCount > 0) {
-        notes.push("Knee bend and lean were measured on the flat picture in " + sideCount + " of " + raw.length +
-          " frames, where the skater was seen from the side.");
+      if (state.analysis && state.analysis.sideOn) {
+        notes.push("Knee bend and lean come from the " + state.analysis.sideOn + " of " + raw.length +
+          " frames where the skater was seen from the side. The other frames are dimmed in the replay bar.");
+      } else if (sideCount > 0) {
+        notes.push("Only " + sideCount + " frames showed the skater from the side, too few to rely on, so knee bend and lean are rough estimates.");
+      } else {
+        notes.push("The skater was never seen from the side, so knee bend and lean are rough estimates.");
       }
       notes.push("Angles are most accurate when the skater is filmed from the side.");
       el.qualityNote.textContent = notes.join(" ");
@@ -765,9 +829,8 @@
       if (/import|fetch|network|load/i.test(msg) && !/video|skater|frames/i.test(msg)) {
         // A page shared online is not allowed to download the model, so video
         // analysis only works when the page is opened from your own computer.
-        msg = location.protocol === "file:" || /^(localhost|127\.0\.0\.1)$/.test(location.hostname)
-          ? "The pose-detection model could not load. Check the internet connection and try again."
-          : "Video analysis is blocked in this online preview. Download the project and open index.html on your computer, or use Load sample session here.";
+        msg = "The pose-detection model could not load. Check the internet connection and try again. " +
+          "(Some online previews block it. If so, download the project and open index.html on your computer.)";
       }
       say(msg);
     } finally {
@@ -787,10 +850,8 @@
     // Show the video. It stays on this computer.
     if (videoUrl) URL.revokeObjectURL(videoUrl);
     videoUrl = URL.createObjectURL(file);
-    setPlaying(false);
-    state.hasVideo = false;
+    clearReport();   // the old report belongs to the old video
     el.videoPanel.hidden = false;
-    el.trackInfo.textContent = "";
     el.seedInfo.textContent = "Click the skater in the video.";
     el.preview.src = videoUrl;
     el.preview.load();
@@ -808,6 +869,15 @@
     try { el.preview.currentTime = 0.01; } catch (e) { /* fine */ }
   });
   el.analyze.addEventListener("click", analyzeVideo);
+  // If you drag along the timeline quickly, the video can still be busy
+  // jumping to an earlier spot. When it is done, send it to the newest one.
+  el.preview.addEventListener("seeked", function () {
+    if (state.busy || state.playing || !state.hasVideo || !state.frames) return;
+    var want = state.times[state.index];
+    if (Math.abs(el.preview.currentTime - want) > 0.03) {
+      try { el.preview.currentTime = want; } catch (e) { /* fine */ }
+    }
+  });
 
   el.age.addEventListener("change", refresh);
   el.refMode.addEventListener("change", refresh);

@@ -15,7 +15,7 @@
     style.css              the colors and sizes
     targets.json           the "good skater" angles - kids can edit these!
     js/angles.js           the math: measures angles from joint positions
-    js/stride.js           how the pro skates: the stride keyframes
+    js/stride.js           how the pro skates: the stride keyframes (and the sample skater)
     js/default-targets.js  a copy of targets.json the page can always read
     js/figure.js           draws the simpler 3D skater, built from shaped pieces (the backup)
     js/rigged-figure.js    draws the realistic 3D skater (the model made in Blender)
@@ -47,14 +47,17 @@
     <!-- The 3D picture -->
     <section class="stage-wrap" aria-label="3D view">
       <div id="stage" aria-label="3D view of a hockey skater. Drag the ice to orbit. Drag a skater to move it."></div>
-      <div id="stage-problem" class="stage-problem" hidden></div>
+      <div id="stage-problem" class="stage-problem">Loading the 3D skaters...</div>
       <div class="stage-top">
         <div class="seg" role="group" aria-label="Camera view">
           <button type="button" data-view="side">Side</button>
           <button type="button" data-view="front">Front</button>
           <button type="button" data-view="top">Top</button>
         </div>
-        <button type="button" id="stride-btn" class="ghost-btn" aria-pressed="false">Play stride</button>
+        <div class="stage-top-right">
+          <button type="button" id="angles-btn" class="ghost-btn" aria-pressed="true" title="Show or hide the angle signs">Angles</button>
+          <button type="button" id="stride-btn" class="ghost-btn" aria-pressed="false">Play stride</button>
+        </div>
       </div>
       <div class="stage-bottom">
         <div class="tool">
@@ -140,7 +143,7 @@
         <dl class="glossary">
           <dt>Knee</dt><dd>Angle at the glide knee. A smaller number means a deeper bend and more power.</dd>
           <dt>Lean</dt><dd>How far the back tips forward from straight up.</dd>
-          <dt>Push</dt><dd>Angle of the pushing leg at full stride. Close to 180° is a full extension.</dd>
+          <dt>Push</dt><dd>Angle of the pushing leg at the end of each push. Close to 180° is a full extension.</dd>
         </dl>
       </section>
     </aside>

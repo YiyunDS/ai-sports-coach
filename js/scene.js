@@ -24,6 +24,7 @@
     return;
   }
   var THREE = window.THREE;
+  problem.hidden = true; // the "Loading..." message can go
 
   // ---------- 1. Renderer, scene and camera --------------------------
   // The renderer is the "painter" that draws the picture many times a second.
@@ -58,6 +59,10 @@
   controls.maxPolarAngle = Math.PI * 0.49;  // do not let the camera go under the ice
   controls.minDistance = 1.5;
   controls.maxDistance = 18;
+  // Did the user turn or zoom the camera themself? Then we leave it
+  // alone when the window changes size.
+  var userMovedCamera = false;
+  controls.addEventListener("start", function () { userMovedCamera = true; });
 
   // ---------- 2. Lights ----------------------------------------------
   // Soft light from all around, like a big bright room. Shiny things
@@ -233,6 +238,7 @@
   var compareMode = "side";  // "side" = next to each other, "overlay" = on top of each other
   var gap = 2.5;             // meters between the two skaters in side-by-side mode
 
+  var showAngles = true; // the "Angles" button turns the signs and slices off
   // Add the angle signs and "pizza slices" to a skater.
   //   colors = { knee: "...", lean: "...", push: "..." }
   //   showPush = also label the pushing leg?
@@ -241,6 +247,7 @@
   //              signs should say the same numbers as the report.
   function decorate(fig, pose, colors, showPush, shown) {
     var m = M.measurePose(pose);
+    if (!showAngles) { fig.hide("knee"); fig.hide("lean"); fig.hide("push"); return m; }
     if (shown) {
       m.kneeBend = shown.kneeBend; m.forwardLean = shown.forwardLean; m.strideExtension = shown.strideExtension;
       if (shown.glideSide) { m.glideSide = shown.glideSide; m.pushSide = shown.pushSide; }
@@ -398,9 +405,13 @@
     // a wedge: "half" is how much it widens for each meter of distance.)
     var half = Math.tan((camera.fov / 2) * Math.PI / 180), aspect = camera.aspect || 1.6;
     var dist = 1.15 * Math.max(tall / 2 / half, wide / 2 / (half * aspect)) + 0.6;
+    // Stay inside the rink (on a narrow phone screen the camera would
+    // otherwise back up through the glass).
+    if (name === "side") dist = Math.min(dist, (RINK_D / 2 - 0.7 - target.z) / dir.z);
     controls.target.copy(target);
     camera.position.copy(target).addScaledVector(dir, dist);
     controls.update();
+    userMovedCamera = false;
     Array.prototype.forEach.call(viewButtons, function (b) {
       b.setAttribute("aria-pressed", String(b.getAttribute("data-view") === name));
     });
@@ -425,10 +436,12 @@
     refFigure.labelsOn = !overlay;   // two sets of signs on one spot would be a mess
     if (overlay) refFigure.hideAll();
   }
-  function place() { placeSkaters(); frameView(); }
+  var draggedSkater = false; // did the user slide a skater somewhere by hand?
+  function place() { draggedSkater = false; placeSkaters(); frameView(); }
   function setView(name) {
     lastView = name;
-    if (hasKid && compareMode === "side") placeSkaters();
+    // Skaters you moved by hand stay where you put them.
+    if (hasKid && compareMode === "side" && !draggedSkater) placeSkaters();
     frameView();
   }
 
@@ -447,7 +460,7 @@
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
-    if (refFigure.points) frameView();
+    if (refFigure.points && !userMovedCamera) frameView();
   }
   if (window.ResizeObserver) new ResizeObserver(resize).observe(stage);
   window.addEventListener("resize", resize);
@@ -461,6 +474,8 @@
   function tick(now) {
     var dt = Math.min(0.1, (now - lastTime) / 1000); // seconds since last picture
     lastTime = now;
+    // Nothing to draw while the other tab (Positioning) is showing.
+    if (stage.offsetParent === null) { requestAnimationFrame(tick); return; }
     // Other files go first (coach.js picks the kid's pose and tells the
     // pro where in the stride to be), then we draw the pro to match.
     onTick.forEach(function (fn) { fn(dt); });
@@ -474,6 +489,12 @@
   // ---------- 7. Buttons on top of the 3D picture --------------------
   Array.prototype.forEach.call(document.querySelectorAll("[data-view]"), function (btn) {
     btn.addEventListener("click", function () { setView(btn.getAttribute("data-view")); });
+  });
+  // The "Angles" button shows or hides the angle signs and slices.
+  var anglesBtn = document.getElementById("angles-btn");
+  if (anglesBtn) anglesBtn.addEventListener("click", function () {
+    showAngles = !showAngles;
+    anglesBtn.setAttribute("aria-pressed", String(showAngles));
   });
   var strideBtn = document.getElementById("stride-btn");
   strideBtn.addEventListener("click", function () {
@@ -520,6 +541,7 @@
   var grabbed = null;                    // the skater we are dragging right now
   var grabOffset = new THREE.Vector3();  // where on the skater we grabbed it
   var hitPoint = new THREE.Vector3();
+  var lastHover = 0;
 
   function aim(ev) {
     var box = renderer.domElement.getBoundingClientRect();
@@ -556,7 +578,9 @@
   window.addEventListener("pointermove", function (ev) {
     if (!grabbed) {
       // Show a "grab" hand when the pointer is over a skater.
-      if (ev.target === renderer.domElement) {
+      // (Checked at most 12 times a second: it is slow work.)
+      if (ev.target === renderer.domElement && ev.timeStamp - lastHover > 80) {
+        lastHover = ev.timeStamp;
         aim(ev);
         stage.classList.toggle("can-grab", !!skaterUnderPointer());
       }
@@ -568,6 +592,7 @@
     var x = Math.max(-RINK_W / 2 + 1, Math.min(RINK_W / 2 - 1, hitPoint.x + grabOffset.x));
     var z = Math.max(-RINK_D / 2 + 0.6, Math.min(RINK_D / 2 - 0.6, hitPoint.z + grabOffset.z));
     grabbed.group.position.set(x, 0, z);
+    draggedSkater = true;
   });
   function letGo() {
     if (!grabbed) return;

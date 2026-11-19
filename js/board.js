@@ -170,11 +170,13 @@
   function showResult(counts) {
     var sit = P.getSituation(state.id, state.side);
     var r = P.checkSpot(sit, state.role, state.guess);
-    state.revealed = true;
-    if (counts) {
+    // A check only counts the first time (not after you have seen the
+    // answer, and not when you press Check again without a new try).
+    if (counts && !state.revealed) {
       state.checked++;
       if (r.grade === "good") state.onTarget++;
     }
+    state.revealed = true;
     el.result.hidden = false;
     el.result.className = "pos-result " + (counts ? r.grade : "shown");
     el.grade.textContent = counts ? GRADE_WORDS[r.grade] : "Answer";

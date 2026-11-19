@@ -133,6 +133,7 @@ code { font-size: 0.9em; background: var(--panel-2); padding: 1px 5px; border-ra
   pointer-events: none;
 }
 .stage-top { top: 12px; justify-content: space-between; }
+.stage-top-right { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .stage-bottom { bottom: 12px; }
 .stage-top > *, .stage-bottom > * { pointer-events: auto; }
 .tool {
@@ -324,6 +325,9 @@ details[open] summary { margin-bottom: 8px; }
   .pos-layout { grid-template-areas: "stage" "side"; }
   #stage { height: 58vh; }
   .hint { display: none; }
+  /* On a phone the Compare / Spacing / Reset bar would cover the skaters'
+     legs, so it goes under the 3D picture instead. */
+  .stage-bottom { position: static; padding: 8px 12px 10px; }
   .bar-meta { display: none; }
   .results-body { flex-direction: column; }
 }

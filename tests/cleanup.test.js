@@ -122,9 +122,9 @@ test("every bone keeps one length, and the angles do not change", function () {
 
 test("skates go on the ice and lie flat", function () {
   var p = M.makeStancePose({ kneeBend: 120, forwardLean: 30, strideExtension: 165, push: 0.6, pushSide: "r" });
-  // Lift the whole body 20 cm, and the push skate 3 cm more (a wobble).
+  // Lift the whole body 20 cm, and the push skate 1.2 cm more (a wobble).
   var up = M.mapPose(p, function (q) { return M.add(q, M.pt(0.3, 0.2, 0.1)); });
-  ["rKnee", "rAnkle", "rHeel", "rToe"].forEach(function (k) { up[k] = M.add(up[k], M.pt(0, 0.03, 0)); });
+  ["rKnee", "rAnkle", "rHeel", "rToe"].forEach(function (k) { up[k] = M.add(up[k], M.pt(0, 0.012, 0)); });
   var thigh = boneLength(up, "rHip", "rKnee"), shin = boneLength(up, "rKnee", "rAnkle");
   var g = M.plantSkates([up])[0];
   ["l", "r"].forEach(function (s) {

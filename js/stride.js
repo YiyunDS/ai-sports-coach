@@ -126,13 +126,19 @@
     // The hips slide toward the glide skate: right at t = 0.3, left at 0.8.
     function hipsSide(at) { return S.weightShift * Math.cos(2 * Math.PI * (at - S.deepest)); }
     // The hips sink lowest while the glide knee is bent the most.
-    function hipsBob(at) { return -S.hipBob * Math.cos(4 * Math.PI * (at - S.deepest)); }
+    // How much "room" the stride has: a skater who sits low has a push
+    // leg much longer than the bent glide leg, so they can rise, sink and
+    // roll the skates onto their edges. A skater who stands tall has
+    // almost no room, so those movements get smaller (0.15 to 1).
+    var room = M.clamp((legReach(ext) - legReach(knee)) / 0.08, 0.15, 1);
+    function edgeAt(s) { return curve(S.edge, s) * room; }
+    function hipsBob(at) { return -S.hipBob * room * Math.cos(4 * Math.PI * (at - S.deepest)); }
 
     // How high is the ankle? A skate standing straight up has the ankle
     // BODY.ankleHeight above the ice. A skate tipped onto its edge holds
     // the ankle a little lower (like a tipped-over ruler is less tall).
     function ankleHeightAt(s) {
-      return B.ankleHeight * Math.cos(curve(S.edge, s) / DEG) + Math.max(0, curve(S.lift, s));
+      return B.ankleHeight * Math.cos(edgeAt(s) / DEG) + Math.max(0, curve(S.lift, s));
     }
 
     // How high must the hips be so the glide knee bends to exactly
@@ -169,7 +175,17 @@
     // path's middle line is z = 0).
     function ankleAt(side, at) {
       var s = legTime(side, at), k = keysFor[side], sign = side === "r" ? 1 : -1;
-      return pt(curve(k.forward, s), ankleHeightAt(s), sign * curve(k.out, s));
+      var a = pt(curve(k.forward, s), ankleHeightAt(s), sign * curve(k.out, s));
+      // A leg can only reach so far. A skater who stands tall (hips high)
+      // cannot get the skate as far out as one who sits low. If the
+      // keyframes ask for more than the leg can reach, pull the skate in
+      // toward the hip, so the leg is never straighter than the push
+      // angle and the skate stays on the ice.
+      var hipZ = hipsSide(at) + sign * B.hipHalf, drop = hipHeight(at) - a.y, r = legReach(ext);
+      var farthest = Math.sqrt(Math.max(0, r * r - drop * drop));
+      var dx = a.x, dz = a.z - hipZ, d = Math.sqrt(dx * dx + dz * dz);
+      if (d > farthest) { a.x = dx * farthest / d; a.z = hipZ + dz * farthest / d; }
+      return a;
     }
 
     var p = {}, edges = {};
@@ -196,11 +212,11 @@
       var heading = norm(lifted ? add(scale(norm(move), 0.4), pt(0.6, 0, 0)) : move);
       // The bottom of the boot is 6 cm under the ankle (less when tipped).
       var lift = Math.max(0, curve(S.lift, s));
-      var sole = leg.end.y - lift - 0.06 * Math.cos(curve(S.edge, s) / DEG);
+      var sole = leg.end.y - lift - 0.06 * Math.cos(edgeAt(s) / DEG);
       var toeY = sole + lift * (lifted ? 0.6 : 1), heelY = sole + lift * (lifted ? 1.3 : 1);
       p[side + "Toe"] = pt(leg.end.x + B.footFront * heading.x, toeY, leg.end.z + B.footFront * heading.z);
       p[side + "Heel"] = pt(leg.end.x - B.footBack * heading.x, heelY, leg.end.z - B.footBack * heading.z);
-      edges[side] = curve(S.edge, s);
+      edges[side] = edgeAt(s);
     });
 
     // ---- Upper body: lean forward, shoulders turn with the arm swing ----
@@ -255,7 +271,33 @@
     return side === "r" ? s % 1 : (s + 0.5) % 1;
   }
 
-  var api = { STRIDE: STRIDE, curve: curve, legReach: legReach, makeStridePose: makeStridePose, cycleTimeFor: cycleTimeFor };
+  // ---------- A pretend kid, for trying the page without a video -----
+  // A short "video" of poses: a skater with a real skating motion who
+  // stands too tall, does not push all the way, and gets tired (even
+  // straighter knees, less lean) near the end.
+  //   gap = seconds between poses
+  function makeDemoSession(gap) {
+    var frames = [], n = 64;
+    for (var i = 0; i < n; i++) {
+      var part = i / n;
+      var tired = part > 0.6 ? (part - 0.6) / 0.4 : 0;
+      var pose = makeStridePose((i * gap) / STRIDE.secondsPerCycle, {
+        kneeBend: 142 + 12 * tired + 2 * Math.sin(i * 0.9),
+        forwardLean: 17 - 8 * tired + 1.5 * Math.cos(i * 1.3),
+        strideExtension: 163
+      }).pose;
+      delete pose.stickTop; delete pose.stickBlade;   // the camera does not find sticks
+      // Pretend the camera filmed from a funny direction and distance,
+      // so we can check that normalizeFrames() fixes it.
+      var c = Math.cos(2.1), s = Math.sin(2.1);
+      frames.push(M.mapPose(pose, function (q) {
+        return pt((q.x * c - q.z * s) * 0.8, q.y * 0.8 - 0.5, (q.x * s + q.z * c) * 0.8);
+      }));
+    }
+    return frames;
+  }
+
+  var api = { STRIDE: STRIDE, curve: curve, legReach: legReach, makeStridePose: makeStridePose, cycleTimeFor: cycleTimeFor, makeDemoSession: makeDemoSession };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.CoachStride = api;
 })(typeof window !== "undefined" ? window : this);

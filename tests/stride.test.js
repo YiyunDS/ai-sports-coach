@@ -134,4 +134,31 @@ test("a stride from the video maps to the same leg in the pro's cycle", function
   assert.strictEqual(at(St.cycleTimeFor("r", 0.45)).pushSide, "r");
 });
 
+test("a skater who stands tall still keeps the skates on the ice and the legs in one piece", function () {
+  var tall = { kneeBend: 150, forwardLean: 15, strideExtension: 162 };
+  eachMoment(function (t) {
+    var r = at(t, tall);
+    assert.ok(onIce(r, "l") || onIce(r, "r"), "both skates in the air at " + t);
+    ["l", "r"].forEach(function (s) {
+      var knee = M.angleAt(r.pose[s + "Hip"], r.pose[s + "Knee"], r.pose[s + "Ankle"]);
+      assert.ok(knee <= 162 + 1e-6, s + " leg straighter than the push angle: " + knee.toFixed(1) + " at " + t);
+      assert.ok(bladeBottom(r, s) > -1e-6, "skate in the ice at " + t);
+    });
+  });
+});
+
+test("the sample skater strides, stands too tall and tires", function () {
+  var targets = require("../js/default-targets.js");
+  var frames = M.normalizeFrames(St.makeDemoSession(0.1));
+  var rhythm = M.strideSignal(frames);
+  assert.ok(rhythm[rhythm.length - 1].stride >= 4, "several strides");
+  var r = M.analyzeFrames(frames, M.getTarget(targets, 9, "beginner"), targets.yellowZone, 2, null, rhythm);
+  assert.strictEqual(r.summary.kneeBend.grade, "close");
+  assert.ok(r.summary.kneeBend.off > 0, "knees too straight");
+  assert.ok(r.summary.forwardLean.off < 0, "standing too tall");
+  assert.ok(r.peaks.length >= 3 && r.summary.strideExtension, "pushes found");
+  assert.ok(Math.abs(r.summary.strideExtension.value - 163) < 4, "push " + r.summary.strideExtension.value);
+  assert.ok(r.worstFrame > 38, "the biggest slip is near the tired end");
+});
+
 console.log("All stride tests passed!");

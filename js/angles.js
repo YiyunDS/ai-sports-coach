@@ -180,7 +180,7 @@
         if (ext[j] > ext[i] || (ext[j] === ext[i] && j < i)) isTop = false;
       }
       // It only counts as a push if one leg is clearly straighter than the other.
-      var legsDiffer = ext[i] - perFrame[i].m.knee3D >= 12;
+      var legsDiffer = ext[i] - perFrame[i].m.knee3D >= 8;
       if (isTop && legsDiffer && ext[i] >= bestExt - 8) { peaks.push(i); perFrame[i].isPeak = true; }
     }
     // The moments right next to a peak belong to that push.
@@ -682,7 +682,8 @@
   //  * The other skate: if it is only a little above the ice (or poking
   //    into it), it is really on the ice, pushing. We bend that leg a
   //    tiny bit so the skate sits on the ice. If it is higher than
-  //    "snap", the skater lifted it, and we leave it in the air.
+  //    "snap", or the leg would have to stretch to reach the ice, the
+  //    skater lifted it, and we leave it in the air.
   //  * A skate on the ice lies flat.
   //  * The hips go over the middle of the picture.
   function plantSkates(frames, opts) {
@@ -698,8 +699,12 @@
       flatSkate(p, support);
 
       var ankle = p[other + "Ankle"];
-      if (ankle.y - A < snap) {
-        var hip = p[other + "Hip"], knee = p[other + "Knee"];
+      var hip = p[other + "Hip"], knee = p[other + "Knee"];
+      // Pressing the skate down must not stretch the leg by more than
+      // 1.5 cm. If it would, the skate really is in the air (coming
+      // back after a push), and we leave it there.
+      var stretch = len(sub(pt(ankle.x, A, ankle.z), hip)) - len(sub(ankle, hip));
+      if (ankle.y - A < snap && stretch < 0.015) {
         var leg = solveTwoBone(hip, pt(ankle.x, A, ankle.z), len(sub(knee, hip)), len(sub(ankle, knee)), sub(knee, hip));
         var move = sub(leg.end, ankle);
         p[other + "Knee"] = leg.mid;
@@ -707,6 +712,12 @@
         p[other + "Heel"] = add(p[other + "Heel"], move);
         p[other + "Toe"] = add(p[other + "Toe"], move);
         flatSkate(p, other);
+      } else {
+        // In the air: just make sure the toe and heel do not dip into the ice.
+        ["Heel", "Toe"].forEach(function (part) {
+          var q = p[other + part];
+          if (q.y < 0.03) p[other + part] = pt(q.x, 0.03, q.z);
+        });
       }
       return p;
     });

@@ -74,11 +74,11 @@ This branch shows skating form in **3D**. A blue "pro" skater stands in a good h
 2. **Pick a skating video.** It works best filmed from the side, close enough that the skater fills a good part of the picture.
 3. **Click the skater.** Slide the **Frame** slider to a moment where the skater is easy to see, then click the middle of their body. Other people can be in the video; the coach follows only the skater you clicked.
 4. **Pick your age** (6 to 12) and **Beginner** or **Experienced**.
-5. Press **Analyze video**. The coach zooms in on your skater about 10 times per second and draws a white skeleton on the video. **Check that the skeleton sits on the right skater.** If it does not, the numbers mean nothing: click the skater again on a clearer frame.
+5. Press **Analyze video**. The coach zooms in on your skater about 20 times per second and draws a white skeleton on the video. **Check that the skeleton sits on the right skater.** If it does not, the numbers mean nothing: click the skater again on a clearer frame.
 6. **Read your report.** The orange skater is you. A ring around a joint turns green (inside the goal), yellow (almost) or red (work on this one). Each check gets a tip.
 7. **Watch the replay.** The video, your orange skater and the blue pro all move together: when you push with your right leg, the pro pushes with the right leg too, so you can compare the same moment of the stride. The coach looks at about 20 pictures per second and draws the moments in between, so the motion is smooth. The pro skates a real stride: the skate lands under the body, the hips slide over it, the leg pushes out to the side until it is almost straight while the skate rolls onto its inside edge, then the skate swings back in low over the ice. The free arm swings opposite to the pushing leg, and the ice slides under the skaters like a treadmill. Every stride is a little different. The colored stripes show every moment of your video. Press **Jump to the biggest slip** to see where your form slipped the most.
 
-No video handy? Press **Load sample session** to see how it works.
+No video handy? Press **Load sample session** to see how it works. The **Angles** button hides the angle signs when you just want to look at the skaters.
 
 ### Moving the skaters
 
@@ -101,7 +101,7 @@ The spots come from common youth-hockey coverage, and coaches use different syst
 
 ### Changing the goal angles
 
-The goal angles live in [`targets.json`](targets.json). There is one set for each age band (6-8, 9-10, 11-12) and each level, plus one for the pro. To try your own numbers, edit the file and use **Goal numbers > Load my targets.json** on the page. To make them the new normal, also copy the file into `js/default-targets.js`.
+The goal angles live in [`targets.json`](targets.json). There is one set for each age band (6-8, 9-10, 11-12) and each level, plus one for the pro. To try your own numbers, edit the file and use **Edit target angles > Load targets.json** on the page. To make them the new normal, also copy the file into `js/default-targets.js`.
 
 **The numbers in `targets.json` are starter guesses.** We still need to measure real clips and write down where they came from in [`SOURCES.md`](SOURCES.md).
 
@@ -130,8 +130,9 @@ The goal angles live in [`targets.json`](targets.json). There is one set for eac
 
 ### Good to know
 
-- **Your video stays on your computer.** The page only downloads code: three.js from jsDelivr, MediaPipe from jsDelivr, and the pose model from Google's MediaPipe storage.
+- **Your video stays on your computer.** The page only downloads code: three.js from jsDelivr, MediaPipe from jsDelivr, the pose model from Google's MediaPipe storage, and the lettering (fonts) from Google Fonts.
 - The orange skater has no stick, because the AI finds body joints, not sticks.
+- **Knee bend** is always the knee of the leg you are standing on. **Push** is measured at the end of each real push; if the coach sees no push in the clip, it says so instead of making up a number. When enough of the clip is filmed from the side, the report uses only those moments (the others are dimmed in the replay bar).
 - The AI has to guess how deep things are from a flat video, so the 3D pose can wobble. Angles are most trustworthy from a clear side view.
 
 ## Ideas for later
