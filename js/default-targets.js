@@ -23,43 +23,43 @@
     "pro": {
       "kneeBend": { "min": 105, "max": 115 },
       "forwardLean": { "min": 40, "max": 50 },
-      "strideExtension": { "min": 165, "max": 178 }
+      "strideExtension": { "min": 165, "max": 180 }
     },
     "bands": {
       "6-8": {
         "beginner": {
           "kneeBend": { "min": 125, "max": 150 },
           "forwardLean": { "min": 15, "max": 35 },
-          "strideExtension": { "min": 145, "max": 178 }
+          "strideExtension": { "min": 145, "max": 180 }
         },
         "experienced": {
           "kneeBend": { "min": 115, "max": 140 },
           "forwardLean": { "min": 20, "max": 40 },
-          "strideExtension": { "min": 155, "max": 178 }
+          "strideExtension": { "min": 155, "max": 180 }
         }
       },
       "9-10": {
         "beginner": {
           "kneeBend": { "min": 120, "max": 145 },
           "forwardLean": { "min": 20, "max": 40 },
-          "strideExtension": { "min": 150, "max": 178 }
+          "strideExtension": { "min": 150, "max": 180 }
         },
         "experienced": {
           "kneeBend": { "min": 110, "max": 135 },
           "forwardLean": { "min": 25, "max": 45 },
-          "strideExtension": { "min": 158, "max": 178 }
+          "strideExtension": { "min": 158, "max": 180 }
         }
       },
       "11-12": {
         "beginner": {
           "kneeBend": { "min": 115, "max": 140 },
           "forwardLean": { "min": 20, "max": 40 },
-          "strideExtension": { "min": 155, "max": 178 }
+          "strideExtension": { "min": 155, "max": 180 }
         },
         "experienced": {
           "kneeBend": { "min": 105, "max": 130 },
           "forwardLean": { "min": 30, "max": 50 },
-          "strideExtension": { "min": 160, "max": 178 }
+          "strideExtension": { "min": 160, "max": 180 }
         }
       }
     }

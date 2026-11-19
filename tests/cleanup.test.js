@@ -198,10 +198,66 @@ test("side view or not", function () {
 test("the report uses flat-picture angles when it has them", function () {
   var frames = [M.makeStancePose({ kneeBend: 110, forwardLean: 45, strideExtension: 171, push: 1 })];
   var t = { kneeBend: { min: 100, max: 120 }, forwardLean: { min: 40, max: 50 }, strideExtension: { min: 160, max: 178 } };
-  var r = M.analyzeFrames(frames, t, 10, 2, [{ kneeBend: 140, forwardLean: 20 }]);
-  assert.strictEqual(Math.round(r.perFrame[0].m.kneeBend), 140);
+  // The flat picture gives two knee angles (it cannot tell left from
+  // right). The glide knee in 3D is 110, so the closer one (118) is used.
+  var r = M.analyzeFrames(frames, t, 10, 2, [{ kneeA: 165, kneeB: 118, forwardLean: 20 }]);
+  assert.strictEqual(Math.round(r.perFrame[0].m.kneeBend), 118);
   assert.strictEqual(r.perFrame[0].m.fromPicture, true);
   assert.strictEqual(r.summary.forwardLean.grade, "far");
+});
+
+test("knee bend is the standing leg, even while the push leg folds up coming back", function () {
+  var St = require("../js/stride.js");
+  var frames = [], n = 40;
+  for (var i = 0; i < n; i++) frames.push(St.makeStridePose(i / n, { kneeBend: 120, forwardLean: 35, strideExtension: 168 }).pose);
+  var rhythm = M.strideSignal(frames);
+  var t = { kneeBend: { min: 100, max: 140 }, forwardLean: { min: 20, max: 50 }, strideExtension: { min: 150, max: 180 } };
+  var withRhythm = M.analyzeFrames(frames, t, 10, 2, null, rhythm);
+  withRhythm.perFrame.forEach(function (f, i) {
+    var glide = f.m.glideSide === "l" ? f.m.leftKnee : f.m.rightKnee;
+    assert.strictEqual(f.m.kneeBend, glide);
+    assert.notStrictEqual(f.m.glideSide, rhythm[i].side);
+  });
+  // The old way (just "the more bent knee") reads the folded push leg in recovery.
+  var old = M.analyzeFrames(frames, t, 10, 2);
+  var lower = withRhythm.perFrame.filter(function (f, i) { return old.perFrame[i].m.kneeBend < f.m.kneeBend - 3; }).length;
+  assert.ok(lower > 0, "expected some moments where the folded push leg used to be reported");
+});
+
+test("the push number comes from real pushes, and is not made up when there are none", function () {
+  var t = { kneeBend: { min: 100, max: 140 }, forwardLean: { min: 20, max: 50 }, strideExtension: { min: 150, max: 180 } };
+  // A skater who only glides, standing tall with both legs almost straight.
+  var glide = [];
+  for (var i = 0; i < 20; i++) glide.push(M.makeStancePose({ kneeBend: 170 + (i % 3), forwardLean: 10, strideExtension: 172 }));
+  var r = M.analyzeFrames(glide, t, 10, 2, null, M.strideSignal(glide));
+  assert.strictEqual(r.peaks.length, 0);
+  assert.strictEqual(r.summary.strideExtension, null);
+  // The moments next to a peak belong to that push.
+  var clip = cleanClip();
+  var a = M.analyzeFrames(clip.frames, t, 10, 4, null, M.strideSignal(clip.frames));
+  assert.ok(a.peaks.length >= 2);
+  var pk = a.peaks[0];
+  assert.strictEqual(a.perFrame[pk + 1].peak, pk);
+  assert.ok(Math.abs(a.summary.strideExtension.value - 165) < 3);
+});
+
+test("a fully straight push leg is on target, not yellow", function () {
+  var targets = require("../js/default-targets.js");
+  var t = M.getTarget(targets, 9, "beginner");
+  assert.strictEqual(M.scoreAngle(180, t.strideExtension, targets.yellowZone).grade, "good");
+});
+
+test("with enough side-view moments, the summary uses only those", function () {
+  var frames = [], flat = [];
+  for (var i = 0; i < 20; i++) {
+    frames.push(M.makeStancePose({ kneeBend: 110, forwardLean: 45, strideExtension: 170 }));
+    flat.push(i < 10 ? { kneeA: 130, kneeB: 130, forwardLean: 30 } : null);
+  }
+  var t = { kneeBend: { min: 100, max: 140 }, forwardLean: { min: 20, max: 50 }, strideExtension: { min: 150, max: 180 } };
+  var r = M.analyzeFrames(frames, t, 10, 2, flat);
+  assert.strictEqual(r.sideOn, 10);
+  assert.strictEqual(Math.round(r.summary.kneeBend.value), 130);
+  assert.strictEqual(Math.round(r.summary.forwardLean.value), 30);
 });
 
 console.log("All clean-up tests passed!");

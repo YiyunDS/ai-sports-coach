@@ -125,28 +125,48 @@
   // target = the three ranges from getTarget().
   // span   = how many poses to each side we compare when looking for the
   //          top of a push (2 is right for 10 poses per second).
-  // flat   = (optional) for each pose, knee bend and lean measured on the
-  //          flat picture (see measureFlat), or null. When we have them,
-  //          we use them instead of the 3D numbers.
-  function analyzeFrames(frames, target, yellowZone, span, flatAngles) {
+  // flat   = (optional) for each pose, the knee angles and lean measured
+  //          on the flat picture (see measureFlat), or null. When we have
+  //          them (side views), we use them instead of the 3D numbers.
+  // rhythm = (optional) from strideSignal: which leg is pushing in each
+  //          pose. Then "knee bend" is always the knee of the OTHER leg
+  //          (the one you stand on), even while the pushing leg folds up
+  //          on its way back.
+  function analyzeFrames(frames, target, yellowZone, span, flatAngles, rhythm) {
     span = span || 2;
     var CHECKS = ["kneeBend", "forwardLean", "strideExtension"];
     var perFrame = frames.map(function (pose, i) {
       var m = measurePose(pose);
+      if (rhythm && rhythm[i]) {
+        m.pushSide = rhythm[i].side;
+        m.glideSide = m.pushSide === "l" ? "r" : "l";
+        m.kneeBend = m.glideSide === "l" ? m.leftKnee : m.rightKnee;
+        m.strideExtension = m.pushSide === "l" ? m.leftKnee : m.rightKnee;
+      }
+      m.knee3D = m.kneeBend; // kept for finding pushes (see below)
       var f2 = flatAngles && flatAngles[i];
-      if (f2) { m.kneeBend = f2.kneeBend; m.forwardLean = f2.forwardLean; m.fromPicture = true; }
+      if (f2) {
+        // The flat picture cannot tell us which knee is "left". We take
+        // the one that is closer to the glide knee we found in 3D.
+        var ka = f2.kneeA, kb = f2.kneeB;
+        m.kneeBend = Math.abs(ka - m.knee3D) <= Math.abs(kb - m.knee3D) ? ka : kb;
+        m.forwardLean = f2.forwardLean;
+        m.fromPicture = true;
+      }
       var scores = {};
       CHECKS.forEach(function (c) { scores[c] = scoreAngle(m[c], target[c], yellowZone); });
       // "slip" = how far off the form is at this moment.
       // (Stride extension is only fair to judge at the top of a push,
       //  so it is not counted here.)
       var slip = Math.abs(scores.kneeBend.off) + Math.abs(scores.forwardLean.off);
-      return { m: m, scores: scores, slip: slip, isPeak: false };
+      return { m: m, scores: scores, slip: slip, isPeak: false, peak: -1 };
     });
 
-    function column(name) { return perFrame.map(function (f) { return f.m[name]; }); }
+    function column(name, only) {
+      return perFrame.filter(function (f) { return !only || only(f); }).map(function (f) { return f.m[name]; });
+    }
 
-    // The best pushes: we look at the straightest the push leg gets.
+    // The pushes: we look for the moments the push leg is straightest.
     var ext = column("strideExtension");
     var bestExt = percentile(ext, 0.9);
     // A "stride peak" is a moment where the push leg is straighter
@@ -160,22 +180,35 @@
         if (ext[j] > ext[i] || (ext[j] === ext[i] && j < i)) isTop = false;
       }
       // It only counts as a push if one leg is clearly straighter than the other.
-      var legsDiffer = ext[i] - perFrame[i].m.kneeBend >= 12;
+      var legsDiffer = ext[i] - perFrame[i].m.knee3D >= 12;
       if (isTop && legsDiffer && ext[i] >= bestExt - 8) { peaks.push(i); perFrame[i].isPeak = true; }
     }
+    // The moments right next to a peak belong to that push.
+    var reach = Math.ceil(span / 2);
+    peaks.forEach(function (pk) {
+      for (var j = pk - reach; j <= pk + reach; j++) if (perFrame[j] && perFrame[j].peak < 0) perFrame[j].peak = pk;
+    });
 
     // One number per check for the whole video.
+    // Knee bend and lean: the middle value. If enough moments were seen
+    // from the side (measured on the flat picture), we only use those,
+    // because they are much more trustworthy.
+    var sideOn = perFrame.filter(function (f) { return f.m.fromPicture; }).length;
+    var only = sideOn >= 8 ? function (f) { return f.m.fromPicture; } : null;
+    // Push: the middle value of the real pushes we found. If we found no
+    // push at all (the skater only glided), we do not make up a number.
+    var push = peaks.length ? percentile(peaks.map(function (pk) { return ext[pk]; }), 0.5) : null;
     var summary = {
-      kneeBend: scoreAngle(percentile(column("kneeBend"), 0.5), target.kneeBend, yellowZone),
-      forwardLean: scoreAngle(percentile(column("forwardLean"), 0.5), target.forwardLean, yellowZone),
-      strideExtension: scoreAngle(bestExt, target.strideExtension, yellowZone)
+      kneeBend: scoreAngle(percentile(column("kneeBend", only), 0.5), target.kneeBend, yellowZone),
+      forwardLean: scoreAngle(percentile(column("forwardLean", only), 0.5), target.forwardLean, yellowZone),
+      strideExtension: push === null ? null : scoreAngle(push, target.strideExtension, yellowZone)
     };
 
     // Which moment has the biggest slip?
     var worstFrame = 0;
     perFrame.forEach(function (f, idx) { if (f.slip > perFrame[worstFrame].slip) worstFrame = idx; });
 
-    return { perFrame: perFrame, summary: summary, peaks: peaks, worstFrame: worstFrame };
+    return { perFrame: perFrame, summary: summary, peaks: peaks, worstFrame: worstFrame, sideOn: only ? sideOn : 0 };
   }
 
   // ---------- Building a skater pose from angles ---------------------
@@ -357,7 +390,7 @@
     var leftKnee = angleAt(P("lHip"), P("lKnee"), P("lAnkle"));
     var rightKnee = angleAt(P("rHip"), P("rKnee"), P("rAnkle"));
     var back = sub(mid(P("lShoulder"), P("rShoulder")), mid(P("lHip"), P("rHip")));
-    return { kneeBend: Math.min(leftKnee, rightKnee), forwardLean: angleBetween(back, UP) };
+    return { kneeA: leftKnee, kneeB: rightKnee, kneeBend: Math.min(leftKnee, rightKnee), forwardLean: angleBetween(back, UP) };
   }
 
   // Was this pose filmed from the side? In the AI's 3D guess, x goes
