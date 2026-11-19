@@ -723,6 +723,79 @@
     });
   }
 
+  // ---------- Which moments are good enough to show in 3D? ------------
+  //
+  // From a flat video the AI has to GUESS how deep things are. Seen from
+  // the side, on a sharp picture, that guess is decent. Seen from the
+  // front or from behind, or on a blurry picture, it is often wrong, and
+  // the 3D skater twists into shapes nobody can skate in. Showing those
+  // moments teaches nothing, so we only keep the USEFUL ones:
+  //   1. the pose is possible: knees not folded flat, back not lying
+  //      down, hips well above the ice, chest above the hips;
+  //   2. the skater is seen from the side (sideOn[i] is true);
+  //   3. it does not "teleport": no knee or ankle moves faster than a
+  //      real one can (7 meters per second) since the moment before;
+  //   4. it is not alone: it belongs to a run of at least 5 useful
+  //      moments in a row, with at most ONE picture missing between
+  //      two of them. Then there is some real motion to show;
+  //   5. there is a real PUSH in that run: at some moment the skates are
+  //      at least two thirds of a leg length apart. A skater who is only
+  //      gliding along has nothing to teach about the stride.
+  // If that leaves too little (fewer than 8 moments), we relax the rules
+  // one step at a time rather than show nothing, and say so: first
+  // rule 5 goes, then rule 2, then holes of up to 0.2 seconds are allowed.
+  //   frames = cleaned-up poses, times = seconds, sideOn = true/false each
+  // Returns { keep: [true/false for each pose], kept, runs,
+  //           sideOnly, pushesOnly (which rules were used) }
+  function usefulFrames(frames, times, sideOn) {
+    var n = frames.length, leg = BODY.thigh + BODY.shin;
+    var possible = frames.map(function (p) {
+      var m = measurePose(p), hip = mid(p.lHip, p.rHip);
+      return m.leftKnee >= 55 && m.rightKnee >= 55 && m.forwardLean <= 75 &&
+             hip.y >= 0.4 * leg && p.neck.y >= hip.y + 0.15;
+    });
+    // How far apart are two pictures normally? (The short gaps tell us;
+    // the long ones are holes.) One missing picture is still fine.
+    var gaps = [];
+    for (var g = 1; g < n; g++) if (times[g] > times[g - 1]) gaps.push(times[g] - times[g - 1]);
+    var oneMissing = clamp(2.2 * (percentile(gaps, 0.25) || 0.05), 0.06, 0.2);
+
+    function pick(needSide, hole, needPush) {
+      var ok = frames.map(function (_, i) { return possible[i] && (!needSide || !!(sideOn && sideOn[i])); });
+      // Rule 3: too fast to be real since the moment before.
+      for (var i = 1; i < n; i++) {
+        var dt = times[i] - times[i - 1];
+        if (!ok[i] || !ok[i - 1] || dt <= 0 || dt > hole) continue;
+        var far = 0;
+        ["lKnee", "rKnee", "lAnkle", "rAnkle"].forEach(function (k) {
+          far = Math.max(far, len(sub(frames[i][k], frames[i - 1][k])));
+        });
+        if (far / dt > 7) ok[i] = false;
+      }
+      // Rule 4: runs of at least 5 in a row.
+      var keep = frames.map(function () { return false; }), start = -1, runs = 0;
+      for (var j = 0; j <= n; j++) {
+        var here = j < n && ok[j];
+        var joins = here && start >= 0 && times[j] - times[j - 1] <= hole + 1e-9;
+        if (joins) continue;                       // the run goes on
+        if (start >= 0 && j - start >= 5) {
+          var apart = 0;                           // rule 5: how far apart do the skates get?
+          for (var a = start; a < j; a++) apart = Math.max(apart, len(sub(frames[a].lAnkle, frames[a].rAnkle)));
+          if (!needPush || apart >= leg * 2 / 3) { runs++; for (var k = start; k < j; k++) keep[k] = true; }
+        }
+        start = here ? j : -1;                     // a new run starts here, or none
+      }
+      return { keep: keep, runs: runs, kept: keep.filter(Boolean).length };
+    }
+    var tries = [[true, oneMissing, true], [true, oneMissing, false], [false, oneMissing, false], [false, 0.2, false]];
+    for (var t = 0; t < tries.length; t++) {
+      var r = pick(tries[t][0], tries[t][1], tries[t][2]);
+      if (r.kept >= 8) { r.sideOnly = tries[t][0]; r.pushesOnly = tries[t][2]; return r; }
+    }
+    // Hardly anything is usable: show it all rather than nothing.
+    return { keep: frames.map(function () { return true; }), kept: n, runs: n ? 1 : 0, sideOnly: false, pushesOnly: false };
+  }
+
   // Make the kid's poses easy to compare with the pro:
   //   1. turn every pose so the kid faces the same way as the pro (+x),
   //      even when the kid turns around during the clip,
@@ -894,6 +967,7 @@
     mapPose: mapPose, mediapipeConfidence: mediapipeConfidence, measureFlat: measureFlat,
     seenFromSide: seenFromSide, swapLegs: swapLegs, fixLegSwaps: fixLegSwaps,
     smoothTrack: smoothTrack, fixBoneLengths: fixBoneLengths, plantSkates: plantSkates,
+    usefulFrames: usefulFrames,
     makeDemoFrames: makeDemoFrames
   };
 

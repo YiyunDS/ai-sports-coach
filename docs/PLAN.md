@@ -399,6 +399,36 @@ Chart: `docs/screenshots/phase10/push-knee-curve.png`.
 Still estimates: when exactly the leg straightens, the push direction,
 edges, arm swing and real timing.
 
+### Phase 11: The orange skater shows only the useful moments (done)
+
+The team leader's note: replaying every moment of the video in 3D looks
+very weird. On the test clip the old replay showed 102 moments, and most
+of them were the skater far away, seen from the front or from behind,
+where the 3D guess is poor (twisted, upright, even kneeling), with the
+figure frozen through every hole.
+
+- New rule `usefulFrames` in `js/angles.js` (8 tests in
+  `tests/cleanup.test.js`). A moment is kept when: the pose is possible;
+  the skater is seen from the side; no knee or ankle "teleports"; it is
+  part of at least 5 moments in a row with at most one picture missing;
+  and there is a real push in that run (skates at least two thirds of a
+  leg length apart). If that leaves fewer than 8 moments the rules are
+  relaxed one at a time, and the page says which were used.
+- `js/coach.js`: a real video's report and replay use only those
+  moments, and the clean-up runs again on them alone, so left-out
+  moments cannot pull on the ones we keep. The replay (and the video)
+  jumps over a hole instead of freezing; the replay bar shows a dark
+  line at each jump. The sample session and measuring mode (`?dev`) are
+  unchanged.
+- Test clip: 21 of 102 moments are kept, in 2 pieces (2.05-2.55 s and
+  2.90-3.45 s): the two pushes filmed from the side. All three cards
+  now read on target (knee 140°, lean 28°, push 179°).
+Before / after: `docs/screenshots/phase11/`.
+Limits: the replay of this clip is now short (about 1 second of
+skating). The first moment of the second piece (2.90 s) still stands a
+little too upright. A beginner whose pushes are all tiny gets every
+side-view moment (the push rule is dropped), and the note says so.
+
 ### Phase 5: Check the pro against a real skater (needs a video)
 
 - Run a good side-view video of a strong skater through the Phase 1

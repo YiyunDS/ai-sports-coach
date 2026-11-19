@@ -331,6 +331,11 @@
         g.fillRect(x, 0, Math.ceil(cell), 2 * ROW_H + ROW_GAP);
       }
     }
+    // A dark line wherever moments were left out in between.
+    g.fillStyle = "#0b0f14";
+    for (var k = 1; k < n; k++) {
+      if (state.times[k] - state.times[k - 1] > HOLE) g.fillRect(Math.round(k * cell) - 2, 0, 4, h);
+    }
     // A bright box around the moment we are showing now.
     g.strokeStyle = "#ffffff"; g.lineWidth = 2;
     g.strokeRect(state.index * cell + 1.5, 1.5, Math.max(cell - 3, 3), h - 3);
@@ -391,6 +396,10 @@
     showFrame(state.analysis.worstFrame);
   });
 
+  // Two useful moments farther apart than this (seconds) have a hole
+  // between them: the replay does not glide across it.
+  var HOLE = 0.3;
+
   // scene.js calls this about 60 times a second.
   C.onTick.push(function (dt) {
     if (!state.playing) return;
@@ -404,8 +413,18 @@
     var blend = 0;
     if (i < last) {
       var gap = state.times[i + 1] - state.times[i];
-      // (If the skater was lost for a while, the gap is long: hold still instead of sliding.)
-      if (gap > 0 && gap <= 0.3) blend = M.clamp((state.playClock - state.times[i]) / gap, 0, 1);
+      if (gap > 0 && gap <= HOLE) blend = M.clamp((state.playClock - state.times[i]) / gap, 0, 1);
+      else if (gap > HOLE && state.playClock > state.times[i] + 0.08) {
+        // A hole: the moments in between were left out. Do not stand
+        // frozen through it: jump straight to the next useful moment
+        // (the video jumps along with us).
+        i++;
+        state.playClock = state.times[i];
+        if (state.hasVideo) {
+          try { el.preview.currentTime = state.times[i]; } catch (e) { /* video not ready - no problem */ }
+        }
+        videoRuns = false;
+      }
     }
     render(i, blend, videoRuns);
     if (i >= last || (state.hasVideo && el.preview.ended)) setPlaying(false);
@@ -419,7 +438,27 @@
   //         about each joint, and the flat-picture angles (or null).
   function startReport(rawFrames, times, hasVideo, track, extra) {
     extra = extra || {};
-    state.frames = M.normalizeFrames(rawFrames, { smooth: hasVideo, times: times, weights: extra.weights, blur: DEV ? 0.035 : undefined });
+    function cleanUp() {
+      return M.normalizeFrames(rawFrames, { smooth: hasVideo, times: times, weights: extra.weights, blur: DEV ? 0.035 : undefined });
+    }
+    state.frames = cleanUp();
+    // A real video has moments where the AI's 3D guess is no good (the
+    // skater seen from the front, a blurry picture, a lonely moment
+    // between two holes). The orange skater only shows the USEFUL
+    // moments (see usefulFrames in angles.js). Then we clean up once
+    // more, so the left-out moments cannot pull on the ones we keep.
+    // (Not in measuring mode: there we want to see everything.)
+    state.useful = null;
+    if (hasVideo && !DEV) {
+      var useful = M.usefulFrames(state.frames, times, extra.sideView);
+      state.useful = { kept: useful.kept, total: rawFrames.length, runs: useful.runs, sideOnly: useful.sideOnly, pushesOnly: useful.pushesOnly };
+      if (useful.kept < rawFrames.length) {
+        var only = function (list) { return list ? list.filter(function (_, i) { return useful.keep[i]; }) : list; };
+        rawFrames = only(rawFrames); times = only(times); track = only(track);
+        extra = { weights: only(extra.weights), flat: only(extra.flat) };
+        state.frames = cleanUp();
+      }
+    }
     state.raw = { frames: rawFrames, weights: extra.weights || null }; // kept so we can check the clean-up in the browser
     state.flat = extra.flat || null;
     state.rhythm = M.strideSignal(state.frames);
@@ -790,16 +829,34 @@
         if (side) sideCount++;
         return side ? f : null;
       });
-      el.trackInfo.textContent = "Followed in " + tracked + " of " + n + " frames · " + raw.length + " clear enough to measure";
+      // For SHOWING the skater in 3D a rougher side view is good enough
+      // than for measuring: within 60 degrees, and most of the moments
+      // around it (2 before, 2 after) within 50 degrees.
+      var sideView = raw.map(function (pose, i) {
+        var yes = 0, count = 0;
+        for (var j = Math.max(0, i - 2); j <= Math.min(raw.length - 1, i + 2); j++) { count++; if (M.seenFromSide(raw[j], 50)) yes++; }
+        return yes * 2 > count && M.seenFromSide(pose, 60);
+      });
+      var clearCount = raw.length;
 
       if (raw.length < 5) {
         throw new Error("The skater was followed in " + tracked + " of " + n + " frames, but only " + raw.length +
           " were clear enough to measure. Try a clip filmed closer and from the side.");
       }
-      startReport(raw, keptTimes, true, track, { weights: weights, flat: flat });
+      startReport(raw, keptTimes, true, track, { weights: weights, flat: flat, sideView: sideView });
+      var shown = state.useful ? state.useful.kept : clearCount;
+      el.trackInfo.textContent = "Followed in " + tracked + " of " + n + " frames · " + clearCount + " clear enough to measure" +
+        (shown < clearCount ? " · " + shown + " useful ones shown" : "");
 
       // Be honest about how much to trust these numbers.
       var notes = [];
+      if (shown < clearCount) {
+        notes.push("The orange skater shows only the " + shown + " useful moments (" +
+          (state.useful.sideOnly ? "seen from the side, " : "") + "several pictures in a row, a pose that makes sense" +
+          (state.useful.pushesOnly ? ", a real push in it" : "") + ")" +
+          (state.useful.runs > 1 ? ", in " + state.useful.runs + " pieces" : "") + ". The other " + (clearCount - shown) +
+          " were left out because the 3D guess is not good enough there, so the replay jumps over them.");
+      }
       if (stopLater !== null || stopEarlier !== null) {
         notes.push("The camera cut or swung away" +
           (stopEarlier !== null ? " at " + stopEarlier.toFixed(1) + " s" : "") +
@@ -819,7 +876,7 @@
         notes.push(cutOff + " frames were skipped because part of the skater was outside the picture.");
       }
       if (state.analysis && state.analysis.sideOn) {
-        notes.push("Knee bend and lean come from the " + state.analysis.sideOn + " of " + raw.length +
+        notes.push("Knee bend and lean come from the " + state.analysis.sideOn + " of " + shown +
           " frames where the skater was seen from the side. The other frames are dimmed in the replay bar.");
       } else if (sideCount > 0) {
         notes.push("Only " + sideCount + " frames showed the skater from the side, too few to rely on, so knee bend and lean are rough estimates.");

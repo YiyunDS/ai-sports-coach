@@ -260,4 +260,132 @@ test("with enough side-view moments, the summary uses only those", function () {
   assert.strictEqual(Math.round(r.summary.forwardLean.value), 30);
 });
 
+// ---------- Which moments are good enough to show in 3D ---------------
+// 40 poses of a real-looking stride, 20 per second.
+function strideClip(count, weak) {
+  var St = require("../js/stride.js"), frames = [], times = [];
+  var how = weak ? { kneeBend: 155, forwardLean: 15, strideExtension: 158 }    // tiny pushes
+                 : { kneeBend: 110, forwardLean: 40, strideExtension: 170 };   // strong pushes
+  for (var i = 0; i < (count || 40); i++) {
+    var pose = St.makeStridePose((i / 20) / St.STRIDE.secondsPerCycle, how).pose;
+    delete pose.stickTop; delete pose.stickBlade;
+    frames.push(pose); times.push(i / 20);
+  }
+  return { frames: frames, times: times, side: frames.map(function () { return true; }) };
+}
+
+test("a clean side-view clip: every moment is useful", function () {
+  var c = strideClip();
+  var u = M.usefulFrames(c.frames, c.times, c.side);
+  assert.strictEqual(u.kept, 40);
+  assert.strictEqual(u.sideOnly, true);
+  assert.strictEqual(u.pushesOnly, true);
+});
+
+test("a stretch of plain gliding (no push in it) is left out", function () {
+  var c = strideClip(30);
+  // After 1.5 seconds of skating, a hole, then 1 second of standing still on the skates.
+  var glide = M.makeStancePose({ kneeBend: 150, forwardLean: 20, strideExtension: 155 });
+  for (var i = 0; i < 20; i++) { c.frames.push(glide); c.times.push(2.0 + i / 20); c.side.push(true); }
+  var u = M.usefulFrames(c.frames, c.times, c.side);
+  assert.strictEqual(u.kept, 30);
+  assert.strictEqual(u.runs, 1);
+  assert.strictEqual(u.keep[29], true); assert.strictEqual(u.keep[30], false);
+  // A skater whose pushes are all tiny is still shown (rule 5 is dropped), and we say so.
+  var weak = strideClip(40, true);
+  var w = M.usefulFrames(weak.frames, weak.times, weak.side);
+  assert.strictEqual(w.kept, 40);
+  assert.strictEqual(w.pushesOnly, false);
+  assert.strictEqual(w.sideOnly, true);
+});
+
+test("moments not seen from the side are left out", function () {
+  var c = strideClip();
+  for (var i = 20; i < 30; i++) c.side[i] = false;
+  var u = M.usefulFrames(c.frames, c.times, c.side);
+  assert.strictEqual(u.kept, 30);
+  for (var j = 20; j < 30; j++) assert.strictEqual(u.keep[j], false);
+  assert.strictEqual(u.keep[19], true); assert.strictEqual(u.keep[30], true);
+});
+
+test("an impossible pose is left out (a knee folded flat, hips on the ice)", function () {
+  var c = strideClip();
+  // Pose 12: the left ankle is pulled up to the hip (knee folded flat).
+  c.frames[12] = M.mapPose(c.frames[12], function (q) { return q; });
+  c.frames[12].lAnkle = M.pt(c.frames[12].lHip.x + 0.05, c.frames[12].lHip.y - 0.05, c.frames[12].lHip.z);
+  // Pose 30: the whole skater sinks so the hips are almost on the ice.
+  c.frames[30] = M.mapPose(c.frames[30], function (q) { return M.pt(q.x, q.y * 0.25, q.z); });
+  var u = M.usefulFrames(c.frames, c.times, c.side);
+  assert.strictEqual(u.keep[12], false);
+  assert.strictEqual(u.keep[30], false);
+  assert.strictEqual(u.keep[20], true);
+});
+
+test("a leg that teleports is left out", function () {
+  var c = strideClip();
+  // Pose 15: the right leg jumps 60 cm sideways in one twentieth of a second.
+  var p = M.mapPose(c.frames[15], function (q) { return q; });
+  p.rKnee = M.pt(p.rKnee.x, p.rKnee.y, p.rKnee.z + 0.6);
+  p.rAnkle = M.pt(p.rAnkle.x, p.rAnkle.y, p.rAnkle.z + 0.6);
+  c.frames[15] = p;
+  var u = M.usefulFrames(c.frames, c.times, c.side);
+  assert.strictEqual(u.keep[15], false);
+  assert.strictEqual(u.keep[10], true);
+});
+
+test("lonely moments are left out: a run needs 5 in a row", function () {
+  var c = strideClip();
+  // Only poses 0-9, 14-16 and 22-39 are seen from the side.
+  c.side = c.side.map(function (_, i) { return i <= 9 || (i >= 14 && i <= 16) || i >= 22; });
+  var u = M.usefulFrames(c.frames, c.times, c.side);
+  assert.strictEqual(u.keep[15], false, "a run of 3 was kept");
+  assert.strictEqual(u.kept, 10 + 18);
+  // A hole in time also ends a run: 4 poses, half a second lost, 4 poses.
+  var d = strideClip(30);
+  var keepTime = d.times.map(function (t, i) { return i < 4 || i >= 14; });
+  var f = d.frames.filter(function (_, i) { return keepTime[i]; });
+  var t = d.times.filter(function (_, i) { return keepTime[i]; });
+  var v = M.usefulFrames(f, t, f.map(function () { return true; }));
+  assert.strictEqual(v.keep[0], false, "4 poses before a hole were kept");
+  assert.strictEqual(v.keep[4], true);
+  assert.strictEqual(v.kept, 16);
+  assert.strictEqual(v.runs, 1);
+});
+
+test("one missing picture is fine, two missing pictures end the run", function () {
+  var c = strideClip();
+  function without(skip) {
+    var f = c.frames.filter(function (_, i) { return skip.indexOf(i) < 0; });
+    var t = c.times.filter(function (_, i) { return skip.indexOf(i) < 0; });
+    return M.usefulFrames(f, t, f.map(function () { return true; }));
+  }
+  var one = without([20]);
+  assert.strictEqual(one.kept, 39);
+  assert.strictEqual(one.runs, 1);
+  var two = without([20, 21]);
+  assert.strictEqual(two.kept, 38);
+  assert.strictEqual(two.runs, 2);
+});
+
+test("hardly any side view: we use the possible poses and say so", function () {
+  var c = strideClip();
+  c.side = c.side.map(function (_, i) { return i < 6; });   // only 6 side-view moments
+  var u = M.usefulFrames(c.frames, c.times, c.side);
+  assert.strictEqual(u.sideOnly, false);
+  assert.strictEqual(u.kept, 40);
+  // Every third picture is missing two neighbors: no run of 5 is left
+  // with the strict rule, so holes of up to 0.2 seconds are allowed.
+  var holes = strideClip(60), pickSome = holes.times.map(function (_, i) { return i % 7 < 4; });
+  var hf = holes.frames.filter(function (_, i) { return pickSome[i]; });
+  var ht = holes.times.filter(function (_, i) { return pickSome[i]; });
+  var h = M.usefulFrames(hf, ht, hf.map(function () { return true; }));
+  assert.strictEqual(h.kept, hf.length);
+  assert.strictEqual(h.sideOnly, false);
+  // Nothing usable at all: show everything rather than nothing.
+  var tiny = strideClip(3);
+  var w = M.usefulFrames(tiny.frames, tiny.times, tiny.side);
+  assert.strictEqual(w.kept, 3);
+  assert.strictEqual(w.sideOnly, false);
+});
+
 console.log("All clean-up tests passed!");
