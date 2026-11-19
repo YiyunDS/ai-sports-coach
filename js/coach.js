@@ -3,8 +3,10 @@
 //
 //  What happens here, step by step:
 //    1. You pick a video, your age, and Beginner or Experienced.
-//    2. A pose-finding AI (MediaPipe) looks at about 10 pictures per
-//       second of the video and finds your joints in each one.
+//    2. You click the skater you want. The tracker (tracker.js) follows
+//       that one skater, and a pose-finding AI (MediaPipe) looks at a
+//       zoomed-in picture of them about 10 times per second to find
+//       their joints.
 //    3. We measure your angles (the math is in angles.js).
 //    4. We compare them with the goal numbers from targets.json.
 //    5. The orange 3D skater copies your pose. Joints turn
@@ -20,6 +22,7 @@
 (function () {
   "use strict";
   var M = window.CoachMath;
+  var T = window.CoachTracker;
   var C = window.Coach3D;
   if (!C) return; // the 3D picture did not start, so there is nothing to do
 
@@ -27,11 +30,17 @@
   var MP_VERSION = "0.10.14";
   var MP_CODE = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@" + MP_VERSION + "/vision_bundle.mjs";
   var MP_WASM = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@" + MP_VERSION + "/wasm";
-  var MP_MODEL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
+  // Two sizes of the AI. "full" is more accurate; "lite" is the backup.
+  var MP_MODELS = [
+    "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",
+    "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task"
+  ];
 
   var MAX_FRAMES = 150;     // never look at more pictures than this
   var FRAME_GAP = 0.1;      // seconds between pictures (10 per second)
   var MIN_VISIBILITY = 0.5; // how sure the AI must be that it sees a joint
+  var CROP = 512;           // the zoomed-in picture we hand to the AI is 512 x 512 dots
+  var SMALL_SKATER = 0.18;  // skater shorter than this part of the picture = "far away"
 
   var COLORS = { good: "#2fbf71", close: "#e6b422", far: "#ef5350", none: "#263344" };
 
@@ -72,6 +81,8 @@
     progressBar: $("progress-bar"), status: $("status"), refMode: $("ref-mode"),
     targetInfo: $("target-info"), targetsFile: $("targets-file"),
     results: $("results"), stars: $("stars"), cards: $("cards"), preview: $("preview"),
+    videoPanel: $("video-panel"), overlay: $("overlay"), pickTime: $("pick-time"), pickOut: $("pick-out"),
+    seedInfo: $("seed-info"), trackInfo: $("track-info"), qualityNote: $("quality-note"),
     play: $("play-btn"), speed: $("speed"), worst: $("worst-btn"),
     frameInfo: $("frame-info"), timeline: $("timeline")
   };
@@ -81,6 +92,8 @@
     targets: window.DEFAULT_TARGETS,
     frames: null,     // the kid's poses, turned to face the same way as the pro
     times: null,      // the time in the video of each pose (seconds)
+    track: null,      // what the AI saw in each pose: joints and box, in video pixels
+    seed: null,       // where you clicked: { t, x, y } (x and y go from 0 to 1)
     analysis: null,   // scores for every pose
     index: 0,         // which pose we are showing now
     playing: false,
@@ -170,9 +183,14 @@
     el.frameInfo.textContent = "Frame " + (i + 1) + " / " + n + "  ·  " + state.times[i].toFixed(1) + " s";
     drawTimeline();
 
-    // Show the same moment in the little video.
-    if (state.hasVideo && !el.preview.seeking) {
-      try { el.preview.currentTime = state.times[i]; } catch (e) { /* video not ready - no problem */ }
+    // Show the same moment in the video, with what the AI saw drawn on top.
+    if (state.hasVideo) {
+      if (!el.preview.seeking) {
+        try { el.preview.currentTime = state.times[i]; } catch (e) { /* video not ready - no problem */ }
+      }
+      if (state.track && state.track[i]) drawOverlay(state.track[i], null);
+      el.pickTime.value = String(state.times[i]);
+      el.pickOut.textContent = state.times[i].toFixed(1) + " s";
     }
   }
 
@@ -308,12 +326,14 @@
   // ---------- Starting a new report ------------------------------------
 
   // rawFrames = poses straight from the AI. times = seconds for each.
-  function startReport(rawFrames, times, hasVideo) {
-    state.frames = M.normalizeFrames(rawFrames);
+  // track = what the AI saw in the video for each pose (or null for the sample).
+  function startReport(rawFrames, times, hasVideo, track) {
+    state.frames = M.normalizeFrames(rawFrames, { smooth: hasVideo });
     state.times = times;
     state.hasVideo = hasVideo;
+    state.track = track || null;
     state.index = 0;
-    el.preview.hidden = !hasVideo;
+    if (!hasVideo) { el.qualityNote.hidden = true; clearOverlay(); }
     el.results.hidden = false;
     C.layout(true);
     refresh();
@@ -323,29 +343,129 @@
   el.demo.addEventListener("click", function () {
     if (state.busy) return;
     var raw = M.makeDemoFrames();
-    startReport(raw, raw.map(function (_, i) { return i * FRAME_GAP; }), false);
+    startReport(raw, raw.map(function (_, i) { return i * FRAME_GAP; }), false, null);
     say("Sample session loaded: a skater who stands a little too tall and tires near the end.");
+  });
+
+  // ---------- Drawing on top of the video --------------------------------
+  // The joints the AI gives us are numbered. These pairs are the "bones"
+  // we draw between them (11 = left shoulder, 23 = left hip, and so on).
+  var BONES_2D = [
+    [11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 24], [23, 24],
+    [23, 25], [25, 27], [24, 26], [26, 28], [27, 31], [28, 32], [27, 29], [28, 30]
+  ];
+
+  function overlayContext() {
+    var v = el.preview, c = el.overlay;
+    // The drawing canvas has exactly as many dots as the video, so a
+    // spot in the video and a spot on the canvas are the same numbers.
+    if (v.videoWidth && (c.width !== v.videoWidth || c.height !== v.videoHeight)) {
+      c.width = v.videoWidth; c.height = v.videoHeight;
+    }
+    return c.getContext("2d");
+  }
+  function clearOverlay() {
+    var g = overlayContext();
+    g.clearRect(0, 0, el.overlay.width, el.overlay.height);
+    return g;
+  }
+
+  // det = { pts, box } for one person.  win = the search window (or null).
+  function drawOverlay(det, win) {
+    var g = clearOverlay(), W = el.overlay.width;
+    var thin = Math.max(2, W / 500);
+    if (win) { // the square where the tracker is looking
+      g.setLineDash([thin * 4, thin * 3]);
+      g.strokeStyle = "rgba(255,255,255,0.7)"; g.lineWidth = thin;
+      g.strokeRect(win.x, win.y, win.size, win.size);
+      g.setLineDash([]);
+    }
+    if (!det) return;
+    var b = det.box;
+    g.strokeStyle = "#ff9f43"; g.lineWidth = thin;
+    g.strokeRect(b.cx - b.w / 2 - 6, b.cy - b.h / 2 - 6, b.w + 12, b.h + 12);
+    g.strokeStyle = "#ffffff"; g.lineWidth = thin * 0.9; g.lineCap = "round";
+    g.beginPath();
+    BONES_2D.forEach(function (pair) {
+      var p = det.pts[pair[0]], q = det.pts[pair[1]];
+      g.moveTo(p.x, p.y); g.lineTo(q.x, q.y);
+    });
+    g.stroke();
+    g.fillStyle = "#ff9f43";
+    [11, 12, 23, 24, 25, 26, 27, 28].forEach(function (i) {
+      g.beginPath(); g.arc(det.pts[i].x, det.pts[i].y, thin * 1.5, 0, Math.PI * 2); g.fill();
+    });
+  }
+
+  // A ring that shows where you clicked.
+  function drawSeed() {
+    var g = clearOverlay(), W = el.overlay.width, H = el.overlay.height;
+    if (!state.seed) return;
+    var r = Math.max(14, W / 45);
+    g.strokeStyle = "#ff9f43"; g.lineWidth = Math.max(3, W / 320);
+    g.beginPath(); g.arc(state.seed.x * W, state.seed.y * H, r, 0, Math.PI * 2); g.stroke();
+  }
+
+  // ---------- Choosing the skater ------------------------------------------
+
+  function updateAnalyzeButton() {
+    el.analyze.disabled = state.busy || !el.videoFile.files.length || !state.seed;
+  }
+
+  // Slide to a frame.
+  el.pickTime.addEventListener("input", function () {
+    if (state.busy) return;
+    setPlaying(false);
+    var t = Number(el.pickTime.value);
+    el.pickOut.textContent = t.toFixed(1) + " s";
+    try { el.preview.currentTime = t; } catch (e) { /* video not ready - no problem */ }
+    clearOverlay();
+  });
+
+  // Click the skater.
+  el.overlay.addEventListener("click", function (ev) {
+    if (state.busy || !el.preview.videoWidth) return;
+    setPlaying(false);
+    var box = el.overlay.getBoundingClientRect();
+    state.seed = {
+      t: el.preview.currentTime,
+      x: M.clamp((ev.clientX - box.left) / Math.max(1, box.width), 0, 1),
+      y: M.clamp((ev.clientY - box.top) / Math.max(1, box.height), 0, 1)
+    };
+    drawSeed();
+    el.seedInfo.textContent = "Skater selected at " + state.seed.t.toFixed(1) + " s.";
+    updateAnalyzeButton();
+    say("Skater selected. Press Analyze video.");
   });
 
   // ---------- The pose-finding AI (MediaPipe) --------------------------
 
   var landmarkerPromise = null; // we only load the AI one time
-  var lastStamp = 0;            // the AI wants a time stamp that always goes up
 
   function loadPoseFinder() {
     if (!landmarkerPromise) {
       landmarkerPromise = (async function () {
         var vision = await import(MP_CODE);
         var files = await vision.FilesetResolver.forVisionTasks(MP_WASM);
-        async function build(delegate) {
+        async function build(model, delegate) {
           return vision.PoseLandmarker.createFromOptions(files, {
-            baseOptions: { modelAssetPath: MP_MODEL, delegate: delegate },
-            runningMode: "VIDEO",
-            numPoses: 1 // we coach one skater at a time
+            baseOptions: { modelAssetPath: model, delegate: delegate },
+            runningMode: "IMAGE",  // we hand it one still picture at a time
+            numPoses: 3,           // it may find up to 3 people; the tracker picks ours
+            minPoseDetectionConfidence: 0.35,
+            minPosePresenceConfidence: 0.35
           });
         }
-        // Try the fast graphics chip first. If that fails, use the normal chip.
-        try { return await build("GPU"); } catch (e) { return await build("CPU"); }
+        // Try the accurate AI on the fast graphics chip first, then the
+        // other choices, until one of them starts.
+        var lastError = null;
+        for (var m = 0; m < MP_MODELS.length; m++) {
+          var chips = ["GPU", "CPU"];
+          for (var d = 0; d < chips.length; d++) {
+            try { return await build(MP_MODELS[m], chips[d]); } catch (e) { lastError = e; }
+          }
+        }
+        throw lastError || new Error("The pose-detection model could not load.");
       })();
       // If loading failed, forget it so the next click can try again.
       landmarkerPromise.catch(function () { landmarkerPromise = null; });
@@ -370,6 +490,7 @@
 
   // Jump the video to a time and wait until that picture is ready.
   async function seek(video, t) {
+    if (Math.abs(video.currentTime - t) < 0.001 && !video.seeking) return;
     var ready = waitFor(video, "seeked", 2000);
     video.currentTime = t;
     await ready;
@@ -377,14 +498,86 @@
 
   function setBusy(on) {
     state.busy = on;
-    el.analyze.disabled = on || !el.videoFile.files.length;
     el.demo.disabled = on;
     el.videoFile.disabled = on;
+    el.pickTime.disabled = on;
     el.progress.hidden = !on;
+    updateAnalyzeButton();
+  }
+
+  // The zoomed-in picture we hand to the AI.
+  var cropCanvas = document.createElement("canvas");
+  cropCanvas.width = cropCanvas.height = CROP;
+  var cropContext = cropCanvas.getContext("2d");
+
+  // Cut the window out of the video, zoom it, and ask the AI who is in it.
+  // Returns a list of people: { pts, box, world, clear }.
+  //   pts   = joints in whole-video pixels      box = the box around them
+  //   world = joints in 3D (meters)             clear = can we trust the legs?
+  function lookIn(finder, video, win) {
+    cropContext.drawImage(video, win.x, win.y, win.size, win.size, 0, 0, CROP, CROP);
+    var result = finder.detect(cropCanvas);
+    var people = [];
+    var count = result && result.landmarks ? result.landmarks.length : 0;
+    for (var k = 0; k < count; k++) {
+      var flat = result.landmarks[k], world = result.worldLandmarks && result.worldLandmarks[k];
+      if (!flat || !world || flat.length < 33 || world.length < 33) continue;
+      var pts = flat.map(function (l) {
+        return { x: win.x + l.x * win.size, y: win.y + l.y * win.size, v: l.visibility === undefined ? 1 : l.visibility };
+      });
+      people.push({ pts: pts, box: T.boxOf(pts, 0.4), world: world, clear: M.poseIsClear(flat, MIN_VISIBILITY) });
+    }
+    return people;
+  }
+
+  // Find the skater you clicked. We try a small window first (good for
+  // a far-away skater) and then bigger and bigger ones.
+  async function findClickedSkater(finder, video, seed, W, H) {
+    await seek(video, seed.t);
+    var x = seed.x * W, y = seed.y * H, parts = [0.22, 0.36, 0.6, 1];
+    for (var i = 0; i < parts.length; i++) {
+      var win = T.cropWindow(x, y, parts[i] * H, W, H);
+      var people = lookIn(finder, video, win);
+      var pick = T.pickClicked(people.map(function (p) { return p.box; }), x, y);
+      drawOverlay(pick >= 0 ? people[pick] : null, win);
+      if (pick >= 0) return people[pick];
+    }
+    return null;
+  }
+
+  // Follow the skater through the pictures listed in "order"
+  // (forward in time, or backward), starting from where they were found.
+  async function follow(finder, video, times, order, start, W, H, found, onStep) {
+    var cur = start.box, prev = null, misses = 0;
+    for (var k = 0; k < order.length; k++) {
+      var i = order[k];
+      await seek(video, times[i]);
+      var guess = T.predict(prev, cur);
+      var win = T.cropWindow(guess.cx, guess.cy, T.windowSize(cur, misses, H), W, H);
+      var people = lookIn(finder, video, win);
+      var pick = T.pickCandidate(people.map(function (p) { return p.box; }), guess, cur, misses);
+      if (pick < 0 && misses >= 3 && misses % 3 === 0) {
+        // Lost for a while: take one look at a much bigger area.
+        win = T.cropWindow(guess.cx, guess.cy, H, W, H);
+        people = lookIn(finder, video, win);
+        pick = T.pickCandidate(people.map(function (p) { return p.box; }), guess, cur, misses);
+      }
+      if (pick >= 0) {
+        found[i] = people[pick];
+        prev = misses === 0 ? cur : null; // only guess ahead when we saw them last time too
+        cur = people[pick].box;
+        misses = 0;
+      } else {
+        prev = null;
+        misses++;
+      }
+      drawOverlay(found[i] || null, win);
+      onStep();
+    }
   }
 
   async function analyzeVideo() {
-    if (state.busy || !el.videoFile.files.length) return;
+    if (state.busy || !el.videoFile.files.length || !state.seed) return;
     setBusy(true);
     setPlaying(false);
     el.progressBar.removeAttribute("value"); // "thinking" look
@@ -394,39 +587,71 @@
 
       var video = el.preview;
       if (video.readyState < 2) await waitFor(video, "loadeddata", 8000);
-      var duration = video.duration;
-      if (!isFinite(duration) || duration <= 0 || !video.videoWidth) {
+      var duration = video.duration, W = video.videoWidth, H = video.videoHeight;
+      if (!isFinite(duration) || duration <= 0 || !W) {
         throw new Error("That video could not be opened. Try an MP4 or MOV file.");
       }
 
-      var gap = Math.max(FRAME_GAP, duration / MAX_FRAMES);
-      var raw = [], times = [], looked = 0;
-      for (var t = gap / 2; t < duration; t += gap) {
-        await seek(video, t);
-        lastStamp += 100;
-        var result = finder.detectForVideo(video, lastStamp);
-        looked++;
-        var world = result.worldLandmarks && result.worldLandmarks[0];
-        var flat = result.landmarks && result.landmarks[0];
-        // Keep this picture only if the AI can see the body and legs.
-        if (world && M.poseIsClear(flat || world, MIN_VISIBILITY)) {
-          raw.push(M.mediapipeToPose(world));
-          times.push(t);
-        }
-        el.progressBar.value = t / duration;
-        say("Analyzing video: " + Math.round(t / duration * 100) + "%");
+      say("Finding the skater you clicked...");
+      var start = await findClickedSkater(finder, video, state.seed, W, H);
+      if (!start) {
+        throw new Error("No skater was found where you clicked. Slide to a frame where the skater is easier to see and click the middle of their body.");
       }
 
-      if (raw.length < 5) {
-        throw new Error("A full skater was visible in only " + raw.length + " of " + looked +
-          " frames. Try a video filmed from the side, with the whole body in the frame.");
+      // Every moment we will look at. The click moment is one of them.
+      var gap = Math.max(FRAME_GAP, duration / MAX_FRAMES);
+      var plan = T.sampleTimes(duration, gap, state.seed.t);
+      var times = plan.times, n = times.length, found = new Array(n), done = 0;
+      found[plan.seedIndex] = start;
+      function onStep() {
+        done++;
+        el.progressBar.value = done / Math.max(1, n - 1);
+        say("Following the skater: " + Math.round(done / Math.max(1, n - 1) * 100) + "%");
       }
-      startReport(raw, times, true);
-      say("Analysis complete. Pose found in " + raw.length + " of " + looked + " frames.");
+      var forward = [], backward = [];
+      for (var f = plan.seedIndex + 1; f < n; f++) forward.push(f);
+      for (var b = plan.seedIndex - 1; b >= 0; b--) backward.push(b);
+      await follow(finder, video, times, forward, start, W, H, found, onStep);
+      await follow(finder, video, times, backward, start, W, H, found, onStep);
+
+      // Keep the moments where we found the skater AND can trust the legs.
+      var raw = [], keptTimes = [], track = [], tracked = 0, heights = [];
+      for (var i = 0; i < n; i++) {
+        if (!found[i]) continue;
+        tracked++;
+        var pose = M.mediapipeToPose(found[i].world);
+        if (!found[i].clear || !M.limbsLookRight(pose)) continue;
+        raw.push(pose);
+        keptTimes.push(times[i]);
+        track.push({ pts: found[i].pts, box: found[i].box });
+        heights.push(found[i].box.h / H);
+      }
+      el.trackInfo.textContent = "Followed in " + tracked + " of " + n + " frames · " + raw.length + " clear enough to measure";
+
+      if (raw.length < 5) {
+        throw new Error("The skater was followed in " + tracked + " of " + n + " frames, but only " + raw.length +
+          " were clear enough to measure. Try a clip filmed closer and from the side.");
+      }
+      startReport(raw, keptTimes, true, track);
+
+      // Be honest about how much to trust these numbers.
+      var notes = [];
+      var typical = M.percentile(heights, 0.5);
+      if (typical < SMALL_SKATER) {
+        notes.push("The skater is small in this video (about " + Math.round(typical * 100) +
+          "% of the picture height), so the angles are rough estimates. Film closer for better numbers.");
+      }
+      if (raw.length < n * 0.5) {
+        notes.push("Only " + raw.length + " of " + n + " frames could be measured. The skater was hidden, blurry or too far away in the rest.");
+      }
+      notes.push("Angles are most accurate when the skater is filmed from the side.");
+      el.qualityNote.textContent = notes.join(" ");
+      el.qualityNote.hidden = false;
+      say("Analysis complete. Check the video below: the white skeleton should sit on your skater.");
     } catch (err) {
       console.error(err);
       var msg = err && err.message ? err.message : String(err);
-      if (/import|fetch|network|load/i.test(msg) && !/video|skater/i.test(msg)) {
+      if (/import|fetch|network|load/i.test(msg) && !/video|skater|frames/i.test(msg)) {
         // A page shared online is not allowed to download the model, so video
         // analysis only works when the page is opened from your own computer.
         msg = location.protocol === "file:" || /^(localhost|127\.0\.0\.1)$/.test(location.hostname)
@@ -444,15 +669,32 @@
   var videoUrl = null;
   el.videoFile.addEventListener("change", function () {
     var file = el.videoFile.files[0];
-    el.analyze.disabled = !file;
     el.fileName.textContent = file ? file.name : "No video selected";
+    state.seed = null;
+    updateAnalyzeButton();
     if (!file) return;
-    // Show the video in the little player. It stays on this computer.
+    // Show the video. It stays on this computer.
     if (videoUrl) URL.revokeObjectURL(videoUrl);
     videoUrl = URL.createObjectURL(file);
+    setPlaying(false);
+    state.hasVideo = false;
+    el.videoPanel.hidden = false;
+    el.trackInfo.textContent = "";
+    el.seedInfo.textContent = "Click the skater in the video.";
     el.preview.src = videoUrl;
     el.preview.load();
-    say("Video ready. Press Analyze video.");
+    say("Video ready. Click the skater you want to analyze.");
+  });
+  // When the video knows how long it is, set up the frame slider.
+  el.preview.addEventListener("loadedmetadata", function () {
+    var d = isFinite(el.preview.duration) ? el.preview.duration : 0;
+    el.pickTime.max = String(Math.max(0, d - 0.05));
+    el.pickTime.step = "0.05";
+    el.pickTime.value = "0";
+    el.pickOut.textContent = "0.0 s";
+    clearOverlay();
+    // Show the first picture (some browsers show black until you seek).
+    try { el.preview.currentTime = 0.01; } catch (e) { /* fine */ }
   });
   el.analyze.addEventListener("click", analyzeVideo);
 

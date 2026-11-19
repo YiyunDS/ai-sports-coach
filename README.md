@@ -71,11 +71,12 @@ This branch shows skating form in **3D**. A blue "pro" skater stands in a good h
 ### How to use it
 
 1. **Look at the pro.** Drag to spin the view, scroll or pinch to zoom. The signs show the knee angle and the forward lean. Press **Play stride** to watch a push.
-2. **Pick a skating video.** It works best filmed from the side with your whole body in the picture. One skater at a time.
-3. **Pick your age** (6 to 12) and **Beginner** or **Experienced**.
-4. Press **Analyze video**. The AI looks at about 10 pictures per second of your video.
-5. **Read your report.** The orange skater is you. Joints turn green (inside the goal), yellow (almost) or red (work on this one). Each check gets a tip.
-6. **Watch the replay.** The colored stripes show every moment of your video. Press **Jump to the biggest slip** to see where your form slipped the most.
+2. **Pick a skating video.** It works best filmed from the side, close enough that the skater fills a good part of the picture.
+3. **Click the skater.** Slide the **Frame** slider to a moment where the skater is easy to see, then click the middle of their body. Other people can be in the video; the coach follows only the skater you clicked.
+4. **Pick your age** (6 to 12) and **Beginner** or **Experienced**.
+5. Press **Analyze video**. The coach zooms in on your skater about 10 times per second and draws a white skeleton on the video. **Check that the skeleton sits on the right skater.** If it does not, the numbers mean nothing: click the skater again on a clearer frame.
+6. **Read your report.** The orange skater is you. Joints turn green (inside the goal), yellow (almost) or red (work on this one). Each check gets a tip.
+7. **Watch the replay.** The colored stripes show every moment of your video. Press **Jump to the biggest slip** to see where your form slipped the most.
 
 No video handy? Press **Load sample session** to see how it works.
 
@@ -113,6 +114,7 @@ The goal angles live in [`targets.json`](targets.json). There is one set for eac
 | `js/angles.js` | The math: measures angles and scores them |
 | `js/figure.js` | Draws one 3D skater from balls, tubes and boxes |
 | `js/scene.js` | The rink, lights, camera, the pro skater, and moving the skaters |
+| `js/tracker.js` | Follows the one skater you clicked through the video |
 | `js/coach.js` | Reads your video, finds your pose, makes the report and replay |
 | `js/positions.js` | The playbook: where each position should stand in each situation |
 | `js/board.js` | The positioning board you drag your marker on |

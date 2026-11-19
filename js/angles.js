@@ -324,31 +324,118 @@
     return Math.atan2(fwd.z, fwd.x);
   }
 
+  // ---- Which way is FORWARD for this skater? ----
+  // The AI is good at finding joints but can mix up LEFT and RIGHT,
+  // most of all when it sees the skater from behind in a helmet.
+  // So we also use something that is always true in hockey: a skater's
+  // chest leans forward and their knees point forward.
+  function flat(v) { return pt(v.x, 0, v.z); } // forget the up/down part
+  function forwardVote(pose) {
+    var trunk = flat(sub(mid(pose.lShoulder, pose.rShoulder), mid(pose.lHip, pose.rHip)));
+    var lKnee = flat(sub(pose.lKnee, mid(pose.lHip, pose.lAnkle)));
+    var rKnee = flat(sub(pose.rKnee, mid(pose.rHip, pose.rAnkle)));
+    return add(trunk, add(lKnee, rKnee));
+  }
+  function legLength(pose) {
+    return (len(sub(pose.lHip, pose.lKnee)) + len(sub(pose.lKnee, pose.lAnkle)) +
+            len(sub(pose.rHip, pose.rKnee)) + len(sub(pose.rKnee, pose.rAnkle))) / 2;
+  }
+
+  // Swap every left joint with its right twin (for when the AI mixed them up).
+  function swapSides(pose) {
+    var out = {};
+    Object.keys(pose).forEach(function (k) {
+      var twin = k.charAt(0) === "l" && pose["r" + k.slice(1)] ? "r" + k.slice(1)
+        : k.charAt(0) === "r" && pose["l" + k.slice(1)] ? "l" + k.slice(1) : k;
+      out[twin] = pose[k];
+    });
+    return out;
+  }
+
+  // Do the legs have a believable shape? When the AI is guessing, it
+  // often makes a shin three times longer than a thigh. We skip those.
+  function limbsLookRight(pose) {
+    return ["l", "r"].every(function (s) {
+      var thigh = len(sub(pose[s + "Hip"], pose[s + "Knee"]));
+      var shin = len(sub(pose[s + "Knee"], pose[s + "Ankle"]));
+      if (thigh < 1e-6 || shin < 1e-6) return false;
+      var ratio = shin / thigh;
+      return ratio > 0.55 && ratio < 1.8;
+    });
+  }
+
+  // The middle one of three numbers (throws away one wild value).
+  function middleOf3(a, b, c) { return Math.max(Math.min(a, b), Math.min(Math.max(a, b), c)); }
+
   // Make the kid's poses easy to compare with the pro:
-  //   1. turn them so the kid faces the same way as the pro (+x),
+  //   1. turn every pose so the kid faces the same way as the pro (+x),
+  //      even when the kid turns around during the clip,
   //   2. make the kid's legs the same length as the pro's legs,
   //   3. stand the lowest skate on the ice, hips over the middle.
   // Turning, resizing and sliding do NOT change any joint angles.
-  function normalizeFrames(frames) {
+  //   opts.smooth = true also calms down jittery joints (for real video).
+  function normalizeFrames(frames, opts) {
     if (!frames.length) return [];
-    // Average facing direction over the whole clip (so the figure
-    // does not spin around if one frame is a little wobbly).
-    var sx = 0, sz = 0;
-    frames.forEach(function (f) { var a = facingAngle(f); sx += Math.cos(a); sz += Math.sin(a); });
-    var a = Math.atan2(sz, sx), ca = Math.cos(a), sa = Math.sin(a);
+    var n = frames.length;
+
+    // Step A: find "forward" in every pose.
+    var prevAngle = null;
+    var angles = frames.map(function (f) {
+      var hips = facingAngle(f);
+      var vote = forwardVote(f);
+      var a;
+      if (len(vote) > 0.12 * legLength(f)) {
+        a = Math.atan2(vote.z, vote.x);       // leaning or bent enough to be sure
+      } else {
+        // Standing tall and straight: trust the hips, but if that is the
+        // opposite of where the skater was just facing, flip it around.
+        a = hips;
+        if (prevAngle !== null && Math.cos(a - prevAngle) < 0) a += Math.PI;
+      }
+      prevAngle = a;
+      return a;
+    });
+
+    // Step B: smooth the direction over 5 poses so the figure turns
+    // smoothly instead of twitching.
+    var smoothAngles = angles.map(function (_, i) {
+      var sx = 0, sz = 0;
+      for (var j = Math.max(0, i - 2); j <= Math.min(n - 1, i + 2); j++) { sx += Math.cos(angles[j]); sz += Math.sin(angles[j]); }
+      return Math.atan2(sz, sx);
+    });
 
     // Average leg length over the whole clip.
     var legSum = 0;
-    frames.forEach(function (f) {
-      legSum += (len(sub(f.lHip, f.lKnee)) + len(sub(f.lKnee, f.lAnkle)) +
-                 len(sub(f.rHip, f.rKnee)) + len(sub(f.rKnee, f.rAnkle))) / 2;
-    });
-    var size = (BODY.thigh + BODY.shin) / Math.max(1e-6, legSum / frames.length);
+    frames.forEach(function (f) { legSum += legLength(f); });
+    var size = (BODY.thigh + BODY.shin) / Math.max(1e-6, legSum / n);
 
-    return frames.map(function (f) {
-      var turned = mapPose(f, function (q) {
+    var out = frames.map(function (f, i) {
+      var a = smoothAngles[i], ca = Math.cos(a), sa = Math.sin(a);
+      // If the hips say the skater faces the other way, the AI mixed up
+      // left and right in this pose. Swap them back.
+      if (Math.cos(facingAngle(f) - a) < 0) f = swapSides(f);
+      return mapPose(f, function (q) {
         return pt((q.x * ca + q.z * sa) * size, q.y * size, (-q.x * sa + q.z * ca) * size);
       });
+    });
+
+    // Step C (real video only): each joint takes the middle value of
+    // the pose before, this pose and the pose after.
+    if (opts && opts.smooth && n >= 3) {
+      out = out.map(function (f, i) {
+        if (i === 0 || i === n - 1) return f;
+        var before = out[i - 1], after = out[i + 1], calm = {};
+        Object.keys(f).forEach(function (k) {
+          calm[k] = pt(middleOf3(before[k].x, f[k].x, after[k].x),
+                       middleOf3(before[k].y, f[k].y, after[k].y),
+                       middleOf3(before[k].z, f[k].z, after[k].z));
+        });
+        return calm;
+      });
+    }
+
+    // Stand each pose on the ice with the hips over the middle.
+    return out.map(function (turned) {
       var hipMid = mid(turned.lHip, turned.rHip);
       var lowest = Math.min(turned.lHeel.y, turned.rHeel.y, turned.lToe.y, turned.rToe.y);
       var shift = pt(-hipMid.x, 0.03 - lowest, -hipMid.z);
@@ -393,6 +480,7 @@
     BODY: BODY, solveTwoBone: solveTwoBone, makeStancePose: makeStancePose,
     MP: MP, mediapipeToPose: mediapipeToPose, poseIsClear: poseIsClear,
     facingAngle: facingAngle, normalizeFrames: normalizeFrames,
+    forwardVote: forwardVote, swapSides: swapSides, limbsLookRight: limbsLookRight,
     makeDemoFrames: makeDemoFrames
   };
 

@@ -18,6 +18,7 @@
     js/default-targets.js  a copy of targets.json the page can always read
     js/figure.js           draws one 3D skater out of balls, tubes and boxes
     js/scene.js            the rink, the lights, the camera, moving the skaters
+    js/tracker.js          follows the one skater you clicked through the video
     js/coach.js            reads your video, finds your pose, makes the report
     js/positions.js        the playbook: where each position should stand
     js/board.js            the positioning board you drag your marker on
@@ -78,7 +79,11 @@
             <input type="file" id="video-file" accept="video/*">
           </label>
           <div id="file-name" class="small">No video selected</div>
-          <div class="small">Film from the side with the whole body in the frame.</div>
+          <div class="small">Best results: filmed from the side, close enough that the skater fills a good part of the frame.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Skater to follow</span>
+          <div id="seed-info" class="small">Choose a video, then click the skater in it.</div>
         </div>
         <div class="field row">
           <label for="age">Age</label>
@@ -138,14 +143,31 @@
 
     <!-- The report (appears after a session is analyzed) -->
     <section class="report">
+      <!-- The video, with the tracking drawn on top (appears when a video is chosen) -->
+      <section id="video-panel" class="panel video-panel" hidden>
+        <div class="results-head">
+          <h2>Video</h2>
+          <span id="track-info" class="small num"></span>
+        </div>
+        <div class="video-box">
+          <video id="preview" muted playsinline preload="auto"></video>
+          <canvas id="overlay" aria-label="Video frame. Click the skater you want to analyze."></canvas>
+        </div>
+        <div class="pick-row">
+          <label for="pick-time" class="tool-label">Frame</label>
+          <input type="range" id="pick-time" min="0" max="1" step="0.01" value="0">
+          <output id="pick-out" for="pick-time" class="num">0.0 s</output>
+        </div>
+        <p class="small">Slide to a frame where the skater is easy to see, then click the middle of the skater's body. The coach follows that one skater through the clip, and draws what it sees here so you can check it.</p>
+      </section>
       <section id="results" class="panel" hidden>
         <div class="results-head">
           <h2>Session report</h2>
           <span id="stars" class="score"></span>
         </div>
+        <p id="quality-note" class="note" hidden></p>
         <div class="results-body">
           <div id="cards" class="cards"></div>
-          <video id="preview" class="preview" muted playsinline preload="auto" hidden></video>
         </div>
         <div class="replay">
           <div class="replay-controls">
@@ -248,6 +270,7 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <!-- Our own code, in the order it needs to load. -->
   <script src="js/angles.js"></script>
+  <script src="js/tracker.js"></script>
   <script src="js/default-targets.js"></script>
   <script src="js/figure.js"></script>
   <script src="js/scene.js"></script>
