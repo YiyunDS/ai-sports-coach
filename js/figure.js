@@ -367,7 +367,10 @@
 
   // Move every piece to match a new pose.
   // grades (optional) = { lKnee: "good", neck: "far", ... }
-  Figure.prototype.update = function (pose, grades) {
+  // extras (optional) = { edges: { l: degrees, r: degrees } } how far each
+  //                     skate is tipped onto its inside edge
+  Figure.prototype.update = function (pose, grades, extras) {
+    var edges = extras && extras.edges;
     var self = this, P = {};
     Object.keys(pose).forEach(function (k) { P[k] = v3(pose[k]); });
     P.hipMid = new THREE.Vector3().addVectors(P.lHip, P.rHip).multiplyScalar(0.5);
@@ -442,7 +445,18 @@
       // The skate's right side is "along x up"; its own up is "side x along".
       var side = new THREE.Vector3().crossVectors(along, Y_AXIS).normalize();
       var upright = new THREE.Vector3().crossVectors(side, along).normalize();
-      sk.position.copy(heel);
+      if (edges && edges[s]) {
+        // Tip the skate onto its inside edge (toward the other skate),
+        // turning it around the ankle.
+        var e = edges[s] / 180 * Math.PI;
+        var inside = side.clone().multiplyScalar(s === "r" ? -1 : 1);
+        upright = upright.multiplyScalar(Math.cos(e)).addScaledVector(inside, Math.sin(e)).normalize();
+        side = new THREE.Vector3().crossVectors(along, upright).normalize();
+        // The ankle sits 7 cm in front of the heel and 6 cm above the sole.
+        sk.position.copy(P[s + "Ankle"]).addScaledVector(along, -0.07 * length / SKATE_LENGTH).addScaledVector(upright, -0.06);
+      } else {
+        sk.position.copy(heel);
+      }
       sk.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(along, upright, side));
       sk.scale.set(length / SKATE_LENGTH, 1, 1);
     });

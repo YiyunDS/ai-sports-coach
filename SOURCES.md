@@ -6,6 +6,18 @@ Every video clip we use to measure "good skater" angles goes here.
 |---|---|---|---|
 | | | | |
 
+# Skating studies behind the pro's stride
+
+| What we used | Where it came from |
+|---|---|
+| The phases of a stride (glide, push out to the side, recovery) and that strong skaters differ from weaker ones in hip and knee movement | Upjohn, Turcotte, Pearsall & Loh (2008), "Three-dimensional kinematics of the lower limbs during forward ice hockey skating", Sports Biomechanics 7(2), 206-221, https://doi.org/10.1080/14763140701841621 (we read the summary, not the full paper yet) |
+| Both skates on the ice about 15-25% of the stride at full speed | Marino, "Biomechanics of power skating", summarized at https://ojs.ub.uni-konstanz.de/cpa/article/view/2985 |
+| Forward lean of about 40-50° | Matches our pro target in targets.json; still needs a better source |
+
+The stride width, push direction, edge angles and arm swing in
+`js/stride.js` are our own estimates. We plan to check them against a
+video of a strong skater.
+
 # Code and models we download
 
 The page downloads these when it runs. None of them gets our video: they

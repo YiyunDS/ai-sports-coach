@@ -76,7 +76,7 @@ This branch shows skating form in **3D**. A blue "pro" skater stands in a good h
 4. **Pick your age** (6 to 12) and **Beginner** or **Experienced**.
 5. Press **Analyze video**. The coach zooms in on your skater about 10 times per second and draws a white skeleton on the video. **Check that the skeleton sits on the right skater.** If it does not, the numbers mean nothing: click the skater again on a clearer frame.
 6. **Read your report.** The orange skater is you. A ring around a joint turns green (inside the goal), yellow (almost) or red (work on this one). Each check gets a tip.
-7. **Watch the replay.** The video, your orange skater and the blue pro all move together: when you push with your right leg, the pro pushes with the right leg too, so you can compare the same moment of the stride. The coach looks at about 20 pictures per second and draws the moments in between, so the motion is smooth. The pro is not a robot: every stride is a little different, the shoulders turn, the stick sways and the skate lifts as the leg comes back. The colored stripes show every moment of your video. Press **Jump to the biggest slip** to see where your form slipped the most.
+7. **Watch the replay.** The video, your orange skater and the blue pro all move together: when you push with your right leg, the pro pushes with the right leg too, so you can compare the same moment of the stride. The coach looks at about 20 pictures per second and draws the moments in between, so the motion is smooth. The pro skates a real stride: the skate lands under the body, the hips slide over it, the leg pushes out to the side until it is almost straight while the skate rolls onto its inside edge, then the skate swings back in low over the ice. The free arm swings opposite to the pushing leg, and the ice slides under the skaters like a treadmill. Every stride is a little different. The colored stripes show every moment of your video. Press **Jump to the biggest slip** to see where your form slipped the most.
 
 No video handy? Press **Load sample session** to see how it works.
 
@@ -119,6 +119,8 @@ The goal angles live in [`targets.json`](targets.json). There is one set for eac
 | `js/positions.js` | The playbook: where each position should stand in each situation |
 | `js/board.js` | The positioning board you drag your marker on |
 | `tests/angles.test.js` | Checks the math. Run `node tests/angles.test.js` |
+| `js/stride.js` | How the pro skates: the stride keyframes (kids can edit them) and the math that turns them into a pose |
+| `tests/stride.test.js` | Checks the pro's stride (bones keep their length, skates stay on the ice and do not skid). Run `node tests/stride.test.js` |
 | `tests/cleanup.test.js` | Checks the clean-up of video poses (smoothing, fixed bones, skates on the ice). Run `node tests/cleanup.test.js` |
 
 ### Good to know

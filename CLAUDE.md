@@ -13,7 +13,8 @@ team leader) for the Presidential SI Challenge. All work happens on the
 - Keep all tests passing:
   `node tests/angles.test.js`, `node tests/tracker.test.js`,
   `node tests/motion.test.js`, `node tests/positions.test.js`,
-  `node tests/cleanup.test.js` (added in Phase 1).
+  `node tests/cleanup.test.js` (added in Phase 1),
+  `node tests/stride.test.js` (added in Phase 3).
   Add tests for new math.
 - Do not break the Positioning tab.
 - Any outside asset or video must be free to use and listed in

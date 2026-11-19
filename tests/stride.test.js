@@ -9,7 +9,9 @@ var B = M.BODY, DEG = 180 / Math.PI;
 var PRO = { kneeBend: 110, forwardLean: 45, strideExtension: 171 };
 function at(t, opts) { return St.makeStridePose(t, opts || PRO); }
 function bone(p, a, b) { return M.len(M.sub(p[a], p[b])); }
-function onIce(p, s) { return Math.abs(p[s + "Ankle"].y - B.ankleHeight) < 1e-6; }
+// The bottom of the steel blade: 9 cm under the ankle, less when the skate is tipped onto its edge.
+function bladeBottom(r, s) { return r.pose[s + "Ankle"].y - B.ankleHeight * Math.cos(r.edges[s] / DEG); }
+function onIce(r, s) { return Math.abs(bladeBottom(r, s)) < 1e-6; }
 var STEPS = 400;
 function eachMoment(fn) { for (var i = 0; i < STEPS; i++) fn(i / STEPS); }
 
@@ -36,12 +38,10 @@ test("bones never change length", function () {
 test("there is always a skate on the ice, and never one under it", function () {
   var both = 0;
   eachMoment(function (t) {
-    var p = at(t).pose;
-    assert.ok(onIce(p, "l") || onIce(p, "r"), "both skates in the air at " + t);
-    ["l", "r"].forEach(function (s) {
-      assert.ok(p[s + "Ankle"].y > B.ankleHeight - 1e-6 && p[s + "Heel"].y > 0.03 - 1e-6 && p[s + "Toe"].y > 0.03 - 1e-6, "skate in the ice at " + t);
-    });
-    if (onIce(p, "l") && onIce(p, "r")) both++;
+    var r = at(t);
+    assert.ok(onIce(r, "l") || onIce(r, "r"), "both skates in the air at " + t);
+    ["l", "r"].forEach(function (s) { assert.ok(bladeBottom(r, s) > -1e-6, "skate in the ice at " + t); });
+    if (onIce(r, "l") && onIce(r, "r")) both++;
   });
   // Studies of full-speed skating: both skates on the ice about 15-25% of the time.
   var share = both / STEPS;
@@ -58,9 +58,9 @@ test("the glide knee bends exactly to the target at its deepest", function () {
 
 test("the push leg straightens exactly to the target at lift-off", function () {
   [160, 168, 175].forEach(function (e) {
-    var p = at(St.STRIDE.liftOff, { kneeBend: 110, forwardLean: 45, strideExtension: e }).pose;
+    var r = at(St.STRIDE.liftOff, { kneeBend: 110, forwardLean: 45, strideExtension: e }), p = r.pose;
     assert.ok(Math.abs(M.angleAt(p.rHip, p.rKnee, p.rAnkle) - e) < 1e-6, "push " + e);
-    assert.ok(onIce(p, "r"), "the push skate is still on the ice at lift-off");
+    assert.ok(onIce(r, "r"), "the push skate is still on the ice at lift-off");
   });
 });
 
@@ -78,9 +78,9 @@ test("the hips shift over the glide skate", function () {
 test("a skate on the ice slides only the way its blade points", function () {
   var speed = St.STRIDE.metersPerCycle, dt = 0.001;
   eachMoment(function (t) {
-    var p = at(t).pose, q = at(t + dt).pose;
+    var rp = at(t), rq = at(t + dt), p = rp.pose, q = rq.pose;
     ["l", "r"].forEach(function (s) {
-      if (!onIce(p, s) || !onIce(q, s)) return;
+      if (!onIce(rp, s) || !onIce(rq, s)) return;
       var move = M.pt((q[s + "Ankle"].x - p[s + "Ankle"].x) / dt + speed, 0, (q[s + "Ankle"].z - p[s + "Ankle"].z) / dt);
       var blade = M.sub(p[s + "Toe"], p[s + "Heel"]); blade.y = 0;
       var off = M.angleBetween(move, blade);

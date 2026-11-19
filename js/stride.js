@@ -128,6 +128,13 @@
     // The hips sink lowest while the glide knee is bent the most.
     function hipsBob(at) { return -S.hipBob * Math.cos(4 * Math.PI * (at - S.deepest)); }
 
+    // How high is the ankle? A skate standing straight up has the ankle
+    // BODY.ankleHeight above the ice. A skate tipped onto its edge holds
+    // the ankle a little lower (like a tipped-over ruler is less tall).
+    function ankleHeightAt(s) {
+      return B.ankleHeight * Math.cos(curve(S.edge, s) / DEG) + Math.max(0, curve(S.lift, s));
+    }
+
     // How high must the hips be so the glide knee bends to exactly
     // "kneeBend" at its deepest moment? (Pythagoras, with the skate's
     // spot at that moment.)
@@ -136,7 +143,7 @@
     var across = deepFootOut - deepHipZ;
     var flatGap = Math.sqrt(deepFootF * deepFootF + across * across);
     var reach = legReach(knee);
-    var hipHeight0 = B.ankleHeight + Math.sqrt(Math.max(0, reach * reach - flatGap * flatGap)) - hipsBob(S.deepest);
+    var hipHeight0 = ankleHeightAt(S.deepest) + Math.sqrt(Math.max(0, reach * reach - flatGap * flatGap)) - hipsBob(S.deepest);
     function hipHeight(at) { return hipHeight0 + hipsBob(at); }
 
     // Where does the skate leave the ice? Exactly where the push leg is
@@ -144,7 +151,7 @@
     var outAngle = S.pushOutDegrees / DEG;
     var liftT = { r: S.liftOff, l: (S.liftOff + 0.5) % 1 }; // the cycle time of each lift-off
     function liftOffSpot(side) {
-      var drop = hipHeight(liftT[side]) - B.ankleHeight, r = legReach(ext);
+      var drop = hipHeight(liftT[side]) - ankleHeightAt(S.liftOff), r = legReach(ext);
       var flat = Math.sqrt(Math.max(0, r * r - drop * drop));
       var hipOut = B.hipHalf + (side === "r" ? 1 : -1) * hipsSide(liftT[side]);
       return { forward: -flat * Math.cos(outAngle), out: hipOut + flat * Math.sin(outAngle) };
@@ -162,7 +169,7 @@
     // path's middle line is z = 0).
     function ankleAt(side, at) {
       var s = legTime(side, at), k = keysFor[side], sign = side === "r" ? 1 : -1;
-      return pt(curve(k.forward, s), B.ankleHeight + Math.max(0, curve(S.lift, s)), sign * curve(k.out, s));
+      return pt(curve(k.forward, s), ankleHeightAt(s), sign * curve(k.out, s));
     }
 
     var p = {}, edges = {};
@@ -187,8 +194,10 @@
       // In the air the skate does not have to follow its blade, so it
       // mostly points forward.
       var heading = norm(lifted ? add(scale(norm(move), 0.4), pt(0.6, 0, 0)) : move);
+      // The bottom of the boot is 6 cm under the ankle (less when tipped).
       var lift = Math.max(0, curve(S.lift, s));
-      var toeY = 0.03 + lift * (lifted ? 0.6 : 1), heelY = 0.03 + lift * (lifted ? 1.3 : 1);
+      var sole = leg.end.y - lift - 0.06 * Math.cos(curve(S.edge, s) / DEG);
+      var toeY = sole + lift * (lifted ? 0.6 : 1), heelY = sole + lift * (lifted ? 1.3 : 1);
       p[side + "Toe"] = pt(leg.end.x + B.footFront * heading.x, toeY, leg.end.z + B.footFront * heading.z);
       p[side + "Heel"] = pt(leg.end.x - B.footBack * heading.x, heelY, leg.end.z - B.footBack * heading.z);
       edges[side] = curve(S.edge, s);

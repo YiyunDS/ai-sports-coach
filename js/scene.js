@@ -100,6 +100,7 @@
   }
 
   var iceTexture = paintIce();
+  iceTexture.wrapS = THREE.RepeatWrapping; // so the ice can slide along and wrap around
   // These two lines stretch the picture to fit the whole rink.
   iceTexture.repeat.set(1 / RINK_W, 1 / RINK_D);
   iceTexture.offset.set(0.5, 0.5);
@@ -151,7 +152,6 @@
   // The angles the blue skater shows. coach.js can change these.
   var reference = { kneeBend: 110, forwardLean: 45, strideExtension: 171 };
   var strideOn = false;   // is the blue skater doing a stride right now?
-  var strideClock = 0;    // how far we are into the stride movie
   var hasKid = false;
   var BLUE = "#4da3ff";
 
@@ -166,8 +166,12 @@
   //              sometimes measures on the flat video picture, and the
   //              signs should say the same numbers as the report.
   function decorate(fig, pose, colors, showPush, shown) {
-    var m = M.measurePose(pose), g = m.glideSide, p = m.pushSide;
-    if (shown) { m.kneeBend = shown.kneeBend; m.forwardLean = shown.forwardLean; m.strideExtension = shown.strideExtension; }
+    var m = M.measurePose(pose);
+    if (shown) {
+      m.kneeBend = shown.kneeBend; m.forwardLean = shown.forwardLean; m.strideExtension = shown.strideExtension;
+      if (shown.glideSide) { m.glideSide = shown.glideSide; m.pushSide = shown.pushSide; }
+    }
+    var g = m.glideSide, p = m.pushSide;
 
     // Knee angle of the glide leg.
     var knee = pose[g + "Knee"];
@@ -208,41 +212,74 @@
     return (x - Math.floor(x)) * 2 - 1;
   }
 
+  // How far the pro is through its skating cycle (0 to 1, see stride.js),
+  // and how much it is skating right now (0 = standing in its stance,
+  // 1 = fully skating). Going between the two takes about half a second,
+  // so the pro eases into the stride instead of snapping.
+  var cycleTime = 0, cycles = 0, moveAmount = 0;
+  // A skater carries speed, so the ice slides under the skaters like a
+  // treadmill while the pro skates (the skaters stay in view).
+  var iceSlide = 0;
+
   // Build the blue skater's pose for this moment and draw it.
   //   dt = seconds since the last picture
   function drawReference(dt) {
-    var push = 0, side = "r", phase = 0, stride = 0, moving = false;
+    var St = window.CoachStride, S = St.STRIDE;
+    dt = dt || 0;
+    var moving = !!sync || strideOn;
     if (sync) {
-      push = sync.push; side = sync.side; phase = sync.phase; stride = sync.stride; moving = true;
+      // Follow the kid: aim for the same leg at the same moment of the
+      // push, and glide there the short way around the cycle.
+      var want = St.cycleTimeFor(sync.side, sync.phase);
+      var diff = ((want - cycleTime) % 1 + 1.5) % 1 - 0.5;
+      var step = diff * (1 - Math.exp(-dt / 0.12));
+      cycleTime += step;
+      if (cycleTime >= 1) { cycleTime -= 1; cycles++; }
+      if (cycleTime < 0) { cycleTime += 1; cycles--; }
     } else if (strideOn) {
-      // One push takes 1.6 seconds. Right leg, then left leg, and so on.
-      var cycle = strideClock / 1.6;
-      stride = Math.floor(cycle);
-      side = stride % 2 ? "l" : "r";
-      phase = cycle % 1;
-      push = Math.pow(Math.sin(phase * Math.PI), 2);
-      moving = true;
+      cycleTime += dt / S.secondsPerCycle;
+      if (cycleTime >= 1) { cycleTime -= 1; cycles++; }
     }
-    // What the pro is aiming for on THIS stride: a little deeper or
+    moveAmount += ((moving ? 1 : 0) - moveAmount) * (1 - Math.exp(-dt / 0.18));
+    var stride = cycles * 2 + (cycleTime >= 0.5 ? 1 : 0); // which push this is
+
+    // What the pro is aiming for on THIS push: a little deeper or
     // taller, a little more or less lean, and not always a full push.
     // The left leg is a touch weaker, like most real skaters' off side.
-    var want = { knee: reference.kneeBend, lean: reference.forwardLean, ext: reference.strideExtension };
+    var goal = { knee: reference.kneeBend, lean: reference.forwardLean, ext: reference.strideExtension };
     if (moving) {
-      want.knee += 4 * wobble(stride, 1);
-      want.lean += 3 * wobble(stride, 2);
-      want.ext -= 5 * Math.abs(wobble(stride, 3)) + (side === "l" ? 2 : 0);
+      goal.knee += 4 * wobble(stride, 1);
+      goal.lean += 3 * wobble(stride, 2);
+      goal.ext -= 5 * Math.abs(wobble(stride, 3)) + (cycleTime >= 0.5 ? 0 : 2);
     }
-    var ease = 1 - Math.exp(-(dt || 0) / 0.25); // drift there over about a quarter second
-    live.knee += (want.knee - live.knee) * ease;
-    live.lean += (want.lean - live.lean) * ease;
-    live.ext += (want.ext - live.ext) * ease;
+    var ease = 1 - Math.exp(-dt / 0.25); // drift there over about a quarter second
+    live.knee += (goal.knee - live.knee) * ease;
+    live.lean += (goal.lean - live.lean) * ease;
+    live.ext += (goal.ext - live.ext) * ease;
+    var angles = { kneeBend: live.knee, forwardLean: live.lean, strideExtension: live.ext };
 
-    var pose = M.makeStancePose({
-      kneeBend: live.knee, forwardLean: live.lean, strideExtension: live.ext,
-      push: push, pushSide: side, phase: phase, natural: moving, withStick: true
-    });
-    refFigure.update(pose);
-    decorate(refFigure, pose, { knee: BLUE, lean: BLUE, push: BLUE }, push > 0.35);
+    // The standing pose and the skating pose, blended by moveAmount.
+    var stance = M.makeStancePose({ kneeBend: live.knee, forwardLean: live.lean, strideExtension: live.ext, withStick: true });
+    var pose = stance, edges = null, shown = null;
+    if (moveAmount > 0.001) {
+      var skating = St.makeStridePose(cycleTime, angles);
+      pose = M.lerpPose(stance, skating.pose, moveAmount);
+      edges = { l: skating.edges.l * moveAmount, r: skating.edges.r * moveAmount };
+      if (moveAmount > 0.5) {
+        // Label the leg that carries the weight, and the leg that pushes.
+        var g = skating.glideSide, pu = skating.pushSide || (g === "r" ? "l" : "r");
+        shown = {
+          glideSide: g, pushSide: pu, forwardLean: M.measurePose(pose).forwardLean,
+          kneeBend: M.angleAt(pose[g + "Hip"], pose[g + "Knee"], pose[g + "Ankle"]),
+          strideExtension: M.angleAt(pose[pu + "Hip"], pose[pu + "Knee"], pose[pu + "Ankle"])
+        };
+      }
+      iceSlide += S.metersPerCycle / S.secondsPerCycle * moveAmount * dt;
+      iceTexture.offset.x = 0.5 + iceSlide / RINK_W;
+    }
+    refFigure.update(pose, null, { edges: edges });
+    var showPush = shown ? !!skating.pushSide : false;
+    decorate(refFigure, pose, { knee: BLUE, lean: BLUE, push: BLUE }, showPush, shown);
     // Park the puck in front of the middle of the stick blade.
     var at = refFigure.group.position;
     var out = M.norm(M.pt(pose.stickBlade.x - pose.stickTop.x, 0, pose.stickBlade.z - pose.stickTop.z));
@@ -316,7 +353,6 @@
   function tick(now) {
     var dt = Math.min(0.1, (now - lastTime) / 1000); // seconds since last picture
     lastTime = now;
-    if (strideOn) strideClock += dt;
     // Other files go first (coach.js picks the kid's pose and tells the
     // pro where in the stride to be), then we draw the pro to match.
     onTick.forEach(function (fn) { fn(dt); });
@@ -335,7 +371,6 @@
   strideBtn.addEventListener("click", function () {
     if (sync) return; // while synced, the kid's stride drives the pro
     strideOn = !strideOn;
-    strideClock = 0;
     strideBtn.textContent = strideOn ? "Hold stance" : "Play stride";
     strideBtn.setAttribute("aria-pressed", String(strideOn));
   });

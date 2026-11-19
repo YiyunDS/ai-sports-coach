@@ -185,7 +185,23 @@ skater, and the lean sign still looks like a grey fin (Phase 4).
 Recommendation: **2B**, then decide with the team from screenshots
 whether 2A is worth it.
 
-### Phase 3: A pro who actually skates (area b)
+### Phase 3: A pro who actually skates (area b) (done, option 3B)
+
+The pro now skates from keyframes in `js/stride.js`: touchdown under
+the body, glide with the hips sliding over the skate, push out to the
+side and back to the exact "push" angle while the skate rolls onto its
+inside edge, then a low recovery. Both skates are on the ice 20% of the
+time (studies of full-speed skating find 15-25%). Each skate is turned
+to point the way it moves over the ice, so it never skids sideways. The
+free arm swings opposite to the pushing leg, the top hand stays on a
+stick that never changes length, and the ice slides under the skaters
+like a treadmill. It still keeps step with the kid's strides.
+Tests: `tests/stride.test.js` (14 checks). Screenshots:
+`docs/screenshots/phase3/`.
+
+Still estimates: the stride width, push direction, edge angles and arm
+swing are our best guesses, not measured. Phase 5 should check them
+against a real skater.
 
 **Option 3A: Real skater's stride from video**
 - Film (or find, free to use) a strong skater from the side, run it
