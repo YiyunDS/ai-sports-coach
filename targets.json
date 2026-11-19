@@ -1,0 +1,57 @@
+{
+  "_read_me": [
+    "These are the GOAL numbers (in degrees) that Angle Coach compares you with.",
+    "Each check has a 'min' and a 'max'. If your number is in between, you get full points.",
+    "kneeBend = the angle at your knee on your bent (gliding) leg. 180 is a straight leg, 90 is a deep squat. SMALLER means MORE bend.",
+    "forwardLean = how far your shoulders tip forward from standing straight up. 0 is standing tall. BIGGER means MORE lean.",
+    "strideExtension = the angle at your knee on your pushing leg when your feet are farthest apart. 180 is a fully straight push.",
+    "To change a goal, change the number, keep the commas and quotes, and save. See README.md, section 'Tuning the targets'."
+  ],
+  "ageBands": [
+    {
+      "name": "Ages 6-8",
+      "minAge": 6,
+      "maxAge": 8,
+      "Beginner": {
+        "kneeBend": { "min": 115, "max": 145 },
+        "forwardLean": { "min": 10, "max": 35 },
+        "strideExtension": { "min": 145, "max": 180 }
+      },
+      "Experienced": {
+        "kneeBend": { "min": 105, "max": 135 },
+        "forwardLean": { "min": 15, "max": 40 },
+        "strideExtension": { "min": 150, "max": 180 }
+      }
+    },
+    {
+      "name": "Ages 9-10",
+      "minAge": 9,
+      "maxAge": 10,
+      "Beginner": {
+        "kneeBend": { "min": 110, "max": 140 },
+        "forwardLean": { "min": 15, "max": 38 },
+        "strideExtension": { "min": 150, "max": 180 }
+      },
+      "Experienced": {
+        "kneeBend": { "min": 100, "max": 130 },
+        "forwardLean": { "min": 20, "max": 42 },
+        "strideExtension": { "min": 155, "max": 180 }
+      }
+    },
+    {
+      "name": "Ages 11-12",
+      "minAge": 11,
+      "maxAge": 12,
+      "Beginner": {
+        "kneeBend": { "min": 105, "max": 135 },
+        "forwardLean": { "min": 18, "max": 40 },
+        "strideExtension": { "min": 155, "max": 180 }
+      },
+      "Experienced": {
+        "kneeBend": { "min": 95, "max": 125 },
+        "forwardLean": { "min": 25, "max": 45 },
+        "strideExtension": { "min": 160, "max": 180 }
+      }
+    }
+  ]
+}
