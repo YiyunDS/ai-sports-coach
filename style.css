@@ -1,0 +1,32 @@
+/* Colors and sizes in one place so kids can change the look. */
+:root { --blue:#1d4ed8; --green:#15803d; --red:#b91c1c; --bg:#f1f5f9; --card:#fff; --ink:#0f172a; }
+* { box-sizing: border-box; }
+body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:var(--ink); line-height:1.4; }
+header, footer { text-align:center; padding:12px 16px; }
+main { max-width:900px; margin:0 auto; padding:0 16px 24px; }
+.card { background:var(--card); border-radius:12px; padding:16px; margin:12px 0; box-shadow:0 1px 4px #0002; }
+h1 { margin:0; } h2 { margin-top:0; font-size:1.2rem; }
+.row { display:flex; flex-wrap:wrap; gap:12px; align-items:end; margin:8px 0; }
+label { display:flex; flex-direction:column; gap:4px; font-weight:600; }
+.row label:has(input[type=radio]) { flex-direction:row; align-items:center; }
+input, select, button { font-size:1rem; padding:8px; border-radius:8px; border:1px solid #94a3b8; }
+button { background:var(--blue); color:#fff; border:0; cursor:pointer; font-weight:700; }
+button.secondary { background:#64748b; }
+button:disabled { background:#94a3b8; cursor:not-allowed; }
+[hidden] { display:none !important; }
+.small { font-size:.9rem; color:#475569; }
+progress { width:100%; }
+.videoBox { position:relative; max-width:100%; }
+.videoBox video { width:100%; display:block; background:#000; border-radius:8px; }
+.videoBox canvas { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+#bigScore { font-size:1.6rem; font-weight:800; }
+#tips li { margin:6px 0; font-size:1.05rem; }
+.good { color:var(--green); } .warn { color:var(--red); }
+.chips { list-style:none; padding:0; display:flex; flex-wrap:wrap; gap:6px; }
+.chips li { background:#e2e8f0; border-radius:999px; padding:4px 10px; }
+.chips button { background:none; color:var(--red); padding:0 4px; }
+.charts { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+@media (max-width:640px) { .charts { grid-template-columns:1fr; } }
+#hrAdvice { margin-top:12px; padding:12px; border-radius:8px; background:#f8fafc; font-size:1.05rem; }
+#hrAdvice.rest { background:#fef3c7; border:2px solid #f59e0b; }
+table { border-collapse:collapse; width:100%; } td, th { border-bottom:1px solid #e2e8f0; padding:4px 8px; text-align:left; }

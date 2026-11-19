@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Health &amp; Dryland Coach</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Chart.js draws our graphs. It is loaded from the internet (cdnjs). -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+<header>
+  <h1>🏒 Health &amp; Dryland Coach</h1>
+  <p>Your video and heart-rate numbers stay on <strong>this device</strong>. Nothing is uploaded anywhere.</p>
+</header>
+
+<main>
+  <!-- STEP 1: choose what to check -->
+  <section class="card" id="setup">
+    <h2>1. Pick your mode</h2>
+    <div class="row">
+      <label><input type="radio" name="mode" value="skating" checked> ⛸️ Skating</label>
+      <label><input type="radio" name="mode" value="dryland"> 🏋️ Dryland (squats &amp; lunges)</label>
+    </div>
+
+    <div class="row">
+      <label>Video file <input type="file" id="videoFile" accept="video/*"></label>
+    </div>
+    <div class="row">
+      <label>Age
+        <select id="age"></select>
+      </label>
+      <label id="levelWrap">Level
+        <select id="level"><option>Beginner</option><option>Experienced</option></select>
+      </label>
+      <label id="exerciseWrap" hidden>Exercise
+        <select id="exercise"><option value="squat">Squat</option><option value="lunge">Lunge</option></select>
+      </label>
+    </div>
+    <button id="analyzeBtn" disabled>Check my video</button>
+    <p id="status" role="status">Choose a video to begin.</p>
+    <progress id="progress" value="0" max="1" hidden></progress>
+  </section>
+
+  <!-- STEP 2: the video with the skeleton drawn on top -->
+  <section class="card" id="videoCard" hidden>
+    <h2>2. Your video</h2>
+    <div class="videoBox">
+      <video id="video" controls muted playsinline></video>
+      <canvas id="overlay"></canvas>
+    </div>
+    <p id="liveReadout" class="small"></p>
+  </section>
+
+  <!-- STEP 3: results -->
+  <section class="card" id="results" hidden>
+    <h2>3. Your coach says...</h2>
+    <div id="bigScore"></div>
+    <ul id="tips"></ul>
+    <div id="repTable"></div>
+  </section>
+
+  <!-- Heart rate: only for skating -->
+  <section class="card" id="hrCard">
+    <h2>❤️ Heart rate (skating)</h2>
+    <p class="small">Type readings from your Fitbit. "Time" is how far into the video you were, like <code>1:30</code> or just seconds like <code>90</code>.</p>
+    <form id="hrForm" class="row">
+      <label>Time <input id="hrTime" placeholder="1:30" size="6" required></label>
+      <label>Beats per minute <input id="hrBpm" type="number" min="40" max="240" placeholder="150" required></label>
+      <button type="submit">Add</button>
+      <button type="button" id="hrExample" class="secondary">Try example</button>
+      <button type="button" id="hrClear" class="secondary">Clear</button>
+    </form>
+    <ul id="hrList" class="chips"></ul>
+  </section>
+
+  <section class="card" id="chartsCard" hidden>
+    <h2>📈 Skating score and heart rate</h2>
+    <div class="charts">
+      <div><canvas id="scoreChart"></canvas></div>
+      <div><canvas id="hrChart"></canvas></div>
+    </div>
+    <div id="hrAdvice"></div>
+  </section>
+</main>
+
+<footer>
+  <p class="small">Made by two hockey players and a parent for the Presidential SI Challenge. If you ever need contact info, use a parent's email.</p>
+</footer>
+
+<script src="angles.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
