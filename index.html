@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Sports Coach - 3D Visual Coach</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!--
+    HOW THIS PAGE IS PUT TOGETHER
+    index.html             the boxes and buttons you see (this file)
+    style.css              the colors and sizes
+    targets.json           the "good skater" angles - kids can edit these!
+    js/angles.js           the math: measures angles from joint positions
+    js/default-targets.js  a copy of targets.json the page can always read
+    js/figure.js           draws one 3D skater out of balls, tubes and boxes
+    js/scene.js            the rink, the lights, the camera and the PRO skater
+  -->
+  <header class="top">
+    <div class="logo" aria-hidden="true">🏒</div>
+    <div>
+      <h1>AI Sports Coach <span class="tag">3D Visual Coach</span></h1>
+      <p>See good skating form in 3D. Spin it around and look from every side!</p>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- LEFT SIDE: the steps and what to look for -->
+    <aside class="side">
+      <!--COACH-PANEL-->
+      <section class="card">
+        <h2>What to look for</h2>
+        <ul class="look">
+          <li><b>Knees bent.</b> The blue slice at the knee shows the knee angle. Smaller number = more bend = more power.</li>
+          <li><b>Lean forward a little.</b> The slice at the hips shows how far the back tips forward.</li>
+          <li><b>Stick on the ice.</b> The blade stays down, ready for a pass.</li>
+          <li><b>Push all the way.</b> Press <i>Show the stride</i> and watch the pushing leg get almost straight.</li>
+        </ul>
+      </section>
+    </aside>
+
+    <!-- RIGHT SIDE: the 3D picture -->
+    <section class="main">
+      <div class="stage-wrap">
+        <div id="stage" aria-label="3D view of a hockey skater. Drag to spin it."></div>
+        <div id="stage-problem" class="stage-problem" hidden></div>
+        <div class="stage-top">
+          <span class="hint">🖱️ Drag to spin &nbsp;•&nbsp; Scroll or pinch to zoom</span>
+        </div>
+        <div class="stage-buttons">
+          <button type="button" data-view="side">Side view</button>
+          <button type="button" data-view="front">Front view</button>
+          <button type="button" data-view="top">Top view</button>
+          <button type="button" id="stride-btn" class="primary" aria-pressed="false">▶ Show the stride</button>
+        </div>
+      </div>
+      <!--COACH-RESULTS-->
+    </section>
+  </main>
+
+  <footer class="foot">
+    Made by Team PHL for the Presidential SI Challenge. Your video stays on your own computer.
+  </footer>
+
+  <!-- three.js = the 3D drawing library. OrbitControls = drag-to-spin camera. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <!-- Our own code, in the order it needs to load. -->
+  <script src="js/angles.js"></script>
+  <script src="js/default-targets.js"></script>
+  <script src="js/figure.js"></script>
+  <script src="js/scene.js"></script>
+  <!--COACH-SCRIPT-->
+</body>
+</html>

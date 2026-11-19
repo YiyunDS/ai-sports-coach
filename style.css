@@ -1,0 +1,146 @@
+/* =====================================================================
+   style.css  --  COLORS AND SIZES
+   The names at the top (like --navy) are our team colors. Change one
+   here and it changes everywhere on the page.
+   ===================================================================== */
+:root {
+  --ice: #eaf6ff;
+  --navy: #0f2540;
+  --blue: #2563eb;
+  --red: #e11d48;
+  --orange: #f97316;
+  --good: #22c55e;
+  --close: #facc15;
+  --far: #ef4444;
+  --card: #ffffff;
+  --line: #cfe3f5;
+  --muted: #4b6584;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ice);
+  color: var(--navy);
+  font-family: ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI", system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+/* ---------- Top of the page ---------- */
+.top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 20px;
+  background: var(--navy);
+  color: #fff;
+  border-bottom: 6px solid var(--red);
+}
+.top .logo {
+  font-size: 34px;
+  background: #fff;
+  border-radius: 50%;
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.top h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
+.top p { margin: 2px 0 0; color: #cfe3f5; }
+.tag {
+  display: inline-block;
+  background: var(--close);
+  color: var(--navy);
+  font-size: 0.8rem;
+  padding: 2px 10px;
+  border-radius: 999px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* ---------- Two columns: steps on the left, 3D on the right ---------- */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(270px, 340px) minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px;
+  max-width: 1500px;
+  margin: 0 auto;
+}
+.side, .main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+.card {
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-bottom-width: 5px;
+  border-radius: 18px;
+  padding: 14px 16px;
+}
+.card h2 { margin: 0 0 8px; font-size: 1.1rem; }
+.look { margin: 0; padding-left: 20px; }
+.look li { margin-bottom: 6px; }
+
+/* ---------- The 3D picture ---------- */
+.stage-wrap {
+  position: relative;
+  border: 3px solid var(--navy);
+  border-radius: 22px;
+  overflow: hidden;
+  background: #cdeaff;
+}
+#stage { width: 100%; height: min(68vh, 640px); min-height: 380px; }
+#stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.stage-problem {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  padding: 30px; text-align: center; font-size: 1.2rem; font-weight: 700;
+  background: #fff7ed;
+}
+.stage-problem[hidden] { display: none; }
+.stage-top { position: absolute; top: 10px; left: 10px; right: 10px; pointer-events: none; }
+.hint {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.88);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 0.9rem;
+}
+.stage-buttons {
+  position: absolute; left: 10px; right: 10px; bottom: 10px;
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+
+/* ---------- Buttons ---------- */
+button, .file-btn {
+  font: inherit;
+  font-weight: 700;
+  color: var(--navy);
+  background: #fff;
+  border: 2px solid var(--navy);
+  border-bottom-width: 4px;
+  border-radius: 12px;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+button:hover, .file-btn:hover { background: #f0f7ff; }
+button:active { transform: translateY(2px); border-bottom-width: 2px; }
+button:focus-visible, select:focus-visible, input:focus-visible, .file-btn:focus-within {
+  outline: 3px solid var(--orange);
+  outline-offset: 2px;
+}
+button.primary { background: var(--red); border-color: #9f1239; color: #fff; }
+button.primary:hover { background: #be123c; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.foot { text-align: center; color: var(--muted); padding: 6px 16px 24px; font-size: 0.9rem; }
+
+/* ---------- Small screens: stack everything ---------- */
+@media (max-width: 860px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .main { order: -1; }
+  #stage { height: 56vh; }
+  .top h1 { font-size: 1.2rem; }
+}
