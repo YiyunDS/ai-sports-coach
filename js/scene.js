@@ -135,10 +135,16 @@
 
   // ---------- 4. The skaters -----------------------------------------
   // The blue one is the PRO (or the goal for your age).
-  var refFigure = new window.SkaterFigure({ name: "PRO", nameColor: "#4da3ff", jersey: 0x2f7fd6, helmet: 0x12335c, socks: 0x2f7fd6 });
+  var refFigure = new window.SkaterFigure({
+    name: "PRO", nameColor: "#4da3ff", number: "14",
+    jersey: 0x2f6fc0, trim: 0x0e2240, socks: 0x2f6fc0, pants: 0x14213a, helmet: 0x0e2240, glove: 0x14213a
+  });
   scene.add(refFigure.group);
   // The orange one is YOU. It stays hidden until there is a pose to show.
-  var kidFigure = new window.SkaterFigure({ name: "YOU", nameColor: "#ff9f43", jersey: 0xf08a24, helmet: 0xe9edf2, socks: 0xf08a24 });
+  var kidFigure = new window.SkaterFigure({
+    name: "YOU", nameColor: "#ff9f43", number: "7",
+    jersey: 0xe57f22, trim: 0x2a1606, socks: 0xe57f22, pants: 0x1b1d22, helmet: 0x1b1d22, glove: 0x1b1d22
+  });
   kidFigure.group.visible = false;
   scene.add(kidFigure.group);
 
@@ -237,9 +243,11 @@
     });
     refFigure.update(pose);
     decorate(refFigure, pose, { knee: BLUE, lean: BLUE, push: BLUE }, push > 0.35);
-    // Park the puck next to the stick blade, wherever the skater stands.
+    // Park the puck in front of the middle of the stick blade.
     var at = refFigure.group.position;
-    puck.position.set(at.x + pose.stickBlade.x + 0.12, 0.0125, at.z + pose.stickBlade.z + 0.1);
+    var out = M.norm(M.pt(pose.stickBlade.x - pose.stickTop.x, 0, pose.stickBlade.z - pose.stickTop.z));
+    puck.position.set(at.x + pose.stickBlade.x + out.x * 0.13 + 0.07,
+                      0.0125, at.z + pose.stickBlade.z + out.z * 0.13);
   }
 
   // ---------- 5. Camera views ----------------------------------------
@@ -377,7 +385,7 @@
     raycaster.setFromCamera(pointer, camera);
   }
   function bodyParts(fig) {
-    return fig.group.children.filter(function (m) { return m.userData.body && m.visible; });
+    return fig.bodyParts();
   }
   // Which skater is under the pointer? (null = none)
   function skaterUnderPointer() {
@@ -429,6 +437,8 @@
 
   // ---------- 9. What other files can use ----------------------------
   window.Coach3D = {
+    camera: camera,       // (for checking the view from the browser console)
+    controls: controls,
     refFigure: refFigure,
     kidFigure: kidFigure,
     decorate: decorate,

@@ -135,7 +135,22 @@ Recommendation: **1A**. Measure the improvement on the test video with
 the same numbers used above (bone length range, biggest ankle jump).
 Only reach for 1B if the cleaned-up result is still not good enough.
 
-### Phase 2: A skater that looks like a hockey player (area a)
+### Phase 2: A skater that looks like a hockey player (area a) (done, option 2B)
+
+The skater is now built in code from shaped pieces: a jersey and hockey
+pants that stretch and twist with the body (stacks of rounded rings),
+padded shoulders, sleeves, elbow pads, gloves with cuffs, socks over
+shin pads, a helmet with ear guards and a wire cage, skates with a boot,
+white holder and steel blade, and a stick with a taped blade lying flat
+on the ice. Jerseys have hem stripes and a number on the back. The grey
+joint balls are gone; graded joints get a green, yellow or red ring.
+No outside files, so double-clicking index.html still works.
+Screenshots: `docs/screenshots/phase2/sheet-phase2-before-after.png` and
+`sheet-phase2-closeups.png`.
+
+Left for later phases: the motion is still the old robot stride
+(Phase 3), and Overlay still hides the pro behind the solid orange
+skater, and the lean sign still looks like a grey fin (Phase 4).
 
 **Option 2A: Rigged humanoid model, joints retargeted to bones**
 - Candidate: one of the teen-proportion bodies from Quaternius
