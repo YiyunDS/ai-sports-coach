@@ -1,0 +1,25 @@
+{
+  "_readme": "Kids: you can change these numbers! Angles are in degrees. 'min' and 'max' make the GOOD range. 'tolerance' = how many degrees outside the range before the score hits 0. Replace with numbers you measure from elite skater clips (see SOURCES.md).",
+  "skating": {
+    "Beginner": {
+      "kneeAngle":   { "min": 110, "max": 145, "tolerance": 40 },
+      "forwardLean": { "min": 10,  "max": 35,  "tolerance": 25 },
+      "strideAngle": { "min": 25,  "max": 50,  "tolerance": 25 }
+    },
+    "Experienced": {
+      "kneeAngle":   { "min": 95,  "max": 130, "tolerance": 35 },
+      "forwardLean": { "min": 20,  "max": 45,  "tolerance": 25 },
+      "strideAngle": { "min": 35,  "max": 65,  "tolerance": 25 }
+    }
+  },
+  "ageAdjust": [
+    { "minAge": 6,  "maxAge": 8,  "kneeAngleAdd": 10, "strideScale": 0.8 },
+    { "minAge": 9,  "maxAge": 10, "kneeAngleAdd": 5,  "strideScale": 0.9 },
+    { "minAge": 11, "maxAge": 12, "kneeAngleAdd": 0,  "strideScale": 1.0 }
+  ],
+  "dryland": {
+    "squat": { "depthKneeAngleMax": 100, "backLeanMax": 45, "tolerance": 40 },
+    "lunge": { "frontKneeMin": 80, "frontKneeMax": 100, "backLeanMax": 25, "tolerance": 40 }
+  },
+  "heartRate": { "sloppyScoreDrop": 10, "restBreakSeconds": 60 }
+}
