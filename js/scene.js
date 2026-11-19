@@ -38,65 +38,119 @@
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // "Tone mapping" works like a camera's exposure: very bright things
+  // (white ice under arena lights) keep their detail instead of turning
+  // into a flat white blob.
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
   stage.appendChild(renderer.domElement);
 
   var scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0b0f14);     // a dark arena, like on TV
-  scene.fog = new THREE.Fog(0x0b0f14, 16, 34);      // far things fade out
+  scene.background = new THREE.Color(0x0a0e13);     // a dark arena, like on TV
+  scene.fog = new THREE.Fog(0x0a0e13, 18, 46);      // far things fade into the dark
 
-  var camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+  var camera = new THREE.PerspectiveCamera(35, 1, 0.1, 120);
 
   // OrbitControls lets you drag to spin, scroll to zoom.
   var controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;            // smooth, glidey movement
   controls.maxPolarAngle = Math.PI * 0.49;  // do not let the camera go under the ice
   controls.minDistance = 1.5;
-  controls.maxDistance = 12;
+  controls.maxDistance = 18;
 
   // ---------- 2. Lights ----------------------------------------------
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x5b7896, 0.8)); // soft light from everywhere
-  var sun = new THREE.DirectionalLight(0xffffff, 0.8);           // one bright arena light
-  sun.position.set(3, 7, 4);
+  // Soft light from all around, like a big bright room. Shiny things
+  // (helmets, skate steel, the ice) also show soft reflections of it.
+  var pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new THREE.RoomEnvironment(), 0.04).texture;
+  scene.environmentIntensity = 0.55;
+  scene.add(new THREE.HemisphereLight(0xdfe9f5, 0x28323d, 0.5)); // a little light from the sky and the floor
+  // The main arena light, high above and in front. It casts the shadows.
+  var sun = new THREE.DirectionalLight(0xffffff, 2.2);
+  sun.position.set(3, 10, 5);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.left = -5; sun.shadow.camera.right = 5;
-  sun.shadow.camera.top = 5; sun.shadow.camera.bottom = -5;
+  sun.shadow.camera.left = -8; sun.shadow.camera.right = 8;
+  sun.shadow.camera.top = 8; sun.shadow.camera.bottom = -8;
+  sun.shadow.camera.far = 30;
+  sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02;
+  sun.shadow.radius = 3;
   scene.add(sun);
+  // A cool light from behind that outlines the skaters against the dark.
+  var rimLight = new THREE.DirectionalLight(0xbcd4ff, 1.1);
+  rimLight.position.set(-5, 5, -7);
+  scene.add(rimLight);
 
   // ---------- 3. The rink --------------------------------------------
-  var RINK_W = 16, RINK_D = 8;
+  // The middle part of a real rink (center ice), at real size:
+  // 30 meters long and 15 meters wide, with boards and glass around it.
+  var RINK_W = 30, RINK_D = 15, CORNER = 4.5;
+  var PX = 2048 / RINK_W; // dots of the ice picture per meter
 
   // We paint the ice (lines, circle, skate marks) on a flat picture,
-  // then stick that picture onto the floor.
+  // then stick that picture onto the floor. Every size here is in meters.
   function paintIce() {
     var c = document.createElement("canvas");
-    c.width = 1024; c.height = 512;
+    c.width = 2048; c.height = 1024;
     var g = c.getContext("2d");
-    g.fillStyle = "#e9f0f5"; g.fillRect(0, 0, 1024, 512);
-    // Skate marks: lots of faint curvy scratches.
-    g.strokeStyle = "rgba(110,150,185,0.16)"; g.lineWidth = 1.2;
-    for (var i = 0; i < 70; i++) {
-      var x = (i * 173) % 1024, y = (i * 97) % 512;
-      g.beginPath(); g.arc(x, y, 40 + (i * 31) % 120, i, i + 1.2); g.stroke();
+    function X(m) { return 1024 + m * PX; }   // meters from center ice -> dots
+    function Y(m) { return 512 + m * PX; }
+    // The ice, a touch darker in places, like real ice.
+    g.fillStyle = "#e5ecf1"; g.fillRect(0, 0, 2048, 1024);
+    for (var k = 0; k < 18; k++) {
+      var gx = (k * 397) % 2048, gy = (k * 263) % 1024, r = 120 + (k * 53) % 220;
+      var shade = g.createRadialGradient(gx, gy, 0, gx, gy, r);
+      shade.addColorStop(0, "rgba(160,180,200,0.10)"); shade.addColorStop(1, "rgba(160,180,200,0)");
+      g.fillStyle = shade; g.fillRect(gx - r, gy - r, 2 * r, 2 * r);
     }
-    // Blue lines and the red center line.
-    g.fillStyle = "#1f56b5"; g.fillRect(302, 0, 10, 512); g.fillRect(712, 0, 10, 512);
-    g.fillStyle = "#c8243a"; g.fillRect(507, 0, 10, 512);
-    // Center circle and dot.
-    g.strokeStyle = "#1f56b5"; g.lineWidth = 4;
-    g.beginPath(); g.arc(512, 256, 95, 0, Math.PI * 2); g.stroke();
-    g.fillStyle = "#1f56b5"; g.beginPath(); g.arc(512, 256, 8, 0, Math.PI * 2); g.fill();
-    return new THREE.CanvasTexture(c);
+    // The lines are painted UNDER the ice, so their edges are a little soft.
+    g.filter = "blur(1.2px)";
+    g.fillStyle = "#1d4fa3";                                   // blue lines
+    [-7.6, 7.6].forEach(function (x) { g.fillRect(X(x) - 0.15 * PX, 0, 0.3 * PX, 1024); });
+    g.fillStyle = "#b81f33";                                   // red center line
+    g.fillRect(X(0) - 0.15 * PX, 0, 0.3 * PX, 1024);
+    g.strokeStyle = "#1d4fa3"; g.lineWidth = 0.05 * PX;        // center circle
+    g.beginPath(); g.arc(X(0), Y(0), 4.5 * PX, 0, Math.PI * 2); g.stroke();
+    g.fillStyle = "#1d4fa3";                                   // center dot
+    g.beginPath(); g.arc(X(0), Y(0), 0.15 * PX, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "#b81f33";                                   // neutral-zone dots
+    [-6.1, 6.1].forEach(function (x) {
+      [-6.7, 6.7].forEach(function (y) { g.beginPath(); g.arc(X(x), Y(y), 0.3 * PX, 0, Math.PI * 2); g.fill(); });
+    });
+    g.filter = "none";
+    // Skate marks: lots of faint curvy scratches on top.
+    g.lineWidth = 1;
+    for (var i = 0; i < 260; i++) {
+      var sx = (i * 173) % 2048, sy = (i * 97) % 1024;
+      g.strokeStyle = "rgba(120,145,170," + (0.05 + (i % 5) * 0.015) + ")";
+      g.beginPath(); g.arc(sx, sy, 60 + (i * 31) % 260, i, i + 0.5 + (i % 3) * 0.3); g.stroke();
+    }
+    var t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = renderer.capabilities.getMaxAnisotropy(); // stays sharp when seen at a low angle
+    return t;
   }
 
   // A rectangle with round corners, like a real rink.
-  function roundedRect(w, d, r) {
-    var s = new THREE.Shape(), x = -w / 2, y = -d / 2;
+  function roundedRect(w, d, r, path) {
+    var s = path || new THREE.Shape(), x = -w / 2, y = -d / 2;
     s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r);
     s.lineTo(x + w, y + d - r); s.quadraticCurveTo(x + w, y + d, x + w - r, y + d);
     s.lineTo(x + r, y + d); s.quadraticCurveTo(x, y + d, x, y + d - r);
     s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y);
     return s;
+  }
+  // A wall that follows the rink's outline: "thick" meters thick, from
+  // height "bottom" up to height "top", starting "gap" meters outside the ice.
+  function rinkWall(gap, thick, bottom, top, material) {
+    var outer = roundedRect(RINK_W + 2 * (gap + thick), RINK_D + 2 * (gap + thick), CORNER + gap + thick);
+    outer.holes.push(roundedRect(RINK_W + 2 * gap, RINK_D + 2 * gap, CORNER + gap, new THREE.Path()));
+    var geo = new THREE.ExtrudeGeometry(outer, { depth: top - bottom, bevelEnabled: false, curveSegments: 24 });
+    var wall = new THREE.Mesh(geo, material);
+    wall.rotation.x = -Math.PI / 2; // stand it up
+    wall.position.y = bottom;
+    scene.add(wall);
+    return wall;
   }
 
   var iceTexture = paintIce();
@@ -105,25 +159,37 @@
   iceTexture.repeat.set(1 / RINK_W, 1 / RINK_D);
   iceTexture.offset.set(0.5, 0.5);
   var ice = new THREE.Mesh(
-    new THREE.ShapeGeometry(roundedRect(RINK_W, RINK_D, 2), 24),
-    new THREE.MeshStandardMaterial({ map: iceTexture, roughness: 0.25 })
+    new THREE.ShapeGeometry(roundedRect(RINK_W, RINK_D, CORNER), 32),
+    new THREE.MeshStandardMaterial({ map: iceTexture, roughness: 0.22, metalness: 0, envMapIntensity: 0.6 })
   );
   ice.rotation.x = -Math.PI / 2; // lay it flat
   ice.receiveShadow = true;
   scene.add(ice);
 
-  // A dark rim around the ice, like the boards.
-  var rim = new THREE.Mesh(
-    new THREE.ShapeGeometry(roundedRect(RINK_W + 0.5, RINK_D + 0.5, 2.25), 24),
-    new THREE.MeshStandardMaterial({ color: 0x2a3644, roughness: 0.7 })
-  );
-  rim.rotation.x = -Math.PI / 2; rim.position.y = -0.03;
-  scene.add(rim);
+  // The boards: white, with a yellow kick plate at the bottom and a dark
+  // rail on top. Then the glass above them.
+  var boards = rinkWall(0, 0.16, 0, 1.0, new THREE.MeshStandardMaterial({ color: 0xf1f3f5, roughness: 0.5 }));
+  boards.receiveShadow = true;
+  rinkWall(-0.004, 0.17, 0, 0.24, new THREE.MeshStandardMaterial({ color: 0xc99a2e, roughness: 0.55 }));
+  rinkWall(-0.01, 0.19, 1.0, 1.05, new THREE.MeshStandardMaterial({ color: 0x15233a, roughness: 0.4 }));
+  rinkWall(0.07, 0.02, 1.05, 2.6, new THREE.MeshStandardMaterial({
+    color: 0xd6e6f2, roughness: 0.05, transparent: true, opacity: 0.07, depthWrite: false, side: THREE.DoubleSide
+  }));
+  // Thin posts that hold the glass panels, every 2 meters along the long sides.
+  var postGeo = new THREE.BoxGeometry(0.035, 1.55, 0.035);
+  var postPaint = new THREE.MeshStandardMaterial({ color: 0x8b96a3, roughness: 0.4, metalness: 0.5 });
+  for (var px = -RINK_W / 2 + CORNER; px <= RINK_W / 2 - CORNER + 0.01; px += 2) {
+    [-1, 1].forEach(function (side) {
+      var post = new THREE.Mesh(postGeo, postPaint);
+      post.position.set(px, 1.82, side * (RINK_D / 2 + 0.08));
+      scene.add(post);
+    });
+  }
   var floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(80, 80),
-    new THREE.MeshStandardMaterial({ color: 0x0d1218, roughness: 1 })
+    new THREE.PlaneGeometry(160, 160),
+    new THREE.MeshStandardMaterial({ color: 0x0c1117, roughness: 1 })
   );
-  floor.rotation.x = -Math.PI / 2; floor.position.y = -0.06;
+  floor.rotation.x = -Math.PI / 2; floor.position.y = -0.02;
   scene.add(floor);
 
   // A puck.
@@ -227,6 +293,7 @@
     var St = window.CoachStride, S = St.STRIDE;
     dt = dt || 0;
     var moving = !!sync || strideOn;
+    var advance = 0; // how much of a cycle the pro moved on this frame
     if (sync) {
       // Follow the kid: aim for the same leg at the same moment of the
       // push, and glide there the short way around the cycle.
@@ -234,10 +301,12 @@
       var diff = ((want - cycleTime) % 1 + 1.5) % 1 - 0.5;
       var step = diff * (1 - Math.exp(-dt / 0.12));
       cycleTime += step;
+      advance = step;
       if (cycleTime >= 1) { cycleTime -= 1; cycles++; }
       if (cycleTime < 0) { cycleTime += 1; cycles--; }
     } else if (strideOn) {
-      cycleTime += dt / S.secondsPerCycle;
+      advance = dt / S.secondsPerCycle;
+      cycleTime += advance;
       if (cycleTime >= 1) { cycleTime -= 1; cycles++; }
     }
     moveAmount += ((moving ? 1 : 0) - moveAmount) * (1 - Math.exp(-dt / 0.18));
@@ -274,7 +343,9 @@
           strideExtension: M.angleAt(pose[pu + "Hip"], pose[pu + "Knee"], pose[pu + "Ankle"])
         };
       }
-      iceSlide += S.metersPerCycle / S.secondsPerCycle * moveAmount * dt;
+      // The ice slides exactly as far as the skater's stride carries them,
+      // so it stops when the replay is paused.
+      iceSlide += S.metersPerCycle * advance * moveAmount;
       iceTexture.offset.x = 0.5 + iceSlide / RINK_W;
     }
     refFigure.update(pose, null, { edges: edges });
@@ -289,40 +360,68 @@
 
   // ---------- 5. Camera views ----------------------------------------
   // Where the camera looks, and how far away it sits.
+  //   side  = from the skater's right side, a little above (best for knee and lean)
+  //   front = from in front (best for the push out to the side)
+  //   top   = from above
   var lastView = "side";
-  function setView(name) {
-    lastView = name;
-    // Look at the middle of whoever is on the ice.
+  var VIEW_DIRECTIONS = { side: [0, 0.24, 1], front: [1, 0.24, 0], top: [0, 1, 0.14] };
+  var viewButtons = document.querySelectorAll("[data-view]");
+
+  // Point the camera so every skater on the ice (and their signs) fits
+  // in the picture, with a little room around them.
+  function frameView() {
     var r = refFigure.group.position, k = kidFigure.group.position;
-    var cx = hasKid ? (r.x + k.x) / 2 : r.x, cz = hasKid ? (r.z + k.z) / 2 : r.z;
-    var spread = hasKid ? Math.sqrt((r.x - k.x) * (r.x - k.x) + (r.z - k.z) * (r.z - k.z)) : 0;
-    var target = new THREE.Vector3(cx + 0.25, 0.7, cz);
-    var dist = 3.6 + spread * 0.8;
-    // On a tall, skinny screen (a phone) step back so everything fits.
-    var aspect = camera.aspect || 1;
-    if (aspect < 1.3) dist *= 1.3 / aspect;
-    var offset = {
-      side: [0.25 * dist, 0.22 * dist, 0.95 * dist],
-      front: [0.97 * dist, 0.2 * dist, 0.22 * dist],
-      top: [0.02, dist, 0.35 * dist]
-    }[name] || [0, 0, dist];
+    var xs = [r.x], zs = [r.z];
+    if (hasKid) { xs.push(k.x); zs.push(k.z); }
+    var x0 = Math.min.apply(null, xs) - 0.7, x1 = Math.max.apply(null, xs) + 1.1; // the stick reaches forward
+    var z0 = Math.min.apply(null, zs) - 0.7, z1 = Math.max.apply(null, zs) + 0.7;
+    var name = lastView, dir = new THREE.Vector3().fromArray(VIEW_DIRECTIONS[name] || VIEW_DIRECTIONS.side).normalize();
+    var wide, tall, target;
+    if (name === "top") {
+      // From above, show a bit more ice so the signs do not crowd the skater.
+      wide = Math.max(x1 - x0, 4); tall = Math.max(z1 - z0, 3);
+      target = new THREE.Vector3((x0 + x1) / 2, 0.2, (z0 + z1) / 2);
+    } else {
+      wide = name === "front" ? z1 - z0 : x1 - x0;
+      tall = 1.9; // from the ice to just above the name signs
+      target = new THREE.Vector3((x0 + x1) / 2, 0.8, (z0 + z1) / 2);
+    }
+    // How far back must the camera be to see all of it? (The camera sees
+    // a wedge: "half" is how much it widens for each meter of distance.)
+    var half = Math.tan((camera.fov / 2) * Math.PI / 180), aspect = camera.aspect || 1.6;
+    var dist = 1.15 * Math.max(tall / 2 / half, wide / 2 / (half * aspect)) + 0.6;
     controls.target.copy(target);
-    camera.position.set(target.x + offset[0], target.y + offset[1], target.z + offset[2]);
+    camera.position.copy(target).addScaledVector(dir, dist);
     controls.update();
+    Array.prototype.forEach.call(viewButtons, function (b) {
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-view") === name));
+    });
   }
 
   // Put the skaters on their starting spots for the current compare mode.
-  //   side by side: blue on the left, orange on the right
-  //   overlay:      both on the same spot, and blue turns into a "ghost"
-  function place() {
+  //   side by side: blue on the left, orange on the right (as the camera sees them)
+  //   overlay:      both on the same spot, and blue turns into a see-through outline
+  function placeSkaters() {
     var overlay = hasKid && compareMode === "overlay";
     var half = hasKid && !overlay ? gap / 2 : 0;
-    refFigure.group.position.set(-half, 0, 0);
-    kidFigure.group.position.set(half, 0, 0);
+    if (lastView === "front") {
+      // From the front, standing one behind the other would hide one of
+      // them, so they stand next to each other across the ice instead.
+      refFigure.group.position.set(0, 0, half);
+      kidFigure.group.position.set(0, 0, -half);
+    } else {
+      refFigure.group.position.set(-half, 0, 0);
+      kidFigure.group.position.set(half, 0, 0);
+    }
     refFigure.setGhost(overlay);
     refFigure.labelsOn = !overlay;   // two sets of signs on one spot would be a mess
     if (overlay) refFigure.hideAll();
-    setView(lastView);
+  }
+  function place() { placeSkaters(); frameView(); }
+  function setView(name) {
+    lastView = name;
+    if (hasKid && compareMode === "side") placeSkaters();
+    frameView();
   }
 
   // Show one skater, or two.
@@ -340,6 +439,7 @@
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    if (refFigure.points) frameView();
   }
   if (window.ResizeObserver) new ResizeObserver(resize).observe(stage);
   window.addEventListener("resize", resize);

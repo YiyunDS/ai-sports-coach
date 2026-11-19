@@ -266,19 +266,39 @@
     Team PHL &middot; Presidential SI Challenge &middot; Video is analyzed in the browser and never uploaded.
   </footer>
 
-  <!-- three.js = the 3D drawing library. OrbitControls = drag-to-spin camera. -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-  <!-- Our own code, in the order it needs to load. -->
-  <script src="js/angles.js"></script>
-  <script src="js/stride.js"></script>
-  <script src="js/tracker.js"></script>
-  <script src="js/default-targets.js"></script>
-  <script src="js/figure.js"></script>
-  <script src="js/scene.js"></script>
-  <script src="js/coach.js"></script>
-  <script src="js/positions.js"></script>
-  <script src="js/board.js"></script>
+  <!-- three.js = the 3D drawing library (version 0.187.0, pinned so it never
+       changes on us). It comes as a "module", a newer kind of script, so we
+       load it first and then load our own files, in order. -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module">
+    // Our own code, in the order it needs to load.
+    var OURS = ["js/angles.js", "js/stride.js", "js/tracker.js", "js/default-targets.js", "js/figure.js",
+                "js/scene.js", "js/coach.js", "js/positions.js", "js/board.js"];
+    try {
+      var parts = await Promise.all([
+        import("three"),
+        import("three/addons/controls/OrbitControls.js"),   // drag to spin the camera
+        import("three/addons/environments/RoomEnvironment.js") // soft light from all around
+      ]);
+      // Our files expect "THREE" with everything in it, like the old library.
+      window.THREE = Object.assign({}, parts[0], { OrbitControls: parts[1].OrbitControls, RoomEnvironment: parts[2].RoomEnvironment });
+    } catch (e) {
+      console.error(e); // no internet? scene.js shows a message, the Positioning tab still works
+    }
+    OURS.forEach(function (src) {
+      var s = document.createElement("script");
+      s.src = src;
+      s.async = false; // run them one after another, in this order
+      document.head.appendChild(s);
+    });
+  </script>
   <script>
     // The two tabs at the top: show one section, hide the other.
     (function () {

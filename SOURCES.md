@@ -27,4 +27,4 @@ run inside the browser.
 |---|---|---|
 | MediaPipe Tasks Vision 0.10.14 (the pose-finding code) | https://www.npmjs.com/package/@mediapipe/tasks-vision | Apache 2.0 |
 | Pose Landmarker models: heavy (used first), full and lite (backups) | https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker | Apache 2.0 |
-| three.js r128 and OrbitControls (the 3D drawing code) | https://github.com/mrdoob/three.js | MIT |
+| three.js 0.187.0 with OrbitControls and RoomEnvironment (the 3D drawing code) | https://github.com/mrdoob/three.js | MIT |

@@ -105,6 +105,7 @@
     g.strokeStyle = "#ffffff"; g.lineWidth = 7;                    // sharp ring
     g.beginPath(); g.arc(64, 64, 46, 0, Math.PI * 2); g.stroke();
     ringTexture = new THREE.CanvasTexture(c);
+    ringTexture.colorSpace = THREE.SRGBColorSpace;
     return ringTexture;
   }
 
@@ -129,6 +130,7 @@
       [0, 512].forEach(function (x) { g.strokeText(number, x, 112); g.fillText(number, x, 112); });
     }
     var t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace; // the picture's colors are normal screen colors
     t.anisotropy = 4;
     return t;
   }
@@ -357,7 +359,8 @@
     // --- Colored rings for graded joints ---
     this.rings = {};
     RING_JOINTS.forEach(function (name) {
-      var sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: getRingTexture(), depthTest: false, transparent: true }));
+      // toneMapped: false = keep the exact traffic-light color (no camera "exposure").
+      var sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: getRingTexture(), depthTest: false, transparent: true, toneMapped: false }));
       sprite.renderOrder = 9; // drawn on top, so you can always see it
       sprite.visible = false;
       self.group.add(sprite);
@@ -508,7 +511,8 @@
       var canvas = document.createElement("canvas");
       canvas.width = 320; canvas.height = 110;
       var texture = new THREE.CanvasTexture(canvas);
-      var sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false, transparent: true }));
+      texture.colorSpace = THREE.SRGBColorSpace;
+      var sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false, transparent: true, toneMapped: false }));
       sprite.scale.set(0.46, 0.158, 1);
       sprite.renderOrder = 10; // draw on top of everything
       this.group.add(sprite);
@@ -521,41 +525,57 @@
     L.sprite.visible = true;
   };
 
-  // Draw a see-through "pizza slice" that shows an angle.
+  // Draw a see-through "pizza slice" that shows an angle, with a sharp
+  // outline. It is drawn on top of the body, so you can always see it.
   // center = the joint. dirA and dirB = the two directions that make
   // the angle. radius = how big the slice is.
   Figure.prototype.setWedge = function (id, center, dirA, dirB, radius, color) {
     if (!this.labelsOn) { this.hide(id); return; }
-    var N = 20, W = this.wedges[id];
+    var N = 24, W = this.wedges[id];
     if (!W) {
       var geo = new THREE.BufferGeometry();
       geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array((N + 2) * 3), 3));
       var index = [];
       for (var i = 1; i <= N; i++) index.push(0, i, i + 1);
       geo.setIndex(index);
-      var mat = new THREE.MeshBasicMaterial({
-        color: color, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false
-      });
-      W = this.wedges[id] = new THREE.Mesh(geo, mat);
+      W = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+        color: color, transparent: true, opacity: 0.4, side: THREE.DoubleSide,
+        depthWrite: false, depthTest: false, toneMapped: false
+      }));
+      W.renderOrder = 7;
       W.frustumCulled = false;
+      // The outline: the two arms of the angle and the arc between them.
+      var lineGeo = new THREE.BufferGeometry();
+      lineGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array((N + 3) * 3), 3));
+      W.outline = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({
+        color: color, transparent: true, opacity: 0.95, depthTest: false, toneMapped: false
+      }));
+      W.outline.renderOrder = 8;
+      W.outline.frustumCulled = false;
+      W.add(W.outline);
+      this.wedges[id] = W;
       this.group.add(W);
     }
     var a = v3(dirA).normalize(), b = v3(dirB).normalize();
     var theta = Math.acos(Math.max(-1, Math.min(1, a.dot(b))));
-    var pos = W.geometry.attributes.position;
+    var pos = W.geometry.attributes.position, line = W.outline.geometry.attributes.position;
     pos.setXYZ(0, center.x, center.y, center.z);
+    line.setXYZ(0, center.x, center.y, center.z);
     for (var k = 0; k <= N; k++) {
       // Sweep smoothly from direction a to direction b.
       var t = k / N, s = Math.sin(theta) || 1;
       var wa = theta < 1e-4 ? 1 - t : Math.sin((1 - t) * theta) / s;
       var wb = theta < 1e-4 ? t : Math.sin(t * theta) / s;
-      pos.setXYZ(k + 1,
-        center.x + (a.x * wa + b.x * wb) * radius,
-        center.y + (a.y * wa + b.y * wb) * radius,
-        center.z + (a.z * wa + b.z * wb) * radius);
+      var x = center.x + (a.x * wa + b.x * wb) * radius;
+      var y = center.y + (a.y * wa + b.y * wb) * radius;
+      var z = center.z + (a.z * wa + b.z * wb) * radius;
+      pos.setXYZ(k + 1, x, y, z);
+      line.setXYZ(k + 1, x, y, z);
     }
-    pos.needsUpdate = true;
+    line.setXYZ(N + 2, center.x, center.y, center.z);
+    pos.needsUpdate = true; line.needsUpdate = true;
     W.material.color.set(color);
+    W.outline.material.color.set(color);
     W.visible = true;
   };
 
@@ -565,19 +585,29 @@
     if (this.wedges[id]) this.wedges[id].visible = false;
   };
 
-  // Turn the skater into a see-through "ghost" (used for Overlay mode),
-  // or back to solid.
+  // Turn the skater into a see-through blue outline (used for Overlay
+  // mode), or back to normal. The outline is drawn ON TOP of the other
+  // skater, so you can always see where the two bodies are different.
   Figure.prototype.setGhost = function (on) {
-    var seen = [];
+    if (!this.ghostPaint) {
+      this.ghostPaint = new THREE.MeshBasicMaterial({
+        color: 0x5aa9ff, transparent: true, opacity: 0.32, depthWrite: false, depthTest: false, toneMapped: false
+      });
+      this.ghostLine = new THREE.LineBasicMaterial({ color: 0x5aa9ff, transparent: true, opacity: 0.5, depthTest: false, toneMapped: false });
+    }
+    var self = this;
     this.group.traverse(function (m) {
       if (!m.userData.body) return;
+      if (on && !m.userData.realPaint) {
+        m.userData.realPaint = m.material;           // remember the real paint
+        m.material = m.isLine ? self.ghostLine : self.ghostPaint;
+        m.renderOrder = 5;
+      } else if (!on && m.userData.realPaint) {
+        m.material = m.userData.realPaint;
+        delete m.userData.realPaint;
+        m.renderOrder = 0;
+      }
       m.castShadow = !on && !m.isLine;
-      if (seen.indexOf(m.material) >= 0) return; // many pieces share one paint
-      seen.push(m.material);
-      m.material.transparent = on;
-      m.material.opacity = on ? 0.3 : 1;
-      m.material.depthWrite = !on;
-      m.material.needsUpdate = true;
     });
   };
 

@@ -234,7 +234,23 @@ against a real skater.
 Recommendation: **3B now**, and use 3A as a check in Phase 5 when a good
 video exists.
 
-### Phase 4: Rink, lighting and camera (area d)
+### Phase 4: Rink, lighting and camera (area d) (done, option 4B)
+
+three.js moved from r128 to 0.187.0 (pinned), loaded as a module and
+handed to our files, so double-clicking index.html still works. Colors
+are handled correctly and a camera-like "exposure" (tone mapping) keeps
+the white ice from blowing out. Soft light from all around, one main
+arena light with soft shadows, and a cool light from behind that
+outlines the skaters. The rink is now center ice at real size
+(30 x 15 m) with lines painted under the ice, skate scratches, white
+boards with a yellow kick plate and dark rail, and glass on posts.
+The camera works out how far back to stand so both skaters and their
+signs fit; Side is a true side view, and in Front view the skaters
+stand next to each other instead of one behind the other. Overlay draws
+the pro as a see-through blue outline on top of the kid. Angle slices
+have sharp outlines and show through the body. The ice slides only as
+far as the stride moves, so it stops when the replay is paused.
+Screenshots: `docs/screenshots/phase4/sheet-phase4-before-after.png`.
 
 **Option 4A: Stay on three.js r128 and improve what is there**
 - Add boards and glass, an arena that fades into the dark, a few

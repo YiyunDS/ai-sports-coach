@@ -86,7 +86,7 @@ Once there are two skaters on the ice (your pose, or the sample session), you ca
 
 - **Drag a skater** with the mouse or a finger to slide it anywhere on the ice. Drag the ice itself to spin the camera.
 - **Side by side** puts the two skaters next to each other. The **Spacing** slider moves them closer or farther apart.
-- **Overlay** puts them on the same spot. The blue skater turns see-through, so you can see exactly where your pose is different.
+- **Overlay** puts them on the same spot. The pro turns into a see-through blue outline drawn on top of you, so you can see exactly where your pose is different.
 - **Reset positions** puts everyone back.
 
 ### Positioning (the second tab)
@@ -113,7 +113,7 @@ The goal angles live in [`targets.json`](targets.json). There is one set for eac
 | `targets.json` | The goal angles (kids can edit) |
 | `js/angles.js` | The math: measures angles and scores them |
 | `js/figure.js` | Draws one 3D hockey skater in full gear (jersey, pants, helmet with cage, gloves, skates), built in code from shaped pieces |
-| `js/scene.js` | The rink, lights, camera, the pro skater, and moving the skaters |
+| `js/scene.js` | The rink (real size, with boards and glass), lights, camera, the pro skater, and moving the skaters |
 | `js/tracker.js` | Follows the one skater you clicked through the video |
 | `js/coach.js` | Reads your video, finds your pose, makes the report and replay |
 | `js/positions.js` | The playbook: where each position should stand in each situation |
@@ -125,7 +125,7 @@ The goal angles live in [`targets.json`](targets.json). There is one set for eac
 
 ### Good to know
 
-- **Your video stays on your computer.** The page only downloads code: three.js from cdnjs and jsDelivr, MediaPipe from jsDelivr, and the pose model from Google's MediaPipe storage.
+- **Your video stays on your computer.** The page only downloads code: three.js from jsDelivr, MediaPipe from jsDelivr, and the pose model from Google's MediaPipe storage.
 - The orange skater has no stick, because the AI finds body joints, not sticks.
 - The AI has to guess how deep things are from a flat video, so the 3D pose can wobble. Angles are most trustworthy from a clear side view.
 
