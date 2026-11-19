@@ -18,8 +18,13 @@ team leader) for the Presidential SI Challenge. All work happens on the
   `node tests/retarget.test.js` (added in Phase 6).
   Add tests for new math.
 - Do not break the Positioning tab.
-- Any outside asset or video must be free to use and listed in
-  `SOURCES.md` with its link and license.
+- Any outside asset must be free to use and listed in `SOURCES.md` with
+  its link and license.
+- Videos we do not own (for example NHL footage of a pro) may only be
+  MEASURED. The clip stays on this computer in `local-videos/` and is
+  never committed or shared. The repo gets only the numbers we measured,
+  with the link and who owns the footage, in `SOURCES.md`. The team
+  leader saves such clips themself.
 - After each phase, open the page, take screenshots, and show before and
   after. Do not call a phase done until you have looked at it.
 - Small commits on `3d-coach`. Do not push until the team leader says so.
