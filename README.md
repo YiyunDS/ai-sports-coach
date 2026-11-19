@@ -122,6 +122,20 @@ Why chance? Nobody can know if one shot will go in. But over many tries, a short
 - Being in the right spot matters: you are open for passes, and the other team's shots get harder.
 - The chances are our own estimates, not measured from real games. They are in `js/gamesim.js` and are easy to change. `node tests/gamesim.test.js` plays thousands of shifts to check that the game stays fair and that good positioning and passing really pay off.
 
+### Referee (the fourth tab): You make the call
+
+In this game **you are the referee**. A short play runs on the rink, then you tap **Offside**, **Icing** or **Good play**. The game freezes the moment that decided it, zooms in on the skates and the line, and tells you why.
+
+- **Offside:** the puck must cross the other team's blue line before any attacker. A player is offside when both skates are completely over the line before the whole puck is. One skate still on the line is fine.
+- **Icing:** the puck is shot from the shooter's own half of the rink and goes all the way over the far goal line with nobody touching it. Not icing: it goes in the net, the other team plays it first, or it stops short.
+- Three levels: **Rookie** (plain to see), **Linesman** (close calls at the line, pucks that are touched, stop short or go in) and **Pro** (faster, and teams that are short a player).
+
+The rules are the USA Hockey rules for players 12 and under: the whistle blows right away (no "tag-up"), and a team killing a penalty may **not** ice the puck (in the NHL it may). The links are in `SOURCES.md`. The plays are built by `js/refplays.js`, and a separate "judge" in the same file makes the call from the skates and the puck alone; `node tests/refplays.test.js` checks that the judge agrees with every play.
+
+### On a phone
+
+Every tab works on a phone: nothing scrolls sideways, and everything you tap is at least 44 pixels tall. In the Game and the Referee tab the rink stands up, and your buttons sit in a sheet at the bottom of the screen so you see the rink and the buttons together. In the Game the picture follows the puck, so the markers stay big enough for a finger.
+
 ### Changing the goal angles
 
 The goal angles live in [`targets.json`](targets.json). There is one set for each age band (6-8, 9-10, 11-12) and each level, plus one for the pro. To try your own numbers, edit the file and use **Edit target angles > Load targets.json** on the page. To make them the new normal, also copy the file into `js/default-targets.js`.
@@ -152,6 +166,10 @@ The goal angles live in [`targets.json`](targets.json). There is one set for eac
 | `tests/angles.test.js` | Checks the math. Run `node tests/angles.test.js` |
 | `js/stride.js` | How the pro skates: the stride keyframes (kids can edit them) and the math that turns them into a pose |
 | `tests/stride.test.js` | Checks the pro's stride (bones keep their length, skates stay on the ice and do not skid). Run `node tests/stride.test.js` |
+| `js/rink.js` | Draws the whole rink from above for the Game and the Referee tabs |
+| `js/refplays.js` | The Referee game: builds short plays and judges them from the rule book (offside, icing) |
+| `js/ref.js` | The Referee game on the page: the little movie, your call, the zoomed-in reason, the score |
+| `tests/refplays.test.js` | Checks the Referee game: the judge agrees with 9,000 built plays. Run `node tests/refplays.test.js` |
 | `tests/gamesim.test.js` | Checks the simulation game: the playbook, the chances, and thousands of whole shifts. Run `node tests/gamesim.test.js` |
 | `tests/cleanup.test.js` | Checks the clean-up of video poses (smoothing, fixed bones, skates on the ice). Run `node tests/cleanup.test.js` |
 

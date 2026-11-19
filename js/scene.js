@@ -237,6 +237,8 @@
   // Where the skaters stand, and how we compare them.
   var compareMode = "side";  // "side" = next to each other, "overlay" = on top of each other
   var gap = 2.5;             // meters between the two skaters in side-by-side mode
+  // A phone's picture is narrow: start the skaters closer so both fit in it.
+  if (window.matchMedia && window.matchMedia("(max-width: 700px)").matches) gap = 1.5;
 
   var showAngles = true; // the "Angles" button turns the signs and slices off
   // Add the angle signs and "pizza slices" to a skater.
@@ -508,6 +510,7 @@
   var modeButtons = document.querySelectorAll("[data-compare]");
   var gapInput = document.getElementById("gap");
   var gapOut = document.getElementById("gap-out");
+  if (gapInput) gapInput.value = String(gap);
   var resetBtn = document.getElementById("reset-pos");
 
   function syncCompareUi() {

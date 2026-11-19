@@ -514,6 +514,45 @@ Phase 14, the referee game "You make the call":
 4. Play it on a phone-size and a desktop-size screen, screenshots,
    docs, small commits.
 
+### Phase 13: Phone-friendly (done)
+
+- Everything you tap is at least 44 px tall on touch screens; a double
+  tap no longer zooms.
+- The four tabs stay on one line (swipe sideways if needed).
+- Game and Referee tabs: the rink stands up and "Your move" is a sheet
+  fixed to the bottom, choices two to a row. In the Game the picture
+  shows the 120 feet of ice around the play and follows the puck, so the
+  markers are finger-sized (first try without that: markers were tiny).
+- Form analysis: on a phone the two skaters start 1.5 m apart, so both
+  fit in the narrow picture.
+- Checked at 375 x 812: no sideways scrolling on any tab, no button or
+  chooser under 44 px. Pictures: `docs/screenshots/phase13/`.
+Limits: checked in a phone-size browser window on the computer, not on
+a real phone. The Form analysis page is long on a phone (the report is
+far down).
+
+### Phase 14: "You make the call", the referee game (done, first version)
+
+- `js/refplays.js`: 10 kinds of play (carry or pass over the blue line,
+  onside or offside; long shots that are icing, a dump-in, touched,
+  stopped short, a goal, shorthanded) at 3 levels, and a judge that
+  makes the call only from the skates, the puck and who touched it.
+  10 tests in `tests/refplays.test.js`; the judge agrees with 9,000
+  built plays.
+- `js/rink.js`: one rink drawing for the Game and the Referee tab (it
+  can stand up, show a part of the rink, and zoom in).
+- `js/ref.js` + fourth tab "Referee": watch, tap Offside / Icing / Good
+  play, see the frozen key moment (offside: zoomed in on the skates and
+  the lit-up edge of the blue line; icing: the puck's path from where it
+  was shot, the red line and the goal line), read why. Score, streak,
+  three levels, watch again.
+Pictures: `docs/screenshots/phase14/`.
+Limits: two rules only (no penalties yet). The plays are simple
+straight-line skating. Two rule details are left out because we could
+not confirm the exact wording (see `SOURCES.md`). A coach or referee
+should read the explanations once.
+Next idea: "Cut the angle", a goalie geometry game (idea B above).
+
 ### Phase 5: Check the pro against a real skater (needs a video)
 
 - Run a good side-view video of a strong skater through the Phase 1

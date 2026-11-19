@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="claude:viewport-fit-sides" content="cover">
+  <meta name="theme-color" content="#0b0f14">
   <title>AI Sports Coach - 3D Visual Coach</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
   <link rel="stylesheet" href="style.css">
@@ -29,6 +30,9 @@
     js/board.js            the positioning board you drag your marker on
     js/gamesim.js          the simulation game: the rules and the chances
     js/game.js             the simulation game: the rink, the buttons, the play-by-play
+    js/rink.js             draws the whole rink from above (for the Game and the Referee tabs)
+    js/refplays.js         "You make the call": the plays, and the judge who knows the rules
+    js/ref.js              "You make the call": the little movie, your answer, the score
   -->
   <header class="bar">
     <div class="bar-in">
@@ -41,6 +45,7 @@
         <button type="button" data-tab="form" aria-pressed="true">Form analysis</button>
         <button type="button" data-tab="position" aria-pressed="false">Positioning</button>
         <button type="button" data-tab="game" aria-pressed="false">Game</button>
+        <button type="button" data-tab="ref" aria-pressed="false">Referee</button>
       </nav>
       <div class="bar-meta">Team PHL</div>
     </div>
@@ -348,6 +353,67 @@
     </aside>
   </main>
 
+  <!-- ================= SECTION 4: YOU MAKE THE CALL (REFEREE) ================= -->
+  <main id="view-ref" class="layout pos-layout game-layout" hidden>
+    <section class="board-wrap" aria-label="You make the call">
+      <div class="scorebar" role="status" aria-live="polite">
+        <div class="score"><span class="team">RIGHT</span><span id="ref-right" class="num big">0</span></div>
+        <div class="score-mid">
+          <span id="ref-info" class="small"></span>
+          <span id="ref-streak" class="small num"></span>
+        </div>
+        <div class="score"><span id="ref-total" class="num big">0</span><span class="team">PLAYS</span></div>
+      </div>
+      <p id="ref-banner" class="ref-banner" hidden>Blue is killing a penalty: one skater short</p>
+      <svg id="ref-rink" viewBox="0 0 200 85" role="img" aria-label="A short hockey play seen from above. The blue team attacks."></svg>
+      <ul class="board-key">
+        <li><span class="key mate"></span>Blue team (attacking)</li>
+        <li><span class="key opp"></span>Other team</li>
+        <li><span class="key puck"></span>Puck</li>
+      </ul>
+    </section>
+
+    <aside class="side">
+      <section class="panel move">
+        <h2>You make the call</h2>
+        <p id="ref-prompt" class="small" role="status" aria-live="polite"></p>
+        <div class="calls" role="group" aria-label="Your call">
+          <button type="button" class="call" data-call="offside" disabled>Offside</button>
+          <button type="button" class="call" data-call="icing" disabled>Icing</button>
+          <button type="button" class="call" data-call="ok" disabled>Good play</button>
+        </div>
+        <div id="ref-result" class="pos-result" role="status" aria-live="polite" hidden>
+          <div class="pos-result-head">
+            <span id="ref-verdict" class="chip"></span>
+            <span id="ref-answer" class="num"></span>
+          </div>
+          <p id="ref-why"></p>
+        </div>
+        <div class="go">
+          <button type="button" id="ref-next" class="primary">Start</button>
+          <button type="button" id="ref-again" disabled>Watch again</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Level</h2>
+        <div class="seg" role="group" aria-label="Level">
+          <button type="button" data-rlevel="1">1 Rookie</button>
+          <button type="button" data-rlevel="2">2 Linesman</button>
+          <button type="button" data-rlevel="3">3 Pro</button>
+        </div>
+        <p id="ref-level-note" class="small"></p>
+      </section>
+
+      <section class="panel">
+        <h2>The two rules</h2>
+        <p class="small"><strong>Offside.</strong> The puck must cross the other team's blue line before any attacker does. A player is offside when both skates are completely over the line before the whole puck is. One skate still on the line is fine, and the stick does not count.</p>
+        <p class="small"><strong>Icing.</strong> A player shoots the puck from their own half of the rink (behind the center red line) and it goes all the way over the far goal line with nobody touching it. It is not icing if it goes in the net, if the other team plays it first, or if it stops short.</p>
+        <p class="small">These are the USA Hockey rules for players 12 and under: the whistle blows right away, and a team that is short a player may not ice the puck. Sources are in <code>SOURCES.md</code>.</p>
+      </section>
+    </aside>
+  </main>
+
   <footer class="foot">
     Team PHL &middot; Presidential SI Challenge &middot; Video is analyzed in the browser and never uploaded.
   </footer>
@@ -366,7 +432,8 @@
   <script type="module">
     // Our own code, in the order it needs to load.
     var OURS = ["js/angles.js", "js/stride.js", "js/measure.js", "js/retarget.js", "js/tracker.js", "js/default-targets.js",
-                "js/figure.js", "js/rigged-figure.js", "js/scene.js", "js/coach.js", "js/positions.js", "js/board.js", "js/gamesim.js", "js/game.js"];
+                "js/figure.js", "js/rigged-figure.js", "js/scene.js", "js/coach.js", "js/positions.js", "js/board.js", "js/rink.js", "js/gamesim.js", "js/game.js",
+                "js/refplays.js", "js/ref.js"];
     // Load one of our .js files and wait until it has run.
     function load(src) {
       return new Promise(function (done, fail) {
@@ -413,7 +480,7 @@
     (function () {
       var tabs = document.querySelectorAll("[data-tab]");
       var views = { form: document.getElementById("view-form"), position: document.getElementById("view-position"),
-                    game: document.getElementById("view-game") };
+                    game: document.getElementById("view-game"), ref: document.getElementById("view-ref") };
       Array.prototype.forEach.call(tabs, function (tab) {
         tab.addEventListener("click", function () {
           var name = tab.getAttribute("data-tab");

@@ -17,11 +17,11 @@
 // =====================================================================
 (function () {
   "use strict";
-  var G = window.CoachGame, P = window.CoachPositions;
+  var G = window.CoachGame, P = window.CoachPositions, R = window.CoachRink;
   var svg = document.getElementById("game-rink");
-  if (!G || !P || !svg) return;
+  if (!G || !P || !R || !svg) return;
+  var shape = R.shape, words = R.words;   // the drawing helpers from rink.js
 
-  var NS = "http://www.w3.org/2000/svg";
   function $(id) { return document.getElementById(id); }
   var el = {
     start: $("game-start"), begin: $("game-new"), prompt: $("game-prompt"), choices: $("game-choices"),
@@ -41,69 +41,37 @@
 
   var tall = window.matchMedia("(max-width: 700px)");
   var calm = window.matchMedia("(prefers-reduced-motion: reduce)");
-  var upright = false;      // is the rink standing up (phone)?
-  var root = null, live = null;
+  var rink = null;          // the rink drawing (from rink.js)
+  var live = null;          // the layer with everything that moves
 
-  // ---------- Small helpers for drawing --------------------------------
-  function shape(tag, attrs, parent) {
-    var e = document.createElementNS(NS, tag);
-    Object.keys(attrs || {}).forEach(function (k) { e.setAttribute(k, attrs[k]); });
-    parent.appendChild(e);
-    return e;
-  }
-  function words(text, attrs, parent) {
-    var e = shape("text", attrs, parent);
-    e.textContent = text;
-    return e;
-  }
-  // Inside the drawing, x = feet up the ice and y = feet across. When
-  // the rink stands up, the whole drawing is turned a quarter turn, so
-  // anything with letters on it is turned back to stay readable.
-  function place(p) { return "translate(" + p.d + "," + p.a + ")" + (upright ? " rotate(90)" : ""); }
+  function place(p) { return rink.place(p); }
   function clamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
   function mix(p, q, t) { return { a: p.a + (q.a - p.a) * t, d: p.d + (q.d - p.d) * t }; }
   function ease(t) { return t * t * (3 - 2 * t); }   // start gently, stop gently
 
-  // ---------- The rink (drawn once) ------------------------------------
-  function drawRink(layer) {
-    shape("rect", { x: 0, y: 0, width: 200, height: 85, rx: 28, class: "ice" }, layer);
-    // Center line and circle, blue lines, goal lines.
-    shape("line", { x1: 100, y1: 0, x2: 100, y2: 85, class: "line-red wide" }, layer);
-    shape("circle", { cx: 100, cy: 42.5, r: 15, class: "line-blue thin" }, layer);
-    [75, 125].forEach(function (x) { shape("line", { x1: x, y1: 0, x2: x, y2: 85, class: "line-blue wide" }, layer); });
-    [11, 189].forEach(function (x) { shape("line", { x1: x, y1: 5.8, x2: x, y2: 79.2, class: "line-red thin" }, layer); });
-    // Faceoff circles and dots.
-    [20.5, 64.5].forEach(function (y) {
-      [31, 169].forEach(function (x) {
-        shape("circle", { cx: x, cy: y, r: 15, class: "line-red thin" }, layer);
-        shape("circle", { cx: x, cy: y, r: 1, class: "dot-red" }, layer);
-      });
-      [80, 120].forEach(function (x) { shape("circle", { cx: x, cy: y, r: 1, class: "dot-red" }, layer); });
-    });
-    // The creases, the nets and the goalies.
-    shape("path", { d: "M11,36.5 A6,6 0 0 1 11,48.5 Z", class: "crease" }, layer);
-    shape("path", { d: "M189,36.5 A6,6 0 0 0 189,48.5 Z", class: "crease" }, layer);
-    shape("rect", { x: 7.6, y: 39.5, width: 3.4, height: 6, class: "net" }, layer);
-    shape("rect", { x: 189, y: 39.5, width: 3.4, height: 6, class: "net" }, layer);
-    shape("circle", { cx: 13.2, cy: 42.5, r: 2, class: "goalie ours" }, layer);
-    shape("circle", { cx: 186.8, cy: 42.5, r: 2, class: "goalie theirs" }, layer);
-    // Little labels so you know which way we are going.
-    var ours = upright ? { a: 42.5, d: 3.4 } : { a: 6, d: 24 };
-    var theirs = upright ? { a: 42.5, d: 197.8 } : { a: 6, d: 176 };
-    words("OUR NET", { transform: place(ours), class: "rink-note" }, layer);
-    words("THEIR NET", { transform: place(theirs), class: "rink-note" }, layer);
+  // The rink lies on its side on a wide screen and stands up on a phone.
+  // A phone is small, so there we only show the 120 feet of ice around
+  // the play (like a TV camera following the puck). Then the markers are
+  // big enough for a finger.
+  var SHOW = 120;
+  // Make sure these depths (feet up the ice) are in the picture. The
+  // first one is the puck: it always is.
+  function fit(depths) {
+    var from = 0, to = 200;
+    if (tall.matches) {
+      var mid = (Math.min.apply(null, depths) + Math.max.apply(null, depths)) / 2;
+      from = clamp(mid - SHOW / 2, depths[0] - SHOW + 14, depths[0] - 14);
+      from = Math.round(clamp(from, 0, 200 - SHOW) / 5) * 5;
+      to = from + SHOW;
+    }
+    if (rink && rink.from === from && rink.to === to && rink.upright === tall.matches) return;
+    rink = R.build(svg, { upright: tall.matches, from: from, to: to });
+    live = shape("g", {}, rink.root);
   }
-
+  function fitToGame() { fit(game ? [game.puck.d, game.us[game.you].d] : [100]); }
   function build() {
-    upright = tall.matches;
-    svg.textContent = "";
-    svg.setAttribute("viewBox", upright ? "0 0 85 200" : "0 0 200 85");
-    root = shape("g", upright ? { transform: "translate(0,200) rotate(-90)" } : {}, svg);
-    drawRink(shape("g", {}, root));
-    // The shape of the ice, so rings and circles are cut off at the boards.
-    var cut = shape("clipPath", { id: "game-ice" }, root);
-    shape("rect", { x: 0, y: 0, width: 200, height: 85, rx: 28 }, cut);
-    live = shape("g", {}, root);
+    rink = null;
+    fitToGame();
     draw();
   }
 
@@ -128,7 +96,7 @@
     var myMove = !busy && !game.over && !G.youHavePuck(game);
 
     // Rings on the best spot (after a beat, or when the hint is on).
-    var under = shape("g", { "clip-path": "url(#game-ice)" }, live);
+    var under = shape("g", { "clip-path": rink.clip }, live);
     if (showRings) {
       shape("circle", { cx: showRings.d, cy: showRings.a, r: G.CLOSE_FEET, class: "zone-close" }, under);
       shape("circle", { cx: showRings.d, cy: showRings.a, r: G.GOOD_FEET, class: "zone-good" }, under);
@@ -229,6 +197,7 @@
     else if (game.owner === "us") el.prompt.textContent = "Our " + P.ROLE_NAMES[game.carrier].toLowerCase() + " has the puck. Drag your marker to where you should be. Then press Play on, or call for a pass if you are open.";
     else el.prompt.textContent = "They have the puck. Drag your marker to where you should defend, then press Play on.";
     drawChoices();
+    if (!busy) fitToGame();
     draw();
   }
 
@@ -261,6 +230,8 @@
     if (!G.youHavePuck(before)) from.us[before.you] = G.toward(before.us[before.you], target || before.us[before.you], G.REACH);
     game = after;
     busy = true; target = null; preview = null;
+    // Keep the whole beat in the picture: where the puck starts, where it goes, and you.
+    fit([before.puck.d].concat(result.events.map(function (e) { return e.puck.d; }), [from.us[before.you].d]));
     showRings = after.lastSpot ? after.lastSpot.ideal : null;
     showSpot();
     refresh();
@@ -327,14 +298,7 @@
   }
 
   // ---------- Dragging your marker, tapping a teammate ------------------
-  function pointerToRink(ev) {
-    var m = root && root.getScreenCTM();
-    if (!m) return null;
-    var p = svg.createSVGPoint();
-    p.x = ev.clientX; p.y = ev.clientY;
-    var local = p.matrixTransform(m.inverse());
-    return { a: clamp(local.y, 3, 82), d: clamp(local.x, 3, 197) };
-  }
+  function pointerToRink(ev) { return rink ? rink.toRink(ev) : null; }
   function moveTo(spot) {
     if (!spot || !game || game.over || busy || G.youHavePuck(game)) return;
     target = G.toward(game.us[game.you], spot, G.REACH);
@@ -368,7 +332,7 @@
   svg.addEventListener("keydown", function (ev) {
     if (!game || game.over || busy || G.youHavePuck(game)) return;
     // On screen: right = up the ice when the rink lies down, up = up the ice when it stands.
-    var step = upright
+    var step = rink.upright
       ? { ArrowLeft: [-3, 0], ArrowRight: [3, 0], ArrowUp: [0, 3], ArrowDown: [0, -3] }[ev.key]
       : { ArrowLeft: [0, -3], ArrowRight: [0, 3], ArrowUp: [-3, 0], ArrowDown: [3, 0] }[ev.key];
     if (step) {
