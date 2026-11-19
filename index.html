@@ -1,0 +1,114 @@
+<!doctype html>
+<!--
+  =====================================================================
+   index.html  -  The page you open in your web browser.
+  =====================================================================
+   HTML is like the skeleton of a web page: it says WHAT is on the page
+   (a title, buttons, a video). style.css says how it LOOKS (colors,
+   sizes). app.js says what it DOES (runs the AI, measures angles).
+
+   To use it: double-click this file, or see README.md ("Angle Coach").
+  =====================================================================
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Angle Coach</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- The top banner with our app's name. -->
+  <header class="banner">
+    <h1>Angle Coach</h1>
+    <p>Your AI skating helper. Upload a video, and we'll measure your knees, lean and stride!</p>
+  </header>
+
+  <main>
+    <!-- ===== STEP 1: The setup card (video, age, level) ===== -->
+    <section class="card" id="setup">
+      <h2>1. Get ready</h2>
+
+      <!-- Pick a video file from the computer. "accept=video/*" means only videos. -->
+      <label class="field">
+        <span>Your skating video</span>
+        <input type="file" id="videoFile" accept="video/*">
+      </label>
+
+      <!-- Pick an age from 6 to 12. app.js fills in the choices. -->
+      <label class="field">
+        <span>How old are you?</span>
+        <select id="age"></select>
+      </label>
+
+      <!-- Beginner or Experienced. Only one can be picked at a time. -->
+      <fieldset class="field level">
+        <legend>What kind of skater are you?</legend>
+        <label><input type="radio" name="level" value="Beginner" checked> Beginner</label>
+        <label><input type="radio" name="level" value="Experienced"> Experienced</label>
+      </fieldset>
+
+      <p class="hint">Best video: film from the SIDE, with your whole body in the picture, for 5 to 20 seconds.</p>
+
+      <button id="analyzeBtn" disabled>Check my skating!</button>
+      <p id="status" class="status" role="status">Pick a video to start.</p>
+      <!-- A bar that fills up while the AI watches the video. -->
+      <progress id="progress" max="100" value="0" hidden></progress>
+    </section>
+
+    <!-- ===== STEP 2: The video with lines drawn on top ===== -->
+    <section class="card" id="viewer" hidden>
+      <h2>2. Watch the AI measure you</h2>
+      <!--
+        The video and the drawing canvas sit in the same box. The canvas
+        is see-through and sits ON TOP of the video, like tracing paper.
+      -->
+      <div class="stage">
+        <video id="video" playsinline muted controls></video>
+        <canvas id="overlay"></canvas>
+      </div>
+      <p class="legend">
+        <span class="dot good"></span> on target
+        <span class="dot off"></span> keep practicing
+      </p>
+    </section>
+
+    <!-- ===== STEP 3: Score and tips ===== -->
+    <section class="card" id="results" hidden>
+      <h2>3. Your coach report</h2>
+      <div class="score-row">
+        <div class="score" id="score">--</div>
+        <div>
+          <p class="score-label">out of 100</p>
+          <p id="bandInfo" class="hint"></p>
+        </div>
+      </div>
+      <!-- A table: your number vs. the goal number for each check. -->
+      <table class="checks">
+        <thead><tr><th>Check</th><th>You</th><th>Goal</th><th>Points</th></tr></thead>
+        <tbody id="checkRows"></tbody>
+      </table>
+      <p id="spreadInfo" class="hint"></p>
+      <h3>Coach tips</h3>
+      <ul id="tips" class="tips"></ul>
+    </section>
+
+    <!-- ===== For grown-ups: load an edited targets.json ===== -->
+    <details class="card grownups">
+      <summary>For grown-ups: goal numbers</summary>
+      <p id="targetsSource" class="hint"></p>
+      <p class="hint">If you opened this page by double-clicking it, the browser may not let it read
+        <code>targets.json</code> by itself. Pick the file here to use your edited goals.</p>
+      <input type="file" id="targetsFile" accept=".json,application/json">
+    </details>
+  </main>
+
+  <footer>
+    Made by Team PHL for the Presidential SI Challenge. Videos stay on your computer; nothing is uploaded.
+  </footer>
+
+  <!-- Load the math first, then the app. -->
+  <script src="angles.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
