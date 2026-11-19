@@ -125,11 +125,16 @@
   // target = the three ranges from getTarget().
   // span   = how many poses to each side we compare when looking for the
   //          top of a push (2 is right for 10 poses per second).
-  function analyzeFrames(frames, target, yellowZone, span) {
+  // flat   = (optional) for each pose, knee bend and lean measured on the
+  //          flat picture (see measureFlat), or null. When we have them,
+  //          we use them instead of the 3D numbers.
+  function analyzeFrames(frames, target, yellowZone, span, flatAngles) {
     span = span || 2;
     var CHECKS = ["kneeBend", "forwardLean", "strideExtension"];
-    var perFrame = frames.map(function (pose) {
+    var perFrame = frames.map(function (pose, i) {
       var m = measurePose(pose);
+      var f2 = flatAngles && flatAngles[i];
+      if (f2) { m.kneeBend = f2.kneeBend; m.forwardLean = f2.forwardLean; m.fromPicture = true; }
       var scores = {};
       CHECKS.forEach(function (c) { scores[c] = scoreAngle(m[c], target[c], yellowZone); });
       // "slip" = how far off the form is at this moment.
@@ -331,6 +336,40 @@
     });
   }
 
+  // How sure the AI was about each joint (0 to 1), by joint name.
+  function mediapipeConfidence(landmarks) {
+    function sure(i) { var v = landmarks[i].visibility; return v === undefined ? 1 : v; }
+    var w = {};
+    Object.keys(MP).forEach(function (name) { w[name] = sure(MP[name]); });
+    w.head = (w.lEar + w.rEar) / 2;
+    w.neck = (w.lShoulder + w.rShoulder) / 2;
+    delete w.lEar; delete w.rEar;
+    return w;
+  }
+
+  // Knee bend and forward lean measured on the FLAT video picture.
+  // The AI finds joints in the picture much better than it guesses how
+  // deep they are, so when we film from the side (where knee bend and
+  // lean happen right across the picture) the flat numbers are better.
+  //   pts = the AI's 33 points in picture pixels, { x, y } (y goes DOWN)
+  function measureFlat(pts) {
+    function P(name) { var q = pts[MP[name]]; return pt(q.x, -q.y, 0); }
+    var leftKnee = angleAt(P("lHip"), P("lKnee"), P("lAnkle"));
+    var rightKnee = angleAt(P("rHip"), P("rKnee"), P("rAnkle"));
+    var back = sub(mid(P("lShoulder"), P("rShoulder")), mid(P("lHip"), P("rHip")));
+    return { kneeBend: Math.min(leftKnee, rightKnee), forwardLean: angleBetween(back, UP) };
+  }
+
+  // Was this pose filmed from the side? In the AI's 3D guess, x goes
+  // across the picture and z goes toward the camera. From the side, the
+  // skater's "forward" points mostly across the picture.
+  //   maxDegrees = how far from a perfect side view still counts (35)
+  function seenFromSide(pose, maxDegrees) {
+    var f = flat(forwardVote(pose)), l = len(f);
+    if (l < 1e-6) return false;
+    return Math.abs(f.x) / l >= Math.cos((maxDegrees || 35) / DEG);
+  }
+
   function mapPose(pose, fn) {
     var out = {};
     Object.keys(pose).forEach(function (k) { out[k] = fn(pose[k]); });
@@ -386,19 +425,238 @@
     });
   }
 
-  // The middle one of three numbers (throws away one wild value).
-  function middleOf3(a, b, c) { return Math.max(Math.min(a, b), Math.min(Math.max(a, b), c)); }
+  // ---------- Cleaning up poses from a real video ---------------------
+  //
+  // The pose-finding AI guesses every picture on its own, so from one
+  // picture to the next its joints wobble, bones stretch and shrink,
+  // and now and then it mixes up the two legs. These helpers fix that.
+
+  // The middle value of a list of points, one direction at a time.
+  // One wild point cannot pull the middle value very far.
+  function middlePoint(points) {
+    return pt(percentile(points.map(function (q) { return q.x; }), 0.5),
+              percentile(points.map(function (q) { return q.y; }), 0.5),
+              percentile(points.map(function (q) { return q.z; }), 0.5));
+  }
+
+  // Which poses are close in time to pose i? (times are in seconds and
+  // go up.) Returns the list of their positions in the list.
+  function neighbors(times, i, reach, skipSelf) {
+    var near = [];
+    for (var j = i; j >= 0 && times[i] - times[j] <= reach; j--) if (!(skipSelf && j === i)) near.push(j);
+    for (j = i + 1; j < times.length && times[j] - times[i] <= reach; j++) near.push(j);
+    return near;
+  }
+
+  // The parts of a leg below the hip.
+  var LEG_PARTS = ["Knee", "Ankle", "Heel", "Toe"];
+
+  // Swap the two legs (but not the arms or hips).
+  function swapLegs(pose) {
+    var out = mapPose(pose, function (q) { return q; });
+    LEG_PARTS.forEach(function (part) {
+      if (pose["l" + part] && pose["r" + part]) { out["l" + part] = pose["r" + part]; out["r" + part] = pose["l" + part]; }
+    });
+    return out;
+  }
+
+  // From the side, one leg hides behind the other, and the AI sometimes
+  // swaps them for a picture or two. For every pose we ask: do the legs
+  // fit better with the poses around it as they are, or swapped?
+  // If swapped fits much better, we swap them back.
+  //   Returns { frames, swapped } where swapped[i] = true if we swapped.
+  function fixLegSwaps(frames, times, reach) {
+    reach = reach || 0.2;
+    var swapped = [];
+    var out = frames.map(function (f, i) {
+      var near = neighbors(times, i, reach, true);
+      swapped.push(false);
+      if (near.length < 2) return f;
+      function misfit(pose) {
+        var total = 0;
+        ["l", "r"].forEach(function (s) {
+          LEG_PARTS.forEach(function (part) {
+            var k = s + part;
+            if (!pose[k]) return;
+            total += len(sub(pose[k], middlePoint(near.map(function (j) { return frames[j][k]; }))));
+          });
+        });
+        return total;
+      }
+      var flipped = swapLegs(f);
+      if (misfit(flipped) < 0.6 * misfit(f)) { swapped[i] = true; return flipped; }
+      return f;
+    });
+    return { frames: out, swapped: swapped };
+  }
+
+  // The best-fitting gentle curve  value = a + b*t + c*t*t  through some
+  // points (t = seconds from now, value = one number per point, w = how
+  // much each point counts). We only need the curve's value at t = 0,
+  // which is "a". (This is the "least squares" method from statistics.)
+  // If there are too few points to fit a curve, we use a plain average.
+  function fitCurveAtZero(ts, values, ws, fallback) {
+    var S = [0, 0, 0, 0, 0], T = [0, 0, 0], total = 0;
+    for (var m = 0; m < ts.length; m++) {
+      var t = ts[m], w = ws[m], tk = w;
+      for (var p = 0; p <= 4; p++) { S[p] += tk; if (p <= 2) T[p] += tk * values[m]; tk *= t; }
+      total += w;
+    }
+    if (total <= 0) return fallback;
+    // Solve the three equations with Cramer's rule.
+    function det3(a, b, c, d, e, f, g, h, k) { return a * (e * k - f * h) - b * (d * k - f * g) + c * (d * h - e * g); }
+    var D = det3(S[0], S[1], S[2], S[1], S[2], S[3], S[2], S[3], S[4]);
+    if (Math.abs(D) < 1e-18 * Math.max(1, S[0] * S[2] * S[4])) return T[0] / total;
+    return det3(T[0], S[1], S[2], T[1], S[2], S[3], T[2], S[3], S[4]) / D;
+  }
+
+  // Calm down jittery joints, the way you would smooth a wobbly line by
+  // hand. Each joint follows a smooth curve through where it was at the
+  // moments around it:
+  //   * moments close in time count a lot, moments farther away count
+  //     less (a bell curve about "blur" seconds wide),
+  //   * joints the AI was sure about count more (weights go 0 to 1),
+  //   * a joint that is far from where its neighbors say it should be
+  //     (a wild guess) counts almost nothing.
+  // Because we look backward AND forward in time, the smooth path does
+  // not lag behind the real one.
+  //   frames  = poses        times = seconds for each pose
+  //   weights = for each pose, { jointName: how sure, 0 to 1 } (or null)
+  function smoothTrack(frames, times, weights, opts) {
+    opts = opts || {};
+    var blur = opts.blur || 0.08;   // seconds
+    var wild = opts.wild || 0.12;   // meters away from the neighbors = a wild guess
+    var reach = 3 * blur;
+    var n = frames.length;
+    if (n < 3) return frames;
+    var out = frames.map(function () { return {}; });
+    Object.keys(frames[0]).forEach(function (k) {
+      // Step 1: how much do we trust this joint in each pose?
+      var trust = frames.map(function (f, i) {
+        var guess = middlePoint(neighbors(times, i, reach, false).map(function (j) { return frames[j][k]; }));
+        var off = len(sub(f[k], guess));
+        var sure = weights && weights[i] && typeof weights[i][k] === "number" ? weights[i][k] : 1;
+        return Math.max(0.02, sure) / (1 + (off / wild) * (off / wild));
+      });
+      // Step 2: draw the best smooth curve through the nearby moments
+      // (counting each one by how much it matters), and read off where
+      // the curve is right now. A curve, not a plain average, so a fast
+      // push keeps its full reach instead of being rounded off.
+      frames.forEach(function (f, i) {
+        var near = neighbors(times, i, reach, false);
+        var dts = near.map(function (j) { return times[j] - times[i]; });
+        var ws = near.map(function (j, m) { return Math.exp(-0.5 * (dts[m] * dts[m]) / (blur * blur)) * trust[j]; });
+        function curveAt(axis) {
+          return fitCurveAtZero(dts, near.map(function (j) { return frames[j][k][axis]; }), ws, f[k][axis]);
+        }
+        out[i][k] = pt(curveAt("x"), curveAt("y"), curveAt("z"));
+      });
+    });
+    return out;
+  }
+
+  // The bones of the body, from the hips outward:
+  // [the joint a bone starts at, the joint it ends at].
+  var BONE_CHAIN = [
+    ["hipMid", "neck"], ["neck", "head"],
+    ["neck", "lShoulder"], ["neck", "rShoulder"],
+    ["lShoulder", "lElbow"], ["lElbow", "lWrist"],
+    ["rShoulder", "rElbow"], ["rElbow", "rWrist"],
+    ["hipMid", "lHip"], ["hipMid", "rHip"],
+    ["lHip", "lKnee"], ["lKnee", "lAnkle"], ["lAnkle", "lHeel"], ["lAnkle", "lToe"],
+    ["rHip", "rKnee"], ["rKnee", "rAnkle"], ["rAnkle", "rHeel"], ["rAnkle", "rToe"]
+  ];
+
+  // Real bones never change length. The AI's guesses do. So we measure
+  // each bone's usual (middle) length over the whole clip, and rebuild
+  // every pose from the hips outward with those lengths. Each bone keeps
+  // the direction it pointed in, so the joint angles do not change.
+  function fixBoneLengths(frames) {
+    if (!frames.length) return [];
+    var withMid = frames.map(function (f) {
+      var g = mapPose(f, function (q) { return q; });
+      g.hipMid = mid(f.lHip, f.rHip);
+      g.neck = mid(f.lShoulder, f.rShoulder); // the neck sits between the shoulders
+      return g;
+    });
+    var lengths = BONE_CHAIN.map(function (b) {
+      return percentile(withMid.map(function (f) { return len(sub(f[b[1]], f[b[0]])); }), 0.5);
+    });
+    return withMid.map(function (f) {
+      var out = mapPose(f, function (q) { return q; });
+      BONE_CHAIN.forEach(function (b, k) {
+        out[b[1]] = add(out[b[0]], scale(norm(sub(f[b[1]], f[b[0]])), lengths[k]));
+      });
+      delete out.hipMid;
+      return out;
+    });
+  }
+
+  // Lay a skate flat on the ice under its ankle. The heel and toe keep
+  // their distance from the ankle and the way they point.
+  function flatSkate(pose, s) {
+    var ankle = pose[s + "Ankle"], drop = ankle.y - 0.03;
+    ["Toe", "Heel"].forEach(function (part) {
+      var q = pose[s + part], arm = sub(q, ankle), reach = len(arm);
+      var dir = norm(flat(arm));
+      var along = Math.sqrt(Math.max(0, reach * reach - drop * drop));
+      pose[s + part] = pt(ankle.x + dir.x * along, 0.03, ankle.z + dir.z * along);
+    });
+  }
+
+  // Put the skates on the ice.
+  //  * The skate carrying the weight (the lower one) stands exactly on
+  //    the ice. We only switch to the other skate when it is clearly
+  //    lower (2 cm), so the weight does not flicker from skate to skate.
+  //  * The other skate: if it is only a little above the ice (or poking
+  //    into it), it is really on the ice, pushing. We bend that leg a
+  //    tiny bit so the skate sits on the ice. If it is higher than
+  //    "snap", the skater lifted it, and we leave it in the air.
+  //  * A skate on the ice lies flat.
+  //  * The hips go over the middle of the picture.
+  function plantSkates(frames, opts) {
+    var snap = (opts && opts.snap) || 0.05;
+    var A = BODY.ankleHeight, support = null;
+    return frames.map(function (f) {
+      if (support === null) support = f.lAnkle.y <= f.rAnkle.y ? "l" : "r";
+      var other = support === "l" ? "r" : "l";
+      if (f[other + "Ankle"].y < f[support + "Ankle"].y - 0.02) { support = other; other = support === "l" ? "r" : "l"; }
+      var hipMid = mid(f.lHip, f.rHip);
+      var shift = pt(-hipMid.x, A - f[support + "Ankle"].y, -hipMid.z);
+      var p = mapPose(f, function (q) { return add(q, shift); });
+      flatSkate(p, support);
+
+      var ankle = p[other + "Ankle"];
+      if (ankle.y - A < snap) {
+        var hip = p[other + "Hip"], knee = p[other + "Knee"];
+        var leg = solveTwoBone(hip, pt(ankle.x, A, ankle.z), len(sub(knee, hip)), len(sub(ankle, knee)), sub(knee, hip));
+        var move = sub(leg.end, ankle);
+        p[other + "Knee"] = leg.mid;
+        p[other + "Ankle"] = leg.end;
+        p[other + "Heel"] = add(p[other + "Heel"], move);
+        p[other + "Toe"] = add(p[other + "Toe"], move);
+        flatSkate(p, other);
+      }
+      return p;
+    });
+  }
 
   // Make the kid's poses easy to compare with the pro:
   //   1. turn every pose so the kid faces the same way as the pro (+x),
   //      even when the kid turns around during the clip,
   //   2. make the kid's legs the same length as the pro's legs,
-  //   3. stand the lowest skate on the ice, hips over the middle.
+  //   3. (real video only) fix swapped legs and calm down the jitter,
+  //   4. give every bone one fixed length,
+  //   5. put the skates on the ice, hips over the middle.
   // Turning, resizing and sliding do NOT change any joint angles.
-  //   opts.smooth = true also calms down jittery joints (for real video).
+  //   opts.smooth  = true for real video
+  //   opts.times   = the time of each pose in seconds
+  //   opts.weights = for each pose, how sure the AI was about each joint
   function normalizeFrames(frames, opts) {
     if (!frames.length) return [];
+    opts = opts || {};
     var n = frames.length;
+    var weights = opts.weights ? opts.weights.slice() : null;
 
     // Step A: find "forward" in every pose.
     var prevAngle = null;
@@ -434,46 +692,28 @@
     var out = frames.map(function (f, i) {
       var a = smoothAngles[i], ca = Math.cos(a), sa = Math.sin(a);
       // If the hips say the skater faces the other way, the AI mixed up
-      // left and right in this pose. Swap them back.
-      if (Math.cos(facingAngle(f) - a) < 0) f = swapSides(f);
+      // left and right in this pose. Swap them back (and how sure it
+      // was about each joint, too).
+      if (Math.cos(facingAngle(f) - a) < 0) {
+        f = swapSides(f);
+        if (weights && weights[i]) weights[i] = swapSides(weights[i]);
+      }
       return mapPose(f, function (q) {
         return pt((q.x * ca + q.z * sa) * size, q.y * size, (-q.x * sa + q.z * ca) * size);
       });
     });
 
-    // Step C (real video only): each joint takes the middle value of
-    // the pose before, this pose and the pose after.
-    if (opts && opts.smooth && n >= 3) {
-      out = out.map(function (f, i) {
-        if (i === 0 || i === n - 1) return f;
-        var before = out[i - 1], after = out[i + 1], calm = {};
-        Object.keys(f).forEach(function (k) {
-          calm[k] = pt(middleOf3(before[k].x, f[k].x, after[k].x),
-                       middleOf3(before[k].y, f[k].y, after[k].y),
-                       middleOf3(before[k].z, f[k].z, after[k].z));
-        });
-        return calm;
-      });
-      // ...and then blends a little with its neighbors (half itself,
-      // a quarter of each neighbor) so the motion flows.
-      var sharp = out;
-      out = sharp.map(function (f, i) {
-        if (i === 0 || i === n - 1) return f;
-        var soft = {};
-        Object.keys(f).forEach(function (k) {
-          soft[k] = add(scale(f[k], 0.5), scale(add(sharp[i - 1][k], sharp[i + 1][k]), 0.25));
-        });
-        return soft;
-      });
+    // Step C (real video only): fix swapped legs, then smooth.
+    if (opts.smooth && n >= 3) {
+      var times = opts.times || frames.map(function (_, i) { return i * 0.1; });
+      var legs = fixLegSwaps(out, times);
+      out = legs.frames;
+      if (weights) weights = weights.map(function (w, i) { return w && legs.swapped[i] ? swapLegs(w) : w; });
+      out = smoothTrack(out, times, weights);
     }
 
-    // Stand each pose on the ice with the hips over the middle.
-    return out.map(function (turned) {
-      var hipMid = mid(turned.lHip, turned.rHip);
-      var lowest = Math.min(turned.lHeel.y, turned.rHeel.y, turned.lToe.y, turned.rToe.y);
-      var shift = pt(-hipMid.x, 0.03 - lowest, -hipMid.z);
-      return mapPose(turned, function (q) { return add(q, shift); });
-    });
+    // Steps D and E: fixed bone lengths, skates on the ice.
+    return plantSkates(fixBoneLengths(out));
   }
 
   // ---------- Moving smoothly, and finding the rhythm of the stride ---
@@ -569,6 +809,9 @@
     facingAngle: facingAngle, normalizeFrames: normalizeFrames,
     forwardVote: forwardVote, swapSides: swapSides, limbsLookRight: limbsLookRight,
     lerpPose: lerpPose, lerpNum: lerpNum, strideSignal: strideSignal,
+    mapPose: mapPose, mediapipeConfidence: mediapipeConfidence, measureFlat: measureFlat,
+    seenFromSide: seenFromSide, swapLegs: swapLegs, fixLegSwaps: fixLegSwaps,
+    smoothTrack: smoothTrack, fixBoneLengths: fixBoneLengths, plantSkates: plantSkates,
     makeDemoFrames: makeDemoFrames
   };
 
