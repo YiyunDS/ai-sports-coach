@@ -8,25 +8,31 @@
 //  with smooth curves.
 //
 //  What a real stride looks like (and what this file copies):
-//    1. TOUCHDOWN  the skate lands under the body, a little in front.
-//    2. GLIDE      the skater rides that skate with a deep knee bend.
-//                  The hips slide sideways over it (weight shift).
-//    3. PUSH       the leg drives out to the side and back until it is
-//                  almost straight, and the skate rolls onto its inside
-//                  edge. The other skate has already landed, so for a
-//                  short time both skates are on the ice.
-//    4. RECOVERY   the skate lifts a little and swings back in under the
+//    1. TOUCHDOWN  the skate lands a little ahead and under the body.
+//                  The hips slide over it, and the knee bends deepest.
+//    2. PUSH       the leg drives out to the side. It does most of its
+//                  straightening early, then rides almost straight, with
+//                  the skate rolling onto its inside edge. The other
+//                  skate has already landed, so for a short time both
+//                  skates are on the ice.
+//    3. RECOVERY   the skate lifts a little and swings back in under the
 //                  body, low over the ice, ready to land again.
 //  The free arm swings forward and back, opposite to the pushing leg,
 //  and the shoulders turn a little with it. The top hand stays on the
 //  stick. The head stays up.
 //
+//  We do not write down where the skate is. We write down HOW STRAIGHT
+//  the leg is at each moment and WHICH WAY the skate is from the hip.
+//  The computer works out the rest, so the knee angles are always exact.
+//
 //  A skate can only slide the way its blade points. So we turn each
 //  skate to point the way it is actually moving over the ice.
 //
-//  The numbers come from skating studies where we could find them
-//  (see SOURCES.md). The rest are our best estimates, and we plan to
-//  check them against a video of a strong skater.
+//  Measured from a clip of Connor McDavid (see SOURCES.md): how bent the
+//  standing knee is, how straight the pushing knee gets, and that the
+//  pushing leg stays almost straight for a good part of the stride.
+//  From skating studies: how long both skates are on the ice. The rest
+//  (direction of the push, edges, arm swing, timing) are our estimates.
 //
 //  No drawing in this file, so we can test it:  node tests/stride.test.js
 // =====================================================================
@@ -42,28 +48,40 @@
   // with legs about 0.8 m long (the size of BODY in angles.js).
   var STRIDE = {
     secondsPerCycle: 2.0,   // one right push and one left push (shown a bit slower than real life)
-    metersPerCycle: 2.2,    // how far the skater travels in one cycle
+    metersPerCycle: 3.0,    // how far the skater travels in one cycle
 
     liftOff: 0.6,           // the skate leaves the ice at this part of its cycle
                             // (each skate is on the ice 60% of the time, so both
                             //  are on the ice 2 x 10% = 20% of the time; studies
                             //  of full-speed skating find about 15 to 25%)
-    deepest: 0.3,           // the glide knee is bent the most here
-    pushOutDegrees: 55,     // the push goes this far out to the side (0 = straight back, 90 = straight out)
+    deepest: 0.15,          // the standing knee is bent the most here, just after
+                            // the other skate has left the ice
+    pushOutDegrees: 55,     // at the end, the push points this far out to the side
+                            // (0 = straight back, 90 = straight out)
 
-    // Where the skate is, compared with the middle of the skater's path.
-    //   forward = toward where the skater is going (+) or behind (-)
-    //   out     = out to its own side (+) or across under the body (-)
-    //   lift    = how high off the ice
-    // The skate's spot at lift-off is worked out by the computer, so the
-    // push leg ends EXACTLY at the "push" angle from targets.json.
-    forward: [[0, 0.1], [0.15, 0.06], [0.3, 0.0], [0.45, -0.1], [0.75, -0.17], [0.9, -0.02]],
-    out:     [[0, 0.04], [0.15, 0.05], [0.3, 0.08], [0.45, 0.2], [0.75, 0.3], [0.9, 0.13]],
+    // HOW STRAIGHT THE LEG IS while its skate is on the ice.
+    //   0 = bent to the "knee bend" angle,  1 = straightened to the "push" angle
+    // Measured on Connor McDavid (see SOURCES.md): the pushing leg is almost
+    // straight for a good part of the stride, not just at the very end. So
+    // the leg does most of its straightening early (0.25 to 0.45) and then
+    // rides almost straight until the skate lifts off.
+    extend: [[0, 0.07], [0.15, 0], [0.25, 0.08], [0.33, 0.34], [0.4, 0.62], [0.45, 0.79], [0.5, 0.9], [0.55, 0.96], [0.6, 1]],
+    // WHICH WAY the skate is from the hip while it is on the ice, like a
+    // compass: 0 = straight ahead, 90 = straight out to the side, 180 =
+    // straight behind, minus = across under the body.
+    // It lands a little ahead and under the body, slides under the hip,
+    // then goes out to the side and back. (The last value is worked out
+    // from pushOutDegrees.)
+    direction: [[0, -25], [0.15, 35], [0.25, 96], [0.35, 110], [0.45, 118], [0.55, 123]],
+
+    // How high the skate lifts off the ice on its way back (meters).
     lift:    [[0, 0], [0.15, 0], [0.3, 0], [0.45, 0], [0.6, 0], [0.68, 0.03], [0.8, 0.065], [0.92, 0.03], [0.98, 0.004]],
     // How far the skate rolls onto its inside edge (degrees).
-    edge:    [[0, -2], [0.15, 2], [0.3, 6], [0.45, 18], [0.6, 36], [0.7, 12], [0.85, 0]],
+    edge:    [[0, -2], [0.15, 3], [0.3, 14], [0.45, 28], [0.6, 36], [0.7, 12], [0.85, 0]],
 
-    weightShift: 0.06,      // how far the hips slide sideways over the glide skate (m)
+    weightShift: 0.06,      // how far the hips slide sideways over the standing skate (m)
+    shiftAt: 0.05,          // the hips are farthest over a skate just after it lands,
+                            // so the weight is already on it when the other skate lifts off
     hipBob: 0.012,          // how much the hips rise and sink (m)
     shoulderTurn: 8,        // how far the shoulders turn with the arm swing (degrees)
     armSwing: 0.24,         // how far the free hand swings forward and back (m)
@@ -95,10 +113,21 @@
     return (2 * u3 - 3 * u2 + 1) * a[1] + (u3 - 2 * u2 + u) * ma + (-2 * u3 + 3 * u2) * b[1] + (u3 - u2) * mb;
   }
 
-  // The same keyframes with one more keyframe put in (keeps them in order).
-  function withKey(keys, s, value) {
-    return keys.filter(function (k) { return Math.abs(k[0] - s) > 1e-9; }).concat([[s, value]])
-      .sort(function (a, b) { return a[0] - b[0]; });
+  // Like curve(), but for keyframes that do NOT loop around (they only
+  // cover the time the skate is on the ice). Before the first keyframe
+  // and after the last one, the value just stays the same.
+  function track(keys, s) {
+    var n = keys.length;
+    if (s <= keys[0][0]) return keys[0][1];
+    if (s >= keys[n - 1][0]) return keys[n - 1][1];
+    var i = 0;
+    while (i < n - 2 && keys[i + 1][0] <= s) i++;
+    var a = keys[i], b = keys[i + 1], before = keys[Math.max(0, i - 1)], after = keys[Math.min(n - 1, i + 2)];
+    var h = b[0] - a[0], u = (s - a[0]) / h;
+    var ma = (b[1] - before[1]) / (b[0] - before[0]) * h;
+    var mb = (after[1] - a[1]) / (after[0] - a[0]) * h;
+    var u2 = u * u, u3 = u2 * u;
+    return (2 * u3 - 3 * u2 + 1) * a[1] + (u3 - 2 * u2 + u) * ma + (-2 * u3 + 3 * u2) * b[1] + (u3 - u2) * mb;
   }
 
   // How far apart the hip and ankle are when the knee is bent to this angle.
@@ -123,8 +152,10 @@
     // left leg's half a cycle later.
     function legTime(side, at) { return (((side === "r" ? at : at + 0.5) % 1) + 1) % 1; }
 
-    // The hips slide toward the glide skate: right at t = 0.3, left at 0.8.
-    function hipsSide(at) { return S.weightShift * Math.cos(2 * Math.PI * (at - S.deepest)); }
+    // The hips slide over the standing skate: farthest right at t = shiftAt
+    // (just after the right skate lands), farthest left half a cycle later.
+    // (A skater who stands tall takes small strides and sways less: see "room" below.)
+    function hipsSide(at) { return S.weightShift * room * Math.cos(2 * Math.PI * (at - S.shiftAt)); }
     // The hips sink lowest while the glide knee is bent the most.
     // How much "room" the stride has: a skater who sits low has a push
     // leg much longer than the bent glide leg, so they can rise, sink and
@@ -141,51 +172,67 @@
       return B.ankleHeight * Math.cos(edgeAt(s) / DEG) + Math.max(0, curve(S.lift, s));
     }
 
-    // How high must the hips be so the glide knee bends to exactly
-    // "kneeBend" at its deepest moment? (Pythagoras, with the skate's
-    // spot at that moment.)
-    var deepFootF = curve(S.forward, S.deepest), deepFootOut = curve(S.out, S.deepest);
-    var deepHipZ = hipsSide(S.deepest) + B.hipHalf;   // right hip at t = deepest
-    var across = deepFootOut - deepHipZ;
-    var flatGap = Math.sqrt(deepFootF * deepFootF + across * across);
-    var reach = legReach(knee);
-    var hipHeight0 = ankleHeightAt(S.deepest) + Math.sqrt(Math.max(0, reach * reach - flatGap * flatGap)) - hipsBob(S.deepest);
+    // How high must the hips be so the standing knee bends to exactly
+    // "kneeBend" at its deepest moment? At that moment the skate is
+    // almost straight under the hip (UNDER meters away, seen from above).
+    var UNDER = 0.03;
+    var hipHeight0 = ankleHeightAt(S.deepest) + Math.sqrt(Math.pow(legReach(knee), 2) - UNDER * UNDER) - hipsBob(S.deepest);
     function hipHeight(at) { return hipHeight0 + hipsBob(at); }
 
-    // Where does the skate leave the ice? Exactly where the push leg is
-    // straightened to "strideExtension", pushing out at pushOutDegrees.
-    var outAngle = S.pushOutDegrees / DEG;
-    var liftT = { r: S.liftOff, l: (S.liftOff + 0.5) % 1 }; // the cycle time of each lift-off
-    function liftOffSpot(side) {
-      var drop = hipHeight(liftT[side]) - ankleHeightAt(S.liftOff), r = legReach(ext);
-      var flat = Math.sqrt(Math.max(0, r * r - drop * drop));
-      var hipOut = B.hipHalf + (side === "r" ? 1 : -1) * hipsSide(liftT[side]);
-      return { forward: -flat * Math.cos(outAngle), out: hipOut + flat * Math.sin(outAngle) };
+    // ---- The skate ON the ice ----
+    // We know how straight the leg should be (the "extend" keyframes), so
+    // we know how far the skate is from the hip. With the hip's height,
+    // Pythagoras tells us how far away it is along the ice. The
+    // "direction" keyframes say which way. So the knee angles are exact.
+    //   side = "l" or "r", s = the leg's own clock (0 to liftOff),
+    //   at = the time in the cycle
+    // Returns where the skate is, measured from the hip, seen from above:
+    //   f = forward (+) or back (-),  o = out to its own side (+)
+    var endDirection = 180 - S.pushOutDegrees;
+    var directionKeys = S.direction.concat([[S.liftOff, endDirection]]);
+    function onIce(s, at) {
+      var bend = knee + (ext - knee) * M.clamp(track(S.extend, s), 0, 1);
+      var far = legReach(bend), drop = hipHeight(at) - ankleHeightAt(s);
+      var along = Math.sqrt(Math.max(UNDER * UNDER, far * far - drop * drop));
+      var compass = track(directionKeys, s) / DEG;
+      return { f: along * Math.cos(compass), o: along * Math.sin(compass) };
     }
-    var keysFor = {};
-    ["l", "r"].forEach(function (side) {
-      var spot = liftOffSpot(side);
-      keysFor[side] = {
-        forward: withKey(S.forward, S.liftOff, spot.forward),
-        out: withKey(S.out, S.liftOff, spot.out)
-      };
-    });
+
+    // ---- The skate IN THE AIR (coming back) ----
+    // A smooth path from where it left the ice to where it lands again.
+    // It starts out moving the way the skate was moving when it lifted
+    // off, and arrives moving the way it will move when it lands, so
+    // there is no jerk at either end.
+    function inAir(s, at) {
+      var L = S.liftOff, span = 1 - L, u = (s - L) / span, e = 0.004;
+      var tOff = at - (s - L), tDown = at + (1 - s);          // when it lifted off, when it lands
+      var p0 = onIce(L, tOff), p0b = onIce(L - e, tOff - e);
+      var p1 = onIce(0, tDown), p1b = onIce(e, tDown + e);
+      var u2 = u * u, u3 = u2 * u;
+      var h00 = 2 * u3 - 3 * u2 + 1, h10 = u3 - 2 * u2 + u, h01 = -2 * u3 + 3 * u2, h11 = u3 - u2;
+      function path(a0, a0b, a1, a1b) {
+        // (the starting speed is turned down a bit, so the skate does not
+        //  keep flying outward after it leaves the ice)
+        var m0 = (a0 - a0b) / e * span * 0.35, m1 = (a1b - a1) / e * span;
+        return h00 * a0 + h10 * m0 + h01 * a1 + h11 * m1;
+      }
+      return { f: path(p0.f, p0b.f, p1.f, p1b.f), o: path(p0.o, p0b.o, p1.o, p1b.o) };
+    }
 
     // The ankle's spot for one leg at cycle time "at" (on the path; the
     // path's middle line is z = 0).
     function ankleAt(side, at) {
-      var s = legTime(side, at), k = keysFor[side], sign = side === "r" ? 1 : -1;
-      var a = pt(curve(k.forward, s), ankleHeightAt(s), sign * curve(k.out, s));
-      // A leg can only reach so far. A skater who stands tall (hips high)
-      // cannot get the skate as far out as one who sits low. If the
-      // keyframes ask for more than the leg can reach, pull the skate in
-      // toward the hip, so the leg is never straighter than the push
-      // angle and the skate stays on the ice.
-      var hipZ = hipsSide(at) + sign * B.hipHalf, drop = hipHeight(at) - a.y, r = legReach(ext);
+      var s = legTime(side, at), sign = side === "r" ? 1 : -1;
+      var rel = s <= S.liftOff ? onIce(s, at) : inAir(s, at);
+      var y = ankleHeightAt(s);
+      // Safety: a leg can only reach so far. If the path asks for more
+      // (it can, for a moment, in the air), pull the skate in toward the
+      // hip so the leg is never straighter than the push angle.
+      var drop = hipHeight(at) - y, r = legReach(ext);
       var farthest = Math.sqrt(Math.max(0, r * r - drop * drop));
-      var dx = a.x, dz = a.z - hipZ, d = Math.sqrt(dx * dx + dz * dz);
-      if (d > farthest) { a.x = dx * farthest / d; a.z = hipZ + dz * farthest / d; }
-      return a;
+      var d = Math.sqrt(rel.f * rel.f + rel.o * rel.o);
+      if (d > farthest && d > 0) { rel.f *= farthest / d; rel.o *= farthest / d; }
+      return pt(rel.f, y, hipsSide(at) + sign * (B.hipHalf + rel.o));
     }
 
     var p = {}, edges = {};
@@ -282,7 +329,7 @@
       var part = i / n;
       var tired = part > 0.6 ? (part - 0.6) / 0.4 : 0;
       var pose = makeStridePose((i * gap) / STRIDE.secondsPerCycle, {
-        kneeBend: 142 + 12 * tired + 2 * Math.sin(i * 0.9),
+        kneeBend: 148 + 12 * tired + 2 * Math.sin(i * 0.9),
         forwardLean: 17 - 8 * tired + 1.5 * Math.cos(i * 1.3),
         strideExtension: 163
       }).pose;
@@ -297,7 +344,7 @@
     return frames;
   }
 
-  var api = { STRIDE: STRIDE, curve: curve, legReach: legReach, makeStridePose: makeStridePose, cycleTimeFor: cycleTimeFor, makeDemoSession: makeDemoSession };
+  var api = { STRIDE: STRIDE, curve: curve, track: track, legReach: legReach, makeStridePose: makeStridePose, cycleTimeFor: cycleTimeFor, makeDemoSession: makeDemoSession };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.CoachStride = api;
 })(typeof window !== "undefined" ? window : this);

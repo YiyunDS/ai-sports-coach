@@ -103,7 +103,9 @@ test("pushes are found from the knees alone (when left and right are mixed up)",
   assert.ok(found.pushes.length >= 7, "found " + found.pushes.length);
   assert.ok(Math.abs(found.pushKnee.value - 168) < 3, "push knee " + found.pushKnee.value);
   assert.ok(found.glideKnee.value > 105 && found.glideKnee.value < 125, "glide knee " + found.glideKnee.value);
-  assert.ok(found.pushKnee.spread < 1);
+  // All the whole pushes agree (the first and last are cut off by the ends of the clip).
+  var whole = found.pushes.slice(1, -1).map(function (p) { return p.pushKnee; });
+  assert.ok(Math.max.apply(null, whole) - Math.min.apply(null, whole) < 0.5);
   // A skater who only glides has no pushes.
   assert.strictEqual(Me.pushesFromKnees(rows.map(function (r) { return [r[0], 150, 155, 20]; })).pushes.length, 0);
 });

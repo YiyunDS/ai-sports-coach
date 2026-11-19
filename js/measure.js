@@ -105,10 +105,15 @@
     function max(a) { return Math.max.apply(null, a); }
     function min(a) { return Math.min.apply(null, a); }
     function where(a, v) { return a.indexOf(v) / STEPS; }
-    var deepest = min(glide), straightest = max(push);
+    var straightest = max(push), peakStep = push.indexOf(straightest);
+    // The standing knee at its most bent, around the moment of the push
+    // (4 steps before to 4 steps after). Outside that, the "standing" leg
+    // may still be in the air on its way back, folded up, which is not
+    // what we mean by knee bend.
+    var deepest = min(glide.slice(Math.max(0, peakStep - 4), peakStep + 5));
     return {
       secondsPerPush: seconds,
-      glideKneeDeepest: deepest,            // the standing knee at its most bent (degrees)
+      glideKneeDeepest: deepest,            // the standing knee at its most bent during the push (degrees)
       glideKneeDeepestWhen: where(glide, deepest),   // 0 = start of the push, 1 = end
       pushKneeStraightest: straightest,     // the pushing knee at its straightest (degrees)
       pushKneeStraightestWhen: where(push, straightest),

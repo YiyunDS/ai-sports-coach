@@ -71,8 +71,14 @@ test("the push goes out to the side and back", function () {
 });
 
 test("the hips shift over the glide skate", function () {
-  assert.ok(M.mid(at(0.3).pose.lHip, at(0.3).pose.rHip).z > 0.04, "over the right skate");
-  assert.ok(M.mid(at(0.8).pose.lHip, at(0.8).pose.rHip).z < -0.04, "over the left skate");
+  // Just after the right skate lands (t = shiftAt) the hips are over it;
+  // half a cycle later they are over the left skate.
+  var when = St.STRIDE.shiftAt;
+  assert.ok(M.mid(at(when).pose.lHip, at(when).pose.rHip).z > 0.04, "over the right skate");
+  assert.ok(M.mid(at(when + 0.5).pose.lHip, at(when + 0.5).pose.rHip).z < -0.04, "over the left skate");
+  // The weight is already on the standing skate when the other one lifts off.
+  var liftOffLeft = St.STRIDE.liftOff - 0.5;
+  assert.ok(M.mid(at(liftOffLeft).pose.lHip, at(liftOffLeft).pose.rHip).z > 0.04, "weight not over the right skate at left lift-off");
 });
 
 test("a skate on the ice slides only the way its blade points", function () {
@@ -85,6 +91,43 @@ test("a skate on the ice slides only the way its blade points", function () {
       var blade = M.sub(p[s + "Toe"], p[s + "Heel"]); blade.y = 0;
       var off = M.angleBetween(move, blade);
       assert.ok(off < 3, s + " skate skids " + off.toFixed(1) + "° at " + t.toFixed(3));
+    });
+  });
+});
+
+test("the pushing leg is almost straight for a good part of the stride (like McDavid's)", function () {
+  // Measured on the McDavid clip: the pushing knee stays above 155 degrees
+  // for roughly 9 to 20 percent of the stride. Our pro, with his angles:
+  var mcdavid = { kneeBend: 97.5, forwardLean: 45, strideExtension: 163 };
+  var above155 = 0, above150 = 0;
+  eachMoment(function (t) {
+    var p = at(t, mcdavid).pose, k = M.angleAt(p.rHip, p.rKnee, p.rAnkle);
+    if (k >= 155) above155++;
+    if (k >= 150) above150++;
+    assert.ok(k <= 163 + 1e-6, "straighter than the push angle at " + t);
+  });
+  assert.ok(above155 / STEPS > 0.09 && above155 / STEPS < 0.2, "above 155: " + (above155 / STEPS * 100).toFixed(0) + "%");
+  assert.ok(above150 / STEPS > 0.13, "above 150: " + (above150 / STEPS * 100).toFixed(0) + "%");
+});
+
+test("the knee follows the 'extend' keyframes exactly while the skate is on the ice", function () {
+  var o = { kneeBend: 100, forwardLean: 45, strideExtension: 164 };
+  [0.3, 0.4, 0.45, 0.5, 0.55].forEach(function (s) {
+    var p = at(s, o).pose, want = 100 + 64 * St.track(St.STRIDE.extend, s);
+    assert.ok(Math.abs(M.angleAt(p.rHip, p.rKnee, p.rAnkle) - want) < 1e-6, "at " + s);
+  });
+});
+
+test("a skate on the ice points ahead or a little outward, never backward or far inward", function () {
+  var speed = St.STRIDE.metersPerCycle, dt = 0.001;
+  [PRO, { kneeBend: 97.5, forwardLean: 45, strideExtension: 163 }, { kneeBend: 146, forwardLean: 17, strideExtension: 163 }].forEach(function (o) {
+    eachMoment(function (t) {
+      var a = at(t, o), b = at(t + dt, o);
+      if (!onIce(a, "r") || !onIce(b, "r")) return;
+      var ahead = (b.pose.rAnkle.x - a.pose.rAnkle.x) / dt + speed, outward = (b.pose.rAnkle.z - a.pose.rAnkle.z) / dt;
+      var toeOut = Math.atan2(outward, ahead) * DEG;
+      assert.ok(ahead > 1.0, "the skate almost stops at " + t);
+      assert.ok(toeOut > -5 && toeOut < 50, "toe-out " + toeOut.toFixed(0) + " at " + t.toFixed(3));
     });
   });
 });

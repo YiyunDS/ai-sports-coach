@@ -17,8 +17,11 @@ What we could NOT measure from this clip, and why:
 - Real timing: the clip is slow motion and we do not know by how much.
 - The push out to the side, edges and arm swing: the camera is not side-on and
   not from behind.
-- One thing we noticed but have not copied yet: his pushing leg stays almost
-  straight for about a fifth of each stride. Our pro's does for much less.
+- His pushing leg stays almost straight (above 155°) for roughly 9% to 20% of
+  each stride. We reworked the pro's stride to copy that: it was 4%, now it is
+  13% (chart in `docs/screenshots/phase10/push-knee-curve.png`). We cannot
+  tell from this clip exactly when his leg straightens, so the timing of the
+  straightening is still our estimate.
 
 We also looked at the NHL's 2024 Fastest Skater video
 (https://www.youtube.com/watch?v=pYmOtDU35DE). The camera changes every second
@@ -29,7 +32,7 @@ or two and never shows him from the side for long, so we could not measure it.
 | What we used | Where it came from |
 |---|---|
 | The phases of a stride (glide, push out to the side, recovery) and that strong skaters differ from weaker ones in hip and knee movement | Upjohn, Turcotte, Pearsall & Loh (2008), "Three-dimensional kinematics of the lower limbs during forward ice hockey skating", Sports Biomechanics 7(2), 206-221, https://doi.org/10.1080/14763140701841621 (we read the summary, not the full paper yet) |
-| Both skates on the ice about 15-25% of the stride at full speed | Marino, "Biomechanics of power skating", summarized at https://ojs.ub.uni-konstanz.de/cpa/article/view/2985 |
+| Both skates on the ice about 15-25% of the stride at full speed (ours: 20%) | Marino, "Biomechanics of power skating", summarized at https://ojs.ub.uni-konstanz.de/cpa/article/view/2985 |
 | Forward lean of about 40-50° | Our estimate; the McDavid clip could not confirm it (see the top of this file) |
 
 The stride width, push direction, edge angles and arm swing in

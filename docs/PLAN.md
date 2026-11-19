@@ -377,6 +377,28 @@ the clip in `local-videos/` (see CLAUDE.md for the rule on NHL footage).
   are in `local-videos/` (ignored by git).
 Still wanted: a true side-on clip and one from behind (Phase 5).
 
+### Phase 10: The stride reworked around the measured push (done)
+
+- `js/stride.js` no longer stores where the skate is. It stores how
+  straight the leg is at each moment (`extend`) and which way the skate
+  is from the hip (`direction`); the foot position is worked out from
+  those, so knee angles are exact at every moment, for deep and tall
+  skaters alike.
+- The leg now does most of its straightening early in the push and then
+  rides almost straight. With McDavid's angles the push knee is above
+  155° for 13% of the stride (before: 4%; measured on him: 9-20%).
+- The standing knee is deepest just after landing, and the hips are
+  already over the standing skate when the other skate lifts off.
+- Skates still only slide along their blades. New tests: the skate
+  never points more than 5° inward or more than 50° outward, never
+  nearly stops, the knee follows the keyframes exactly, and the
+  "almost straight" share stays in McDavid's measured range.
+- The ice now slides 3.0 m per stride (was 2.2), which keeps the skate
+  angles realistic.
+Chart: `docs/screenshots/phase10/push-knee-curve.png`.
+Still estimates: when exactly the leg straightens, the push direction,
+edges, arm swing and real timing.
+
 ### Phase 5: Check the pro against a real skater (needs a video)
 
 - Run a good side-view video of a strong skater through the Phase 1
