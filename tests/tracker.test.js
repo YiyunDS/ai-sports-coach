@@ -48,6 +48,23 @@ assert.ok(Math.abs(plan.times[plan.seedIndex] - 3.27) < 0.001);
 assert.ok(plan.times[0] > 0 && plan.times[plan.times.length - 1] < 12.4);
 assert.ok(plan.times.length > 115 && plan.times.length < 126);
 
+// --- Did the camera jump? ---
+var gray = [], white = [], slightly = [];
+for (var px = 0; px < 576; px++) { gray.push(120); white.push(240); slightly.push(120 + (px % 10)); }
+assert.strictEqual(T.pictureChange(gray, gray), 0);
+assert.ok(Math.abs(T.pictureChange(gray, white) - 120 / 255) < 1e-9);
+assert.ok(T.pictureChange(gray, slightly) < 0.03);
+// Normal following: small changes, never a jump.
+assert.strictEqual(T.cameraJumped([0.03, 0.09, 0.05, 0.1, 0.07], 0.05), false);
+// A scene cut: one huge change.
+assert.strictEqual(T.cameraJumped([0.03, 0.04, 0.3], 0.05), true);
+// A fast swing: three big changes in a row (numbers from the real test clip at 10 s).
+assert.strictEqual(T.cameraJumped([0.07, 0.116, 0.092, 0.14], 0.05), true);
+assert.strictEqual(T.cameraJumped([0.116, 0.05, 0.12], 0.05), false);
+// Pictures far apart in time are allowed to change more.
+assert.strictEqual(T.cameraJumped([0.18], 0.05), true);
+assert.strictEqual(T.cameraJumped([0.18], 0.2), false);
+
 // --- A skater who turns around during the clip still faces forward ---
 function spin(pose, angle) {
   var c = Math.cos(angle), s = Math.sin(angle), out = {};

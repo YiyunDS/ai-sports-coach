@@ -111,9 +111,41 @@
     return { times: times, seedIndex: seedIndex };
   }
 
+  // ---- Did the camera jump? ----
+  // If the video cuts to a new scene, or the camera swings fast to
+  // somewhere else, the skater we were following is gone. If we kept
+  // going, we would grab whoever is standing in the new picture.
+  // So we keep a tiny gray copy of each picture (like 32 x 18 dots) and
+  // compare it with the one before.
+
+  // How different are two tiny gray pictures? Each is a list of
+  // brightness numbers from 0 to 255. Returns 0 (the same) to 1.
+  function pictureChange(a, b) {
+    if (!a || !b || a.length !== b.length || !a.length) return 0;
+    var total = 0;
+    for (var i = 0; i < a.length; i++) total += Math.abs(a[i] - b[i]);
+    return total / a.length / 255;
+  }
+
+  // changes = the picture changes so far, newest last.
+  // The camera jumped if the newest change is huge, or if the last
+  // three changes are all big (a fast swing). The numbers come from
+  // measuring a real handheld clip: normal following stays below 0.10,
+  // a fast swing to another spot stays above 0.11 for a second.
+  //   gap = seconds between pictures (pictures farther apart change more)
+  function cameraJumped(changes, gap) {
+    var n = changes.length;
+    if (!n) return false;
+    var more = Math.sqrt(Math.max(1, (gap || 0.05) / 0.05));
+    if (changes[n - 1] > 0.15 * more) return true;
+    if (n < 3) return false;
+    return (changes[n - 1] + changes[n - 2] + changes[n - 3]) / 3 > 0.11 * more;
+  }
+
   var api = {
     clamp: clamp, boxOf: boxOf, cropWindow: cropWindow, windowSize: windowSize,
-    predict: predict, pickCandidate: pickCandidate, pickClicked: pickClicked, sampleTimes: sampleTimes
+    predict: predict, pickCandidate: pickCandidate, pickClicked: pickClicked, sampleTimes: sampleTimes,
+    pictureChange: pictureChange, cameraJumped: cameraJumped
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.CoachTracker = api;
