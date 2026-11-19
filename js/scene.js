@@ -50,6 +50,7 @@
   scene.fog = new THREE.Fog(0x0a0e13, 18, 46);      // far things fade into the dark
 
   var camera = new THREE.PerspectiveCamera(35, 1, 0.1, 120);
+  camera.layers.enableAll(); // see the skaters (layer 0) and the signs (layer 1)
 
   // OrbitControls lets you drag to spin, scroll to zoom.
   var controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -202,13 +203,20 @@
 
   // ---------- 4. The skaters -----------------------------------------
   // The blue one is the PRO (or the goal for your age).
-  var refFigure = new window.SkaterFigure({
+  // The realistic skater if its model loaded, otherwise the simpler one.
+  function makeSkater(opts) {
+    if (window.RiggedFigure) {
+      try { return new window.RiggedFigure(opts); } catch (e) { console.error(e); }
+    }
+    return new window.SkaterFigure(opts);
+  }
+  var refFigure = makeSkater({
     name: "PRO", nameColor: "#4da3ff", number: "14",
     jersey: 0x2f6fc0, trim: 0x0e2240, socks: 0x2f6fc0, pants: 0x14213a, helmet: 0x0e2240, glove: 0x14213a
   });
   scene.add(refFigure.group);
   // The orange one is YOU. It stays hidden until there is a pose to show.
-  var kidFigure = new window.SkaterFigure({
+  var kidFigure = makeSkater({
     name: "YOU", nameColor: "#ff9f43", number: "7",
     jersey: 0xe57f22, trim: 0x2a1606, socks: 0xe57f22, pants: 0x1b1d22, helmet: 0x1b1d22, glove: 0x1b1d22
   });

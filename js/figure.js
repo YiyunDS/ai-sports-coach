@@ -31,6 +31,9 @@
   };
   // Graded joints get a colored ring. Worse = bigger, so it is easy to spot.
   var GRADE_SIZE = { good: 1, close: 1.15, far: 1.35 };
+  // Signs, rings and angle slices live on their own "layer" (a group the
+  // camera can show or hide), separate from the skaters.
+  var SIGNS_LAYER = 1;
   var RING_JOINTS = ["lKnee", "rKnee", "lHip", "rHip", "neck"];
 
   var Y_AXIS = new THREE.Vector3(0, 1, 0);
@@ -344,14 +347,21 @@
       self.skates[s] = add(g);
     });
 
+    this.addStickAndRings(P.stick, P.tape, add);
+  }
+
+  // The stick and the colored rings. Both kinds of skater (this one and
+  // the realistic one in rigged-figure.js) use these.
+  //   stickPaint, tapePaint = materials;  add = puts a piece on the skater
+  Figure.prototype.addStickAndRings = function (stickPaint, tapePaint, add) {
+    var self = this;
     // --- Stick (hidden unless the pose has one) ---
-    this.stick = new THREE.Group();
-    this.shaft = new THREE.Mesh(new THREE.BoxGeometry(0.022, 1, 0.03), P.stick);
-    this.grip = new THREE.Mesh(new THREE.BoxGeometry(0.025, 1, 0.033), P.tape);
+    this.shaft = new THREE.Mesh(new THREE.BoxGeometry(0.022, 1, 0.03), stickPaint);
+    this.grip = new THREE.Mesh(new THREE.BoxGeometry(0.025, 1, 0.033), tapePaint);
     this.bladeGroup = new THREE.Group();
-    var blade = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.055, 0.008), P.stick);
+    var blade = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.055, 0.008), stickPaint);
     blade.position.set(0.12, 0.0075, 0);
-    var tape = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.05, 0.011), P.tape);
+    var tape = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.05, 0.011), tapePaint);
     tape.position.set(0.14, 0.0075, 0);
     this.bladeGroup.add(blade); this.bladeGroup.add(tape);
     add(this.shaft); add(this.grip); add(this.bladeGroup);
@@ -360,13 +370,14 @@
     this.rings = {};
     RING_JOINTS.forEach(function (name) {
       // toneMapped: false = keep the exact traffic-light color (no camera "exposure").
-      var sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: getRingTexture(), depthTest: false, transparent: true, toneMapped: false }));
+      var sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: getRingTexture(), depthTest: false, depthWrite: false, transparent: true, toneMapped: false }));
       sprite.renderOrder = 9; // drawn on top, so you can always see it
+      sprite.layers.set(SIGNS_LAYER);
       sprite.visible = false;
       self.group.add(sprite);
       self.rings[name] = sprite;
     });
-  }
+  };
 
   // Move every piece to match a new pose.
   // grades (optional) = { lKnee: "good", neck: "far", ... }
@@ -464,6 +475,13 @@
       sk.scale.set(length / SKATE_LENGTH, 1, 1);
     });
 
+    this.placeStickAndRings(P, grades);
+  };
+
+  // Move the stick, the rings and the name sign to match the pose.
+  //   P = the pose as three.js points, grades = { lKnee: "good", ... }
+  Figure.prototype.placeStickAndRings = function (P, grades) {
+    var self = this;
     // ---- Stick (only if this pose has one) ----
     var hasStick = !!(P.stickTop && P.stickBlade);
     this.shaft.visible = this.grip.visible = this.bladeGroup.visible = hasStick;
@@ -512,9 +530,10 @@
       canvas.width = 320; canvas.height = 110;
       var texture = new THREE.CanvasTexture(canvas);
       texture.colorSpace = THREE.SRGBColorSpace;
-      var sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false, transparent: true, toneMapped: false }));
+      var sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false, depthWrite: false, transparent: true, toneMapped: false }));
       sprite.scale.set(0.46, 0.158, 1);
       sprite.renderOrder = 10; // draw on top of everything
+      sprite.layers.set(SIGNS_LAYER);
       this.group.add(sprite);
       L = this.labels[id] = { canvas: canvas, texture: texture, sprite: sprite, key: "" };
     }
@@ -551,6 +570,7 @@
         color: color, transparent: true, opacity: 0.95, depthTest: false, toneMapped: false
       }));
       W.outline.renderOrder = 8;
+      W.layers.set(SIGNS_LAYER); W.outline.layers.set(SIGNS_LAYER);
       W.outline.frustumCulled = false;
       W.add(W.outline);
       this.wedges[id] = W;

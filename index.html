@@ -17,7 +17,10 @@
     js/angles.js           the math: measures angles from joint positions
     js/stride.js           how the pro skates: the stride keyframes
     js/default-targets.js  a copy of targets.json the page can always read
-    js/figure.js           draws one 3D hockey skater in full gear, built from shaped pieces
+    js/figure.js           draws the simpler 3D skater, built from shaped pieces (the backup)
+    js/rigged-figure.js    draws the realistic 3D skater (the model made in Blender)
+    js/skater-model.js     the realistic skater's 3D model, packed as text
+    js/retarget.js         turns the model's bones so it takes our pose
     js/scene.js            the rink, the lights, the camera, moving the skaters
     js/tracker.js          follows the one skater you clicked through the video
     js/coach.js            reads your video, finds your pose, makes the report
@@ -279,16 +282,39 @@
   </script>
   <script type="module">
     // Our own code, in the order it needs to load.
-    var OURS = ["js/angles.js", "js/stride.js", "js/tracker.js", "js/default-targets.js", "js/figure.js",
-                "js/scene.js", "js/coach.js", "js/positions.js", "js/board.js"];
+    var OURS = ["js/angles.js", "js/stride.js", "js/retarget.js", "js/tracker.js", "js/default-targets.js",
+                "js/figure.js", "js/rigged-figure.js", "js/scene.js", "js/coach.js", "js/positions.js", "js/board.js"];
+    // Load one of our .js files and wait until it has run.
+    function load(src) {
+      return new Promise(function (done, fail) {
+        var s = document.createElement("script");
+        s.src = src; s.onload = done; s.onerror = fail;
+        document.head.appendChild(s);
+      });
+    }
     try {
       var parts = await Promise.all([
         import("three"),
-        import("three/addons/controls/OrbitControls.js"),   // drag to spin the camera
-        import("three/addons/environments/RoomEnvironment.js") // soft light from all around
+        import("three/addons/controls/OrbitControls.js"),     // drag to spin the camera
+        import("three/addons/environments/RoomEnvironment.js"), // soft light from all around
+        import("three/addons/loaders/GLTFLoader.js"),           // reads the 3D model file
+        import("three/addons/utils/SkeletonUtils.js")           // copies a model that has a skeleton
       ]);
       // Our files expect "THREE" with everything in it, like the old library.
-      window.THREE = Object.assign({}, parts[0], { OrbitControls: parts[1].OrbitControls, RoomEnvironment: parts[2].RoomEnvironment });
+      window.THREE = Object.assign({}, parts[0], {
+        OrbitControls: parts[1].OrbitControls, RoomEnvironment: parts[2].RoomEnvironment, SkeletonUtils: parts[4]
+      });
+      // The realistic skater: it is packed as text in js/skater-model.js
+      // (so it works when you double-click index.html). Turn it back into
+      // a 3D model. If anything goes wrong, the page uses the simpler skater.
+      try {
+        await load("js/skater-model.js");
+        var bytes = Uint8Array.from(atob(window.SKATER_GLB), function (c) { return c.charCodeAt(0); });
+        window.SKATER_GLTF = await new parts[3].GLTFLoader().parseAsync(bytes.buffer, "");
+        delete window.SKATER_GLB; // free the memory
+      } catch (e) {
+        console.error("The realistic skater could not load; using the simpler one.", e);
+      }
     } catch (e) {
       console.error(e); // no internet? scene.js shows a message, the Positioning tab still works
     }

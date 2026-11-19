@@ -112,7 +112,12 @@ The goal angles live in [`targets.json`](targets.json). There is one set for eac
 | `index.html`, `style.css` | The page and its colors |
 | `targets.json` | The goal angles (kids can edit) |
 | `js/angles.js` | The math: measures angles and scores them |
-| `js/figure.js` | Draws one 3D hockey skater in full gear (jersey, pants, helmet with cage, gloves, skates), built in code from shaped pieces |
+| `js/rigged-figure.js` | Draws the realistic 3D hockey player: a model with a skeleton inside, made in Blender |
+| `js/skater-model.js` | That 3D model, packed as text so the page works when you double-click it (made by `tools/pack_model.py`) |
+| `js/retarget.js` | Turns the model's bones so it takes our pose |
+| `js/figure.js` | The simpler skater built in code from shaped pieces. The page uses it if the realistic one cannot load |
+| `tools/blender/build_skater.py` | The recipe that builds the 3D model in Blender (body from MPFB2, gear modeled by the script) |
+| `tests/retarget.test.js` | Checks that the model's bones point where our pose says. Run `node tests/retarget.test.js` |
 | `js/scene.js` | The rink (real size, with boards and glass), lights, camera, the pro skater, and moving the skaters |
 | `js/tracker.js` | Follows the one skater you clicked through the video |
 | `js/coach.js` | Reads your video, finds your pose, makes the report and replay |

@@ -14,7 +14,8 @@ team leader) for the Presidential SI Challenge. All work happens on the
   `node tests/angles.test.js`, `node tests/tracker.test.js`,
   `node tests/motion.test.js`, `node tests/positions.test.js`,
   `node tests/cleanup.test.js` (added in Phase 1),
-  `node tests/stride.test.js` (added in Phase 3).
+  `node tests/stride.test.js` (added in Phase 3),
+  `node tests/retarget.test.js` (added in Phase 6).
   Add tests for new math.
 - Do not break the Positioning tab.
 - Any outside asset or video must be free to use and listed in
@@ -33,3 +34,12 @@ team leader) for the Presidential SI Challenge. All work happens on the
 - Screenshots for each phase go in `docs/screenshots/<phase>/`.
   The starting point is in `docs/screenshots/before/`.
 - The phased plan is in `docs/PLAN.md`.
+
+## Rebuilding the 3D skater model
+
+- Needs Blender 4.2+ with the MPFB2 extension (installed in Blender 4.3
+  on this Mac).
+- `/Applications/Blender.app/Contents/MacOS/Blender -b -P tools/blender/build_skater.py -- OUT_DIR`
+  (add `--render` for preview pictures), copy `OUT_DIR/skater.glb` to
+  `assets/skater.glb`, then run `python3 tools/pack_model.py` to update
+  `js/skater-model.js`.

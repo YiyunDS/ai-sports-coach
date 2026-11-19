@@ -377,6 +377,19 @@ cage = bpy.context.active_object
 bind_to_bone(cage, "head")
 pieces.append(("cage", cage))
 
+# Neck guard: a short padded collar around the neck.
+nh, nt = bone_ends("neck_01")
+bpy.ops.mesh.primitive_cylinder_add(vertices=28, radius=0.062 * k / 1.24, depth=(nt - nh).length * 1.1, end_fill_type="NOTHING")
+neck = bpy.context.active_object; neck.name = "neckguard"
+neck.location = (nh + nt) / 2
+neck.rotation_euler = (nt - nh).to_track_quat("Z", "Y").to_euler()
+only_select(neck); bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+s_ = neck.modifiers.new("thick", "SOLIDIFY"); s_.thickness = 0.01
+sd = neck.modifiers.new("smooth", "SUBSURF"); sd.levels = 1
+apply_all(neck); smooth_shade(neck)
+bind_to_bone(neck, "neck_01")
+pieces.append(("neck", neck))
+
 # Eyes, so the face behind the cage is not blank.
 for side in ("l", "r"):
     bpy.ops.mesh.primitive_uv_sphere_add(segments=20, ring_count=12, radius=0.0115 * k, location=EYES[side])
@@ -426,7 +439,13 @@ print("ANKLE_TO_ICE", round(SKATE["l"]["ankle_to_ice"], 4))
 # ---------------------------------------------------------------------
 # 6. Paint
 # ---------------------------------------------------------------------
+def linear(c):
+    """Blender wants "linear" color numbers; we think in normal screen
+    colors (like a color picker). This converts one to the other."""
+    return tuple(((x + 0.055) / 1.055) ** 2.4 if x > 0.04045 else x / 12.92 for x in c)
+
 def paint(name, color, rough, metal=0.0, coat=0.0, use_colors=False):
+    color = linear(color)
     m = bpy.data.materials.new(name)
     m.use_nodes = True
     nt = m.node_tree
@@ -442,51 +461,63 @@ def paint(name, color, rough, metal=0.0, coat=0.0, use_colors=False):
     return m
 
 PAINT = {
-    "skin": paint("skin", (0.62, 0.42, 0.32), 0.55),
-    "team": paint("team", (1, 1, 1), 0.8, use_colors=True),   # the page tints it blue or orange
-    "pants": paint("pants", (0.045, 0.05, 0.065), 0.5),
-    "glove": paint("glove", (0.05, 0.055, 0.07), 0.55),
-    "helmet": paint("helmet", (0.045, 0.05, 0.065), 0.22, coat=0.7),
-    "cage": paint("cage", (0.75, 0.77, 0.8), 0.3, metal=0.9),
-    "eye": paint("eye", (0.85, 0.85, 0.82), 0.2),
-    "iris": paint("iris", (0.08, 0.06, 0.05), 0.2),
-    "boot": paint("boot", (0.035, 0.04, 0.045), 0.38),
-    "holder": paint("holder", (0.9, 0.91, 0.92), 0.35),
-    "steel": paint("steel", (0.82, 0.84, 0.87), 0.18, metal=1.0),
+    "skin": paint("skin", (0.6, 0.42, 0.33), 0.6),
+    "neck": paint("neck", (0.1, 0.11, 0.13), 0.8),
+    "team": paint("team", (1, 1, 1), 0.8, use_colors=True),   # the page paints in the team colors
+    "pants": paint("pants", (0.12, 0.13, 0.16), 0.5),
+    "glove": paint("glove", (0.13, 0.14, 0.17), 0.55),
+    "helmet": paint("helmet", (0.12, 0.13, 0.16), 0.22, coat=0.7),
+    "cage": paint("cage", (0.88, 0.89, 0.91), 0.3, metal=0.9),
+    "eye": paint("eye", (0.93, 0.93, 0.9), 0.2),
+    "iris": paint("iris", (0.3, 0.22, 0.16), 0.2),
+    "boot": paint("boot", (0.1, 0.11, 0.12), 0.38),
+    "holder": paint("holder", (0.95, 0.96, 0.96), 0.35),
+    "steel": paint("steel", (0.92, 0.93, 0.95), 0.18, metal=1.0),
 }
 def give(obj, *mats):
     obj.data.materials.clear()
     for m in mats:
         obj.data.materials.append(m)
 
-# Team-colored pieces get dark trim stripes, painted as point colors:
-# white = team color, dark = trim.
-TRIM = (0.08, 0.08, 0.1, 1)
-def stripes(obj, is_trim):
+# Team-colored pieces get stripes, painted as point colors that the page
+# reads as a code:  white = team color,  gray = white stripe,  black = dark trim.
+TEAM, WHITE, DARK = (1, 1, 1, 1), (0.5, 0.5, 0.5, 1), (0, 0, 0, 1)
+def stripes(obj, which):
     attr = obj.data.color_attributes.new("Col", "BYTE_COLOR", "POINT")
+    obj.data.color_attributes.active_color = attr
     for i, v in enumerate(obj.data.vertices):
-        attr.data[i].color = TRIM if is_trim(v.co) else (1, 1, 1, 1)
+        attr.data[i].color = which(v.co)
+def band(u, start):
+    """A stripe set: dark, white, dark, starting at "start" (u = how far along)."""
+    if start <= u < start + 0.035: return DARK
+    if start + 0.035 <= u < start + 0.06: return WHITE
+    if start + 0.06 <= u < start + 0.095: return DARK
+    return None
 hem_z = min(v.co.z for v in jersey.data.vertices)
-def jersey_trim(co):
-    if hem_z + 0.045 < co.z < hem_z + 0.075 or hem_z + 0.09 < co.z < hem_z + 0.105:
-        return min(near(co, "spine_01"), 1) < 0.5     # stripes around the bottom
+def along(co, bone):
+    h, t = bone_ends(bone)
+    d = t - h
+    u = (co - h).dot(d) / d.length_squared
+    return u, (co - (h + d * u)).length
+def jersey_colors(co):
+    if co.z < hem_z + 0.2:                                   # around the bottom of the jersey
+        c = band(co.z - hem_z, 0.05)
+        if c: return c
+    for s in ("l", "r"):                                     # around each sleeve
+        u, r = along(co, "lowerarm_" + s)
+        if r < 0.13:
+            c = band(u * 0.26, 0.04)
+            if c: return c
+    return TEAM
+stripes(jersey, jersey_colors)
+def sock_colors(co):
     for s in ("l", "r"):
-        h, t = bone_ends("lowerarm_" + s)
-        d = t - h
-        u = (co - h).dot(d) / d.length_squared
-        if 0.12 < u < 0.22 and (co - (h + d * u)).length < 0.12:
-            return True                                 # stripe on each sleeve
-    return False
-stripes(jersey, jersey_trim)
-def sock_trim(co):
-    for s in ("l", "r"):
-        h, t = bone_ends("calf_" + s)
-        d = t - h
-        u = (co - h).dot(d) / d.length_squared
-        if (0.18 < u < 0.26 or 0.3 < u < 0.34) and (co - (h + d * u)).length < 0.12:
-            return True
-    return False
-stripes(socks, sock_trim)
+        u, r = along(co, "calf_" + s)
+        if r < 0.13:
+            c = band(u * 0.42, 0.07)
+            if c: return c
+    return TEAM
+stripes(socks, sock_colors)
 
 give(body, PAINT["skin"]); give(jersey, PAINT["team"]); give(socks, PAINT["team"]); give(pants, PAINT["pants"])
 for kind, o in pieces:

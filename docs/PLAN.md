@@ -274,6 +274,28 @@ Screenshots: `docs/screenshots/phase4/sheet-phase4-before-after.png`.
 Recommendation: **4B**. If a quick win is wanted earlier, the ice color
 and camera framing can move into Phase 2.
 
+### Phase 6: A realistic skater model (done)
+
+The skaters are now a real 3D model with a skeleton, built by a script
+in Blender (`tools/blender/build_skater.py`): an athletic body from
+MPFB2 (CC0), and gear made around it (baggy jersey over shoulder and
+elbow pads, padded pants, socks over shin pads with stripes, padded
+gloves with finger rolls, helmet with cage, eyes, neck guard, skates
+with a tall boot, white holder and steel). About 46,500 triangles,
+1.8 MB, packed into `js/skater-model.js` so double-click still works.
+`js/retarget.js` turns the bones every frame so the model takes our
+pose (tested: bones point exactly where the pose says, knees never
+flip). The page tints jersey and socks per team and adds a knit
+texture. Runs at about 120 frames per second with two skaters on an
+M3 Mac. If the model cannot load, the page falls back to the Phase 2
+skater. Soft contact shadows were tried and removed: barely visible
+and three times slower.
+Screenshots: `docs/screenshots/phase6/`.
+
+Honest limits: this is not a console game. No scanned face, no cloth
+simulation, no hand-painted textures; the face is plain and the pants
+are a little rounder than real hockey pants.
+
 ### Phase 5: Check the pro against a real skater (needs a video)
 
 - Run a good side-view video of a strong skater through the Phase 1

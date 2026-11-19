@@ -18,6 +18,13 @@ The stride width, push direction, edge angles and arm swing in
 `js/stride.js` are our own estimates. We plan to check them against a
 video of a strong skater.
 
+# The 3D skater model
+
+| What | Link | License |
+|---|---|---|
+| Body and skeleton made with MPFB2 2.0.18 (the MakeHuman add-on for Blender). Characters it makes are CC0. | https://extensions.blender.org/add-ons/mpfb/ and https://static.makehumancommunity.org/mpfb/about.html | Add-on: GPL-3.0; its assets and what it makes: CC0 |
+| Hockey gear (jersey, pants, socks, gloves, helmet, cage, skates), modeled by our own script `tools/blender/build_skater.py` | this project | ours |
+
 # Code and models we download
 
 The page downloads these when it runs. None of them gets our video: they
