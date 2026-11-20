@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#0b0f14">
   <title>AI Sports Coach - 3D Visual Coach</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
-  <link rel="stylesheet" href="style.css?v=15.1">
+  <link rel="stylesheet" href="style.css?v=16.0">
 </head>
 <body>
   <!--
@@ -28,6 +28,7 @@
     js/scene.js            the rink, the lights, the camera, moving the skaters
     js/tracker.js          follows the one skater you clicked through the video
     js/coach.js            reads your video, finds your pose, makes the report
+    js/ui.js               the little movements of the page: sliding switches, counting numbers
     js/positions.js        the playbook: where each position should stand
     js/board.js            the positioning board you drag your marker on
     js/gamesim.js          the simulation game: the rules and the chances
@@ -142,7 +143,10 @@
           </select>
         </div>
         <p id="target-info" class="small"></p>
-        <p class="small">The pro's knee bend (about 97°) and push (about 163°) were measured from a slow-motion clip of Connor McDavid. Its lean, the shape of its stride, its arm swing and elbow angles, how it holds its stick, and how its skates tip are still our estimates.</p>
+        <details>
+          <summary>Where the pro's numbers come from</summary>
+          <p class="small">The pro's knee bend (about 97°) and push (about 163°) were measured from a slow-motion clip of Connor McDavid. Its lean, the shape of its stride, its arm swing and elbow angles, how it holds its stick, and how its skates tip are still our estimates.</p>
+        </details>
         <details>
           <summary>Edit target angles</summary>
           <p class="small">Change the numbers in <code>targets.json</code>, then load the file here.</p>
@@ -187,15 +191,37 @@
         <p class="small">Slide to a frame where the skater is easy to see, then click the middle of the skater's body. The coach follows that one skater through the clip, and draws what it sees here so you can check it.</p>
       </section>
       <section id="results" class="panel" hidden>
-        <div class="results-head">
-          <h2>Session report</h2>
-          <span id="stars" class="score"></span>
-        </div>
+        <h2>Session report</h2>
         <p id="quality-note" class="note" hidden></p>
-        <p id="kid-note" class="small" hidden></p>
+        <!-- Layer 1: the answer at a glance. A ring that shows how many
+             numbers are on target, and the ONE thing to work on next. -->
+        <div id="verdict" class="verdict">
+          <div id="ring" class="ring" role="img" aria-label="">
+            <svg viewBox="0 0 64 64" aria-hidden="true">
+              <circle class="ring-track" cx="32" cy="32" r="27"></circle>
+              <circle id="ring-fill" class="ring-fill" cx="32" cy="32" r="27"></circle>
+            </svg>
+            <div class="ring-text" aria-hidden="true">
+              <div class="ring-num"><span id="ring-count" class="num">0</span><span class="ring-of">/<span id="ring-total">3</span></span></div>
+              <div class="ring-cap">on target</div>
+            </div>
+          </div>
+          <div class="verdict-text">
+            <div id="verdict-eyebrow" class="eyebrow"></div>
+            <p id="verdict-main" class="verdict-main"></p>
+            <ul id="verdict-rest" class="verdict-rest"></ul>
+          </div>
+        </div>
+        <!-- Layer 2: the three numbers. -->
         <div class="results-body">
           <div id="cards" class="cards"></div>
         </div>
+        <!-- Layer 3: how it was measured (folded away until you ask). -->
+        <p id="kid-note" class="small kid-note" hidden></p>
+        <details id="kid-more" class="more" hidden>
+          <summary>How the orange skater was made</summary>
+          <p id="kid-long" class="small"></p>
+        </details>
         <div class="replay">
           <div class="replay-controls">
             <h3>Replay</h3>
@@ -442,13 +468,13 @@
   <script type="module">
     // Our own code, in the order it needs to load.
     var OURS = ["js/angles.js", "js/stride.js", "js/measure.js", "js/rebuild.js", "js/retarget.js", "js/tracker.js", "js/default-targets.js",
-                "js/skate.js", "js/figure.js", "js/rigged-figure.js", "js/scene.js", "js/coach.js", "js/positions.js", "js/board.js", "js/rink.js", "js/gamesim.js", "js/game.js",
+                "js/skate.js", "js/figure.js", "js/rigged-figure.js", "js/scene.js", "js/ui.js", "js/coach.js", "js/positions.js", "js/board.js", "js/rink.js", "js/gamesim.js", "js/game.js",
                 "js/refplays.js", "js/ref.js"];
     // Our files belong together: a new coach.js with an old scene.js (kept
     // by the browser from an earlier visit) does not work. This number
     // goes on the end of every file's address, so after an update the
     // browser fetches all of them fresh. RAISE IT whenever a .js file changes.
-    var VERSION = "15.1";
+    var VERSION = "16.0";
     // Load one of our .js files and wait until it has run.
     function load(src) {
       return new Promise(function (done, fail) {

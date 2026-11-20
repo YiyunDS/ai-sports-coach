@@ -62,7 +62,7 @@
   // Did the user turn or zoom the camera themself? Then we leave it
   // alone when the window changes size.
   var userMovedCamera = false;
-  controls.addEventListener("start", function () { userMovedCamera = true; });
+  controls.addEventListener("start", function () { userMovedCamera = true; endGlide(); });
 
   // ---------- 2. Lights ----------------------------------------------
   // Soft light from all around, like a big bright room. Shiny things
@@ -395,7 +395,10 @@
 
   // Point the camera so every skater on the ice (and their signs) fits
   // in the picture, with a little room around them.
-  function frameView() {
+  //   smooth = glide there in about half a second (when you press Side,
+  //            Front or Top). Otherwise the camera is simply put there.
+  function frameView(smooth) {
+    endGlide();
     var r = refFigure.group.position, k = kidFigure.group.position;
     var xs = [r.x], zs = [r.z];
     if (hasKid) { xs.push(k.x); zs.push(k.z); }
@@ -419,13 +422,51 @@
     // Stay inside the rink (on a narrow phone screen the camera would
     // otherwise back up through the glass).
     if (name === "side") dist = Math.min(dist, (RINK_D / 2 - 0.7 - target.z) / dir.z);
-    controls.target.copy(target);
-    camera.position.copy(target).addScaledVector(dir, dist);
-    controls.update();
+    var calm = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (smooth && !calm) {
+      // Remember where the camera is and where it should end up. The
+      // drawing loop (tick) moves it a little with every picture.
+      glide = {
+        t: 0,
+        fromTarget: controls.target.clone(), toTarget: target,
+        fromArm: camera.position.clone().sub(controls.target), toArm: dir.clone().multiplyScalar(dist),
+        skaters: []
+      };
+    } else {
+      controls.target.copy(target);
+      camera.position.copy(target).addScaledVector(dir, dist);
+      controls.update();
+    }
     userMovedCamera = false;
     Array.prototype.forEach.call(viewButtons, function (b) {
       b.setAttribute("aria-pressed", String(b.getAttribute("data-view") === name));
     });
+  }
+
+  // ---------- The camera glides to a new view ------------------------
+  // "glide" holds a camera move that is under way (or null).
+  //   Arm = the line from the spot we look at to the camera.
+  var glide = null;
+  var GLIDE_SECONDS = 0.45;
+  function stepGlide(dt) {
+    glide.t = Math.min(1, glide.t + dt / GLIDE_SECONDS);
+    var e = 1 - Math.pow(1 - glide.t, 3);   // start fast, stop gently
+    controls.target.lerpVectors(glide.fromTarget, glide.toTarget, e);
+    // Swing the arm around, and change its length evenly, so the camera
+    // goes AROUND the skaters and not through them.
+    var arm = glide.fromArm.clone().lerp(glide.toArm, e);
+    arm.setLength(glide.fromArm.length() + (glide.toArm.length() - glide.fromArm.length()) * e);
+    camera.position.copy(controls.target).add(arm);
+    // The skaters slide to their new spots at the same time.
+    glide.skaters.forEach(function (m) { m.group.position.lerpVectors(m.from, m.to, e); });
+    if (glide.t >= 1) glide = null;
+  }
+  // Stop a glide early (the user grabbed the camera or a skater). The
+  // skaters go straight to their spots; the camera stays where it is.
+  function endGlide() {
+    if (!glide) return;
+    glide.skaters.forEach(function (m) { m.group.position.copy(m.to); });
+    glide = null;
   }
 
   // Put the skaters on their starting spots for the current compare mode.
@@ -449,11 +490,21 @@
   }
   var draggedSkater = false; // did the user slide a skater somewhere by hand?
   function place() { draggedSkater = false; placeSkaters(); frameView(); }
-  function setView(name) {
+  function setView(name, smooth) {
+    endGlide();
+    var groups = [refFigure.group, kidFigure.group];
+    var from = groups.map(function (g) { return g.position.clone(); });
     lastView = name;
     // Skaters you moved by hand stay where you put them.
     if (hasKid && compareMode === "side" && !draggedSkater) placeSkaters();
-    frameView();
+    frameView(smooth);
+    if (glide) {
+      // The skaters start from where they were and slide over too.
+      groups.forEach(function (g, i) {
+        glide.skaters.push({ group: g, from: from[i], to: g.position.clone() });
+        g.position.copy(from[i]);
+      });
+    }
   }
 
   // Show one skater, or two.
@@ -494,6 +545,7 @@
     // The rebuilt orange skater strides on the very same clock as the
     // pro, so we draw it right after, at exactly the same moment.
     if (sync && sync.drawKid) sync.drawKid(cycleTime, dt);
+    if (glide) stepGlide(dt);
     controls.update();
     renderer.render(scene, camera);
     requestAnimationFrame(tick);
@@ -502,7 +554,7 @@
 
   // ---------- 7. Buttons on top of the 3D picture --------------------
   Array.prototype.forEach.call(document.querySelectorAll("[data-view]"), function (btn) {
-    btn.addEventListener("click", function () { setView(btn.getAttribute("data-view")); });
+    btn.addEventListener("click", function () { setView(btn.getAttribute("data-view"), true); });
   });
   // The "Angles" button shows or hides the angle signs and slices.
   var anglesBtn = document.getElementById("angles-btn");
@@ -587,6 +639,7 @@
     aim(ev);
     var fig = skaterUnderPointer();
     if (!fig || !raycaster.ray.intersectPlane(icePlane, hitPoint)) return;
+    endGlide();
     grabbed = fig;
     grabOffset.copy(fig.group.position).sub(hitPoint);
     controls.enabled = false;          // do not spin the camera while dragging

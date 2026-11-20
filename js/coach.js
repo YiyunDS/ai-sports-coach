@@ -26,6 +26,7 @@
   var C = window.Coach3D;
   if (!C) return; // the 3D picture did not start, so there is nothing to do
   var Rb = window.CoachRebuild;   // rebuilds a smooth stride from the wobbly pictures (rebuild.js)
+  var UI = window.CoachUI;        // the little movements of the page (ui.js)
 
   // Where the pose-finding AI lives on the internet.
   var MP_VERSION = "0.10.14";
@@ -56,9 +57,14 @@
   var COLORS = { good: "#2fbf71", close: "#e6b422", far: "#ef5350", none: "#263344" };
 
   // The three checks, with the words we show for each one.
+  //   tip   = the advice on the card
+  //   short = the same advice in a few words, for the top of the report
   var CHECKS = [
     {
       id: "kneeBend", name: "Knee bend", low: 60, high: 180,
+      short: function (off) {
+        return off > 0 ? "Bend your knees about " + off + "° more" : "Come up about " + (-off) + "°, your bend is very deep";
+      },
       tip: function (off) {
         if (off === 0) return "Knee bend is in the target range. That is where your power comes from.";
         if (off > 0) return "Bend your knees about " + off + "° more. Sit back as if lowering onto a chair.";
@@ -67,6 +73,9 @@
     },
     {
       id: "forwardLean", name: "Forward lean", low: 0, high: 90,
+      short: function (off) {
+        return off < 0 ? "Lean your chest forward about " + (-off) + "° more" : "Lift your chest about " + off + "°";
+      },
       tip: function (off) {
         if (off === 0) return "Forward lean is in the target range. Chest forward, eyes up.";
         if (off < 0) return "Lean your chest forward about " + (-off) + "° more. Nose over knees, knees over toes.";
@@ -75,6 +84,9 @@
     },
     {
       id: "strideExtension", name: "Stride extension", low: 90, high: 180,
+      short: function (off) {
+        return off < 0 ? "Straighten the pushing leg about " + (-off) + "° more" : "Keep a slight bend at the end of the push";
+      },
       tip: function (off) {
         if (off === 0) return "Full extension. The pushing leg gets almost straight.";
         if (off < 0) return "Extend the pushing leg about " + (-off) + "° more, until it is almost straight. Finish the push through your toes.";
@@ -91,10 +103,12 @@
     analyze: $("analyze-btn"), demo: $("demo-btn"), progress: $("progress"),
     progressBar: $("progress-bar"), status: $("status"), refMode: $("ref-mode"),
     targetInfo: $("target-info"), targetsFile: $("targets-file"),
-    results: $("results"), stars: $("stars"), cards: $("cards"), preview: $("preview"),
+    results: $("results"), cards: $("cards"), preview: $("preview"),
+    verdict: $("verdict"), ring: $("ring"), ringFill: $("ring-fill"), ringCount: $("ring-count"), ringTotal: $("ring-total"),
+    verdictEyebrow: $("verdict-eyebrow"), verdictMain: $("verdict-main"), verdictRest: $("verdict-rest"),
     videoPanel: $("video-panel"), overlay: $("overlay"), pickTime: $("pick-time"), pickOut: $("pick-out"),
     seedInfo: $("seed-info"), trackInfo: $("track-info"), qualityNote: $("quality-note"),
-    kidTool: $("kid-tool"), kidNote: $("kid-note"),
+    kidTool: $("kid-tool"), kidNote: $("kid-note"), kidMore: $("kid-more"), kidLong: $("kid-long"),
     play: $("play-btn"), speed: $("speed"), worst: $("worst-btn"),
     frameInfo: $("frame-info"), timeline: $("timeline")
   };
@@ -115,6 +129,10 @@
     kidNow: null,     // smooth mode: the clock and the numbers of the moment we are showing
     looping: false,   // smooth mode: the skaters stride round and round (not following the video)
     target: null,     // the target ranges for this age and level
+    awaitReveal: false, // a new report is waiting to be seen: its entrance has not played yet
+    shown: null,      // the numbers the report cards show now (so they can glide to new ones)
+    reveal: null,     // what must move when the waiting report is seen (numbers, marks, the ring)
+    stopWatching: null, // calls off the wait for the report to be seen
     index: 0,         // which pose we are showing now
     playing: false,
     playClock: 0,
@@ -359,29 +377,37 @@
       b.setAttribute("aria-pressed", String(mode === (smoothOn() ? "smooth" : "filmed")));
     });
     el.kidNote.hidden = !state.frames;
+    el.kidMore.hidden = true;
     if (!state.frames) return;
-    var text;
+    // "text" stays in plain sight. Anything that is NOT the skater's own
+    // (a standard push, a standard rhythm) must be said there.
+    // "more" is the longer explanation, folded away until you ask.
+    var text, more = "";
     if (!can) {
       text = "The orange skater shows the poses as the AI saw them. " + (r ? r.why : "");
     } else if (smoothOn()) {
       var o = r.overall, a = r.angles;
-      text = "The orange skater is your stride, rebuilt from " + r.pictures + " good pictures: knee bend " +
-        Math.round(o.kneeBend) + "°, lean " + Math.round(o.forwardLean) + "°" +
-        (r.pushSeen ? ", push " + Math.round(o.strideExtension) + "°" : "") +
-        (r.rhythmFound ? ", one stride every " + r.clock.secondsPerCycle.toFixed(1) + " s" : "") + ". " +
+      text = "The orange skater is your stride, rebuilt from " + r.pictures + " good pictures. " +
+        "The legs and the lean are yours. The arms, the stick and how the skates tip are drawn the standard way. " +
         (r.pushSeen ? "" : "The coach saw no full push in this clip, so the push is NOT yours: it is drawn at a standard " +
           Math.round(o.strideExtension) + "°. ") +
-        (a.sidesApart ? "Your right push and your left push differ: " + Math.round(M.percentile(a.pushRight, 0.5)) + "° and " +
-          Math.round(M.percentile(a.pushLeft, 0.5)) + "°. " : "") +
         (r.rhythmFound ? "" : "We could not find your rhythm in this clip, so it strides at an even, standard pace. ") +
-        "The legs and the lean are yours. The arms, the stick and how the skates tip are drawn the standard way. " +
+        (a.sidesApart ? "Your right push and your left push differ: " + Math.round(M.percentile(a.pushRight, 0.5)) + "° and " +
+          Math.round(M.percentile(a.pushLeft, 0.5)) + "°. " : "");
+      more = "The rebuilt stride uses knee bend " + Math.round(o.kneeBend) + "°, lean " + Math.round(o.forwardLean) + "°" +
+        (r.pushSeen ? ", push " + Math.round(o.strideExtension) + "°" : "") +
+        (r.rhythmFound ? ", and one stride every " + r.clock.secondsPerCycle.toFixed(1) + " s" : "") + ". " +
+        "One picture alone is wobbly, but the middle value of many pictures can be trusted, so the coach works out HOW you skate and lets a smooth skater skate that way. " +
         "A one-time stumble does not show here; pick \"As filmed\" to see every picture as the AI saw it. " +
         "When the replay ends, both skaters keep striding so you can keep comparing.";
     } else {
-      text = "The orange skater shows the poses as the AI saw them, picture by picture. That is wobbly, because every picture is read on its own. " +
+      text = "The orange skater shows the poses as the AI saw them, picture by picture.";
+      more = "That is wobbly, because every picture is read on its own. " +
         "Pick \"Smooth stride\" to see your stride rebuilt from all the good pictures together.";
     }
     el.kidNote.textContent = text;
+    el.kidMore.hidden = !more;
+    el.kidLong.textContent = more;
   }
   Array.prototype.forEach.call(kidButtons, function (b) {
     b.addEventListener("click", function () {
@@ -405,14 +431,83 @@
     return e;
   }
 
-  function drawCards(target) {
-    var summary = state.analysis.summary, stars = 0, measured = CHECKS.length;
-    el.cards.textContent = "";
+  // Layer 1 of the report: the ring ("1 / 3 on target") and the ONE
+  // thing to work on next. Gives back what must move once the report
+  // is seen (the ring filling up, its number counting).
+  function drawVerdict(fresh) {
+    var summary = state.analysis.summary;
+    var ids = CHECKS.map(function (c) { return c.id; });
+    var measured = ids.filter(function (id) { return summary[id]; });
+    var good = measured.filter(function (id) { return summary[id].grade === "good"; }).length;
+    var focusId = M.nextFocus(summary, ids);
+    var focus = CHECKS.filter(function (c) { return c.id === focusId; })[0];
+
+    // The ring's color says how it went: green = all, red = none.
+    var mood = !measured.length ? "" : good === measured.length ? "good" : good === 0 ? "far" : "close";
+    el.verdict.className = "verdict " + mood;
+    el.ring.setAttribute("aria-label", good + " of " + measured.length + " on target");
+    el.ringTotal.textContent = String(measured.length);
+
+    if (focus) {
+      var off = Math.round(summary[focusId].off);
+      if (off === 0) off = summary[focusId].off > 0 ? 1 : -1;   // "0° more" would make no sense
+      el.verdictEyebrow.textContent = "Work on this next";
+      el.verdictEyebrow.className = "eyebrow " + summary[focusId].grade;
+      el.verdictMain.textContent = focus.short(off);
+    } else {
+      el.verdictEyebrow.textContent = "All on target";
+      el.verdictEyebrow.className = "eyebrow good";
+      el.verdictMain.textContent = "Every number we measured is in the target range for this age.";
+    }
+    // The other checks, each in a few words.
+    el.verdictRest.textContent = "";
     CHECKS.forEach(function (check) {
+      if (check.id === focusId) return;
+      var s = summary[check.id];
+      var li = make("li");
+      li.appendChild(make("span", "dot " + (s ? s.grade : "none")));
+      li.appendChild(document.createTextNode(check.name + ": " + (s ? GRADE_WORDS[s.grade].toLowerCase() : "not seen")));
+      el.verdictRest.appendChild(li);
+    });
+
+    var dash = UI ? UI.ringDash(measured.length ? good / measured.length : 0, 27) : null;
+    var before = state.shown && state.shown.good !== undefined ? state.shown.good : good;
+    if (dash) {
+      el.ringFill.style.strokeDasharray = dash.around + " " + dash.around;
+      if (fresh) el.ringFill.style.strokeDashoffset = dash.around;   // starts empty
+      el.ringFill.style.opacity = good ? 1 : 0;
+    }
+    el.ringCount.textContent = String(fresh ? 0 : before);
+    return {
+      good: good,
+      move: function () {
+        if (dash) el.ringFill.style.strokeDashoffset = dash.hidden;
+        if (UI) UI.count(el.ringCount, fresh ? 0 : before, good, fresh ? 700 : 300);
+        else el.ringCount.textContent = String(good);
+      }
+    };
+  }
+
+  // Layer 2 of the report: one card for each check.
+  //   A new report makes an entrance: the cards rise one after another,
+  //   the numbers count up and the ruler marks slide to their place.
+  //   It plays when the report is SEEN (on a phone, after scrolling down).
+  //   When only the age or level changes, numbers and marks glide over.
+  function drawCards(target) {
+    var summary = state.analysis.summary;
+    var fresh = state.awaitReveal && !!UI;
+    var before = state.shown || {}, now = {}, movers = [];
+    var verdict = drawVerdict(fresh);
+    now.good = verdict.good;
+    movers.push(verdict.move);
+
+    el.cards.textContent = "";
+    CHECKS.forEach(function (check, n) {
       var s = summary[check.id], range = target[check.id];
       if (!s) {
         // We could not measure this one (no clear push in the clip).
-        var none = make("div", "check");
+        var none = make("div", "check" + (fresh ? " enter" : ""));
+        none.style.setProperty("--i", n);
         var top = make("div", "check-head");
         top.appendChild(make("span", "check-name", check.name));
         top.appendChild(make("span", "chip", "Not seen"));
@@ -423,35 +518,78 @@
         none.appendChild(dash);
         none.appendChild(make("p", "tip", "The coach did not see a full push in this clip. Film a few strong strides from the side to measure it."));
         el.cards.appendChild(none);
-        measured--;
         return;
       }
-      if (s.grade === "good") stars++;
-      var card = make("div", "check " + s.grade);
+      var card = make("div", "check " + s.grade + (fresh ? " enter" : ""));
+      card.style.setProperty("--i", n);   // which card this is: the later ones rise a moment later
       var head = make("div", "check-head");
       head.appendChild(make("span", "check-name", check.name));
       head.appendChild(make("span", "chip", GRADE_WORDS[s.grade]));
       card.appendChild(head);
+      var value = Math.round(s.value);
       var nums = make("div", "check-nums");
-      nums.appendChild(make("span", "big", Math.round(s.value) + "°"));
+      var big = make("span", "big"), number = make("span", "", String(value));
+      big.appendChild(number);
+      big.appendChild(make("span", "deg", "°"));
+      nums.appendChild(big);
       nums.appendChild(make("span", "goal", "Target " + rangeText(range)));
       card.appendChild(nums);
 
-      // A little ruler: the green part is the goal, the dot is you.
+      // A ruler: the green part is the goal, the mark is you.
       var ruler = make("div", "ruler");
       var span = check.high - check.low;
       var zone = make("div", "ruler-goal");
-      zone.style.left = ((range.min - check.low) / span * 100) + "%";
-      zone.style.width = ((range.max - range.min) / span * 100) + "%";
-      var dot = make("div", "ruler-dot");
-      dot.style.left = (M.clamp((s.value - check.low) / span, 0, 1) * 100) + "%";
-      ruler.appendChild(zone); ruler.appendChild(dot);
+      var zoneLeft = (range.min - check.low) / span * 100, zoneWide = (range.max - range.min) / span * 100;
+      var spot = M.clamp((s.value - check.low) / span, 0, 1) * 100;
+      var you = make("div", "ruler-you");
+      you.appendChild(make("div", "ruler-dot"));
+      ruler.appendChild(zone); ruler.appendChild(you);
       card.appendChild(ruler);
 
       card.appendChild(make("p", "tip", check.tip(Math.round(s.off))));
       el.cards.appendChild(card);
+
+      // Where the mark and the number START: at the low end for a new
+      // report, or where they were before (so they glide to the new place).
+      var was = before[check.id];
+      var fromSpot = fresh ? 0 : was ? was.spot : spot;
+      var fromValue = fresh ? check.low : was ? was.value : value;
+      you.style.transform = "translateX(" + fromSpot + "%)";
+      number.textContent = String(fromValue);
+      // The green goal also glides when the age or level changes it.
+      zone.style.left = (was && !fresh ? was.zoneLeft : zoneLeft) + "%";
+      zone.style.width = (was && !fresh ? was.zoneWide : zoneWide) + "%";
+      movers.push(function () {
+        zone.style.left = zoneLeft + "%";
+        zone.style.width = zoneWide + "%";
+        you.style.transform = "translateX(" + spot + "%)";
+        if (UI) UI.count(number, fromValue, value, fresh ? 700 : 300);
+        else number.textContent = String(value);
+      });
+      now[check.id] = { spot: spot, value: value, zoneLeft: zoneLeft, zoneWide: zoneWide };
     });
-    el.stars.textContent = stars + " of " + measured + " on target";
+    state.shown = now;
+
+    function go() { movers.forEach(function (move) { move(); }); }
+    if (!fresh) {
+      void el.cards.offsetWidth;   // the page notes the starting places first, then they move
+      go();
+      return;
+    }
+    // A new report: everything waits, unseen, until the report is on screen.
+    state.reveal = go;
+    el.results.classList.remove("reveal");
+    el.results.classList.add("waiting");
+    if (!state.stopWatching) {
+      state.stopWatching = UI.whenSeen(el.verdict, function () {
+        state.stopWatching = null;
+        state.awaitReveal = false;
+        el.results.classList.remove("waiting");
+        el.results.classList.add("reveal");
+        void el.cards.offsetWidth;
+        state.reveal();
+      });
+    }
   }
 
   // ---------- The replay timeline --------------------------------------
@@ -639,6 +777,8 @@
     state.index = 0;
     if (!hasVideo) { el.qualityNote.hidden = true; clearOverlay(); }
     el.results.hidden = false;
+    state.awaitReveal = true;   // a new report: it makes its entrance when it is seen
+    state.shown = null;
     C.layout(true);
     refresh();
     setPlaying(true);
@@ -651,6 +791,10 @@
     kidLive = null;
     state.looping = false;
     state.useful = null;
+    state.awaitReveal = false;
+    state.shown = null;
+    if (state.stopWatching) { state.stopWatching(); state.stopWatching = null; }
+    el.results.classList.remove("waiting", "reveal");
     showKidMode();
     state.hasVideo = false;
     state.index = 0;
