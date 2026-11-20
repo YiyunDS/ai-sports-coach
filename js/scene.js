@@ -235,6 +235,7 @@
   var showAngles = true; // the "Angles" button turns the signs and slices off
   // Add the angle signs and "pizza slices" to a skater.
   //   colors = { knee: "...", lean: "...", push: "...", elbow: "..." (optional) }
+  //            elbow: false = no elbow signs (when the arms were not measured)
   //   showPush = also label the pushing leg?
   //   shown    = (optional) the numbers to print on the signs. The report
   //              sometimes measures on the flat video picture, and the
@@ -273,7 +274,7 @@
     // cover the arm.
     ["l", "r"].forEach(function (s) {
       var sh = pose[s + "Shoulder"], el = pose[s + "Elbow"], wr = pose[s + "Wrist"], id = s + "Elbow";
-      if (!sh || !el || !wr) { fig.hide(id); return; }
+      if (!sh || !el || !wr || colors.elbow === false) { fig.hide(id); return; }
       var deg = M.angleAt(sh, el, wr), color = colors.elbow || "#cbd5e1";
       fig.setWedge(id, el, M.sub(sh, el), M.sub(wr, el), 0.11, color);
       var away = el.x >= sh.x ? 1 : -1;  // in front of the shoulder: sign in front; behind: sign behind
@@ -316,10 +317,18 @@
     dt = dt || 0;
     var moving = !!sync || strideOn;
     var advance = 0; // how much of a cycle the pro moved on this frame
-    if (sync) {
+    if (sync && sync.loop) {
+      // The kid's rebuilt stride goes round and round on its own:
+      // sync.loop() = how many seconds one full stride takes right now.
+      advance = dt / Math.max(0.2, sync.loop());
+      cycleTime += advance;
+      if (cycleTime >= 1) { cycleTime -= 1; cycles++; }
+    } else if (sync) {
       // Follow the kid: aim for the same leg at the same moment of the
       // push, and glide there the short way around the cycle.
-      var want = St.cycleTimeFor(sync.side, sync.phase);
+      // (sync.cycle = the kid's own steady stride clock, from rebuild.js.
+      //  Without it we guess the moment from how far out the leg is.)
+      var want = sync.cycle !== undefined ? ((sync.cycle % 1) + 1) % 1 : St.cycleTimeFor(sync.side, sync.phase);
       var diff = ((want - cycleTime) % 1 + 1.5) % 1 - 0.5;
       var step = diff * (1 - Math.exp(-dt / 0.12));
       cycleTime += step;
@@ -482,6 +491,9 @@
     // pro where in the stride to be), then we draw the pro to match.
     onTick.forEach(function (fn) { fn(dt); });
     drawReference(dt);
+    // The rebuilt orange skater strides on the very same clock as the
+    // pro, so we draw it right after, at exactly the same moment.
+    if (sync && sync.drawKid) sync.drawKid(cycleTime, dt);
     controls.update();
     renderer.render(scene, camera);
     requestAnimationFrame(tick);
@@ -500,7 +512,9 @@
   });
   var strideBtn = document.getElementById("stride-btn");
   strideBtn.addEventListener("click", function () {
-    if (sync) return; // while synced, the kid's stride drives the pro
+    // While synced, the kid's stride drives the pro. (coach.js may give
+    // the button a job of its own then: start or stop the stride loop.)
+    if (sync) { if (sync.onButton) sync.onButton(); return; }
     strideOn = !strideOn;
     strideBtn.textContent = strideOn ? "Hold stance" : "Play stride";
     strideBtn.setAttribute("aria-pressed", String(strideOn));
@@ -625,15 +639,23 @@
     },
     // Make the pro stride in step with the kid.
     //   s = { push, side, phase, stride }   or null to stop syncing
+    //   or  { cycle, drawKid }: the kid's steady stride clock, and a
+    //       function that draws the rebuilt kid at the clock's moment
+    //   or  { loop, drawKid }: stride round and round; loop() says how
+    //       many seconds one full stride takes
+    //   label, onButton, pressed (optional): what the stride button says
+    //       and does while synced
     setSync: function (s) {
       var was = !!sync;
       sync = s;
-      if (was !== !!s) {
-        strideOn = false;
-        strideBtn.disabled = !!s;
-        strideBtn.setAttribute("aria-pressed", "false");
-        strideBtn.textContent = s ? "Pro synced to skater" : "Play stride";
-      }
+      if (was !== !!s) strideOn = false;
+      // The button: "Play stride" when the pro is alone. While synced it
+      // says so, or does the job coach.js gives it (s.label, s.onButton).
+      var words = s ? (s.label || "Pro synced to skater") : "Play stride";
+      var off = !!s && !s.onButton, pressed = String(!!(s && s.pressed));
+      if (strideBtn.textContent !== words) strideBtn.textContent = words;
+      if (strideBtn.disabled !== off) strideBtn.disabled = off;
+      if (strideBtn.getAttribute("aria-pressed") !== pressed) strideBtn.setAttribute("aria-pressed", pressed);
     }
   };
 })();

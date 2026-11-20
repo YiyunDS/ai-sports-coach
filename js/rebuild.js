@@ -264,8 +264,19 @@
     var clock = strideClock(times, rhythm, changeMoment(tidy(overall)));
     var rhythmFound = clock.ok;
     if (!clock.ok) {
+      // No rhythm found (too few leg changes). The skater then strides at
+      // a standard, even pace. We still line it up with the one thing we
+      // did see: the top of a push, where the pushing knee is straightest.
+      // In the model that is the moment the push skate lifts off.
       var pace = St.STRIDE.secondsPerCycle;
-      clock = { ok: false, secondsPerCycle: pace, pushes: 0, cycle: times.map(function (t) { return (t - times[0]) / pace; }) };
+      var top = analysis.peaks[Math.floor(analysis.peaks.length / 2)];
+      var topCycle = St.STRIDE.liftOff + (analysis.perFrame[top].m.pushSide === "l" ? 0.5 : 0);
+      var first = topCycle + (times[0] - times[top]) / pace;
+      var shift = topCycle - Math.floor(first);   // start counting near zero
+      clock = {
+        ok: false, secondsPerCycle: pace, pushes: 0,
+        cycle: times.map(function (t) { return shift + (t - times[top]) / pace; })
+      };
     }
     var angles = strideAngles(analysis.perFrame, times, { secondsPerCycle: clock.secondsPerCycle, sideOnly: analysis.sideOn > 0, rhythm: rhythm });
     return { ok: true, why: "", clock: clock, angles: angles, overall: overall, rhythmFound: rhythmFound, pictures: frames.length };

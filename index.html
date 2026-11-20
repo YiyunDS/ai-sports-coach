@@ -18,6 +18,7 @@
     js/angles.js           the math: measures angles from joint positions
     js/stride.js           how the pro skates: the stride keyframes (and the sample skater)
     js/measure.js          measures a strong skater's stride from a video (for the pro's numbers)
+    js/rebuild.js          rebuilds YOUR stride smoothly from the wobbly pictures of a video
     js/default-targets.js  a copy of targets.json the page can always read
     js/skate.js            builds one hockey skate (boot, tongue, laces, holder, steel)
     js/figure.js           draws the simpler 3D skater, built from shaped pieces (the backup)
@@ -75,6 +76,13 @@
           <div class="seg" role="group" aria-label="How to compare the two skaters">
             <button type="button" data-compare="side" aria-pressed="true" disabled>Side by side</button>
             <button type="button" data-compare="overlay" aria-pressed="false" disabled>Overlay</button>
+          </div>
+        </div>
+        <div class="tool" id="kid-tool" hidden>
+          <span class="tool-label">You</span>
+          <div class="seg" role="group" aria-label="How the orange skater moves">
+            <button type="button" data-kid="smooth" aria-pressed="true" title="Your stride, rebuilt smoothly from all the good pictures">Smooth stride</button>
+            <button type="button" data-kid="filmed" aria-pressed="false" title="The poses the AI saw, picture by picture">As filmed</button>
           </div>
         </div>
         <div class="tool">
@@ -184,6 +192,7 @@
           <span id="stars" class="score"></span>
         </div>
         <p id="quality-note" class="note" hidden></p>
+        <p id="kid-note" class="small" hidden></p>
         <div class="results-body">
           <div id="cards" class="cards"></div>
         </div>
@@ -432,7 +441,7 @@
   </script>
   <script type="module">
     // Our own code, in the order it needs to load.
-    var OURS = ["js/angles.js", "js/stride.js", "js/measure.js", "js/retarget.js", "js/tracker.js", "js/default-targets.js",
+    var OURS = ["js/angles.js", "js/stride.js", "js/measure.js", "js/rebuild.js", "js/retarget.js", "js/tracker.js", "js/default-targets.js",
                 "js/skate.js", "js/figure.js", "js/rigged-figure.js", "js/scene.js", "js/coach.js", "js/positions.js", "js/board.js", "js/rink.js", "js/gamesim.js", "js/game.js",
                 "js/refplays.js", "js/ref.js"];
     // Load one of our .js files and wait until it has run.

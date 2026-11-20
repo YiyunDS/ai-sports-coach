@@ -25,6 +25,7 @@
   var T = window.CoachTracker;
   var C = window.Coach3D;
   if (!C) return; // the 3D picture did not start, so there is nothing to do
+  var Rb = window.CoachRebuild;   // rebuilds a smooth stride from the wobbly pictures (rebuild.js)
 
   // Where the pose-finding AI lives on the internet.
   var MP_VERSION = "0.10.14";
@@ -93,6 +94,7 @@
     results: $("results"), stars: $("stars"), cards: $("cards"), preview: $("preview"),
     videoPanel: $("video-panel"), overlay: $("overlay"), pickTime: $("pick-time"), pickOut: $("pick-out"),
     seedInfo: $("seed-info"), trackInfo: $("track-info"), qualityNote: $("quality-note"),
+    kidTool: $("kid-tool"), kidNote: $("kid-note"),
     play: $("play-btn"), speed: $("speed"), worst: $("worst-btn"),
     frameInfo: $("frame-info"), timeline: $("timeline")
   };
@@ -108,6 +110,11 @@
     span: 2,          // how many poses on each side count as "near" a push
     seed: null,       // where you clicked: { t, x, y } (x and y go from 0 to 1)
     analysis: null,   // scores for every pose
+    rebuilt: null,    // the stride rebuilt from all the poses (see rebuild.js)
+    kidMode: "smooth",// what the orange skater shows: "smooth" = the rebuilt stride, "filmed" = the poses as the AI saw them
+    kidNow: null,     // smooth mode: the clock and the numbers of the moment we are showing
+    looping: false,   // smooth mode: the skaters stride round and round (not following the video)
+    target: null,     // the target ranges for this age and level
     index: 0,         // which pose we are showing now
     playing: false,
     playClock: 0,
@@ -161,8 +168,11 @@
       rangeText(target.kneeBend) + ", lean " + rangeText(target.forwardLean) +
       ", push " + rangeText(target.strideExtension) + ".";
 
+    state.target = target;
     if (state.frames) {
       state.analysis = M.analyzeFrames(state.frames, target, state.targets.yellowZone, state.span, state.flat, state.rhythm);
+      state.rebuilt = Rb ? Rb.build(state.frames, state.times, state.rhythm, state.analysis) : null;
+      showKidMode();
       drawCards(target);
       drawTimeline();
       // (While the replay is playing, the next tick redraws by itself.
@@ -191,35 +201,46 @@
     i = M.clamp(i, 0, n - 1);
     if (i >= n - 1) blend = 0;
     state.index = i;
-    var f = state.analysis.perFrame[i], peak = pushAt(i);
-    var pose = blend > 0 ? M.lerpPose(state.frames[i], state.frames[i + 1], blend) : state.frames[i];
+    state.looping = false;   // we are showing one moment of the video again
+    if (smoothOn()) {
+      // SMOOTH STRIDE: we do not copy this one picture. We tell the 3D
+      // view where the skater is in the stride and what their numbers are
+      // around this moment; it then draws the rebuilt skater and the pro
+      // on the same clock (see drawSmoothKid below).
+      state.kidNow = Rb.at(state.rebuilt, i, blend);
+      C.setSync({ cycle: state.kidNow.cycle, drawKid: drawSmoothKid, label: "Loop my stride", onButton: startLoop });
+    } else {
+      // AS FILMED: the pose the AI saw in this picture.
+      var f = state.analysis.perFrame[i], peak = pushAt(i);
+      var pose = blend > 0 ? M.lerpPose(state.frames[i], state.frames[i + 1], blend) : state.frames[i];
 
-    // Pick the traffic-light color for each joint.
-    var grades = {};
-    grades[f.m.glideSide + "Knee"] = f.scores.kneeBend.grade;   // knee bend -> glide knee
-    grades.lHip = grades.rHip = grades.neck = f.scores.forwardLean.grade; // lean -> hips and neck
-    if (peak) grades[f.m.pushSide + "Knee"] = peak.scores.strideExtension.grade; // push -> push knee
+      // Pick the traffic-light color for each joint.
+      var grades = {};
+      grades[f.m.glideSide + "Knee"] = f.scores.kneeBend.grade;   // knee bend -> glide knee
+      grades.lHip = grades.rHip = grades.neck = f.scores.forwardLean.grade; // lean -> hips and neck
+      if (peak) grades[f.m.pushSide + "Knee"] = peak.scores.strideExtension.grade; // push -> push knee
 
-    C.kidFigure.update(pose, grades);
-    C.decorate(C.kidFigure, pose, {
-      knee: COLORS[f.scores.kneeBend.grade],
-      lean: COLORS[f.scores.forwardLean.grade],
-      push: COLORS[(peak || f).scores.strideExtension.grade]
-    }, !!peak, {   // the numbers the report uses, so the signs match the cards
-      kneeBend: f.m.kneeBend, forwardLean: f.m.forwardLean, glideSide: f.m.glideSide, pushSide: f.m.pushSide,
-      strideExtension: (peak || f).m.strideExtension
-    });
+      C.kidFigure.update(pose, grades);
+      C.decorate(C.kidFigure, pose, {
+        knee: COLORS[f.scores.kneeBend.grade],
+        lean: COLORS[f.scores.forwardLean.grade],
+        push: COLORS[(peak || f).scores.strideExtension.grade]
+      }, !!peak, {   // the numbers the report uses, so the signs match the cards
+        kneeBend: f.m.kneeBend, forwardLean: f.m.forwardLean, glideSide: f.m.glideSide, pushSide: f.m.pushSide,
+        strideExtension: (peak || f).m.strideExtension
+      });
+
+      // Tell the pro where the kid is in the stride, so they move together.
+      var r = state.rhythm[i], next = state.rhythm[Math.min(n - 1, i + 1)];
+      var push = blend > 0 && next.side === r.side ? M.lerpNum(r.push, next.push, blend) : r.push;
+      // Turn "how far out is the leg" into "how far through the stride":
+      // 0 to 0.5 while the leg goes out, 0.5 to 1 while it comes back.
+      var part = Math.asin(Math.sqrt(M.clamp(push / r.peak, 0, 1))) / Math.PI;
+      C.setSync({ push: push, side: r.side, phase: r.rising ? part : 1 - part, stride: r.stride });
+    }
     el.timeline.setAttribute("aria-valuenow", String(i + 1));
     el.timeline.setAttribute("aria-valuemin", "1");
     el.timeline.setAttribute("aria-valuemax", String(n));
-
-    // Tell the pro where the kid is in the stride, so they move together.
-    var r = state.rhythm[i], next = state.rhythm[Math.min(n - 1, i + 1)];
-    var push = blend > 0 && next.side === r.side ? M.lerpNum(r.push, next.push, blend) : r.push;
-    // Turn "how far out is the leg" into "how far through the stride":
-    // 0 to 0.5 while the leg goes out, 0.5 to 1 while it comes back.
-    var part = Math.asin(Math.sqrt(M.clamp(push / r.peak, 0, 1))) / Math.PI;
-    C.setSync({ push: push, side: r.side, phase: r.rising ? part : 1 - part, stride: r.stride });
 
     var now = blend > 0 ? M.lerpNum(state.times[i], state.times[i + 1], blend) : state.times[i];
     el.frameInfo.textContent = "Frame " + (i + 1) + " / " + n + "  ·  " + now.toFixed(1) + " s";
@@ -236,6 +257,128 @@
     }
   }
   function showFrame(i) { render(i, 0, false); }
+
+  // ---------- The smooth orange skater --------------------------------
+  // One picture from the AI is wobbly, but all the good pictures
+  // together tell us HOW this skater skates: how bent the knee is, how
+  // far they lean, how far they push, and their rhythm (rebuild.js).
+  // In "Smooth stride" the orange skater skates exactly that way, with
+  // the same stride builder as the pro and on the same clock. So what
+  // looks different between the two IS different.
+
+  // Is the orange skater showing the rebuilt stride right now?
+  function smoothOn() { return state.kidMode === "smooth" && !!state.rebuilt && state.rebuilt.ok; }
+
+  // The numbers the orange skater has right now. They glide toward the
+  // numbers of the moment we are showing, so nothing snaps.
+  var kidLive = null;
+  var KID_NUMBERS = ["kneeBend", "forwardLean", "pushRight", "pushLeft"];
+
+  // scene.js calls this right after it has drawn the pro.
+  //   cycle = where the pro is in the stride (0 to 1); the kid goes there too
+  //   dt    = seconds since the last picture
+  function drawSmoothKid(cycle, dt) {
+    var want = state.kidNow;
+    if (!want || !smoothOn()) return;
+    if (!kidLive) kidLive = {};
+    var ease = 1 - Math.exp(-(dt || 0) / 0.2);
+    KID_NUMBERS.forEach(function (k) {
+      kidLive[k] = kidLive[k] === undefined ? want[k] : kidLive[k] + (want[k] - kidLive[k]) * ease;
+    });
+    var skating = Rb.poseAt(cycle, kidLive), pose = skating.pose;
+    var glide = skating.glideSide, pushing = skating.pushSide || (glide === "r" ? "l" : "r");
+
+    // The traffic-light colors come from the skater's steady numbers, so
+    // they do not flicker while the legs move.
+    var zone = state.targets.yellowZone, target = state.target;
+    var kneeGrade = M.scoreAngle(kidLive.kneeBend, target.kneeBend, zone).grade;
+    var leanGrade = M.scoreAngle(kidLive.forwardLean, target.forwardLean, zone).grade;
+    var pushGrade = M.scoreAngle(pushing === "r" ? kidLive.pushRight : kidLive.pushLeft, target.strideExtension, zone).grade;
+    var showPush = !!skating.pushSide && state.rebuilt.angles.pushSeen;
+    var grades = {};
+    grades[glide + "Knee"] = kneeGrade;
+    grades.lHip = grades.rHip = grades.neck = leanGrade;
+    if (showPush) grades[pushing + "Knee"] = pushGrade;
+
+    C.kidFigure.update(pose, grades, { edges: skating.edges });
+    // The signs say what the legs are doing at this very moment, like the
+    // pro's signs do. No elbow signs: the arms are not measured here.
+    C.decorate(C.kidFigure, pose, { knee: COLORS[kneeGrade], lean: COLORS[leanGrade], push: COLORS[pushGrade], elbow: false }, showPush, {
+      glideSide: glide, pushSide: pushing, forwardLean: M.measurePose(pose).forwardLean,
+      kneeBend: M.angleAt(pose[glide + "Hip"], pose[glide + "Knee"], pose[glide + "Ankle"]),
+      strideExtension: M.angleAt(pose[pushing + "Hip"], pose[pushing + "Knee"], pose[pushing + "Ankle"])
+    });
+  }
+
+  // THE LOOP. A clip often has only a second or two of useful pictures,
+  // too short to really watch. In the loop the orange skater and the pro
+  // stride round and round, the orange one with the numbers of the whole
+  // clip (the same numbers as the report cards). It starts by itself
+  // when the replay ends, or with the button on the 3D picture.
+  function startLoop() {
+    if (!smoothOn()) return;
+    setPlaying(false);
+    var r = state.rebuilt, a = r.angles;
+    state.looping = true;
+    state.kidNow = {
+      kneeBend: r.overall.kneeBend, forwardLean: r.overall.forwardLean,
+      // (left and right apart only when the coach saw both clearly)
+      pushRight: a.sidesApart ? M.percentile(a.pushRight, 0.5) : r.overall.strideExtension,
+      pushLeft: a.sidesApart ? M.percentile(a.pushLeft, 0.5) : r.overall.strideExtension
+    };
+    C.setSync({
+      // One stride takes the skater's own time, slowed down by the Speed chooser.
+      loop: function () { return r.clock.secondsPerCycle / Number(el.speed.value); },
+      drawKid: drawSmoothKid, label: "Stop the loop", pressed: true, onButton: stopLoop
+    });
+  }
+  function stopLoop() {
+    state.looping = false;
+    if (state.frames) showFrame(state.index);   // back to the moment the replay is at
+  }
+
+  // The "Smooth stride / As filmed" switch, and the line that says what
+  // the orange skater is showing.
+  var kidButtons = document.querySelectorAll("[data-kid]");
+  function showKidMode() {
+    var r = state.rebuilt, can = !!(r && r.ok);
+    el.kidTool.hidden = !state.frames;
+    Array.prototype.forEach.call(kidButtons, function (b) {
+      var mode = b.getAttribute("data-kid");
+      b.disabled = mode === "smooth" && !can;
+      b.setAttribute("aria-pressed", String(mode === (smoothOn() ? "smooth" : "filmed")));
+    });
+    el.kidNote.hidden = !state.frames;
+    if (!state.frames) return;
+    var text;
+    if (!can) {
+      text = "The orange skater shows the poses as the AI saw them. " + (r ? r.why : "");
+    } else if (smoothOn()) {
+      var o = r.overall, a = r.angles;
+      text = "The orange skater is your stride, rebuilt from " + r.pictures + " good pictures: knee bend " +
+        Math.round(o.kneeBend) + "°, lean " + Math.round(o.forwardLean) + "°, push " + Math.round(o.strideExtension) + "°" +
+        (r.rhythmFound ? ", one stride every " + r.clock.secondsPerCycle.toFixed(1) + " s" : "") + ". " +
+        (a.sidesApart ? "Your right push and your left push differ: " + Math.round(M.percentile(a.pushRight, 0.5)) + "° and " +
+          Math.round(M.percentile(a.pushLeft, 0.5)) + "°. " : "") +
+        (r.rhythmFound ? "" : "We could not find your rhythm in this clip, so it strides at an even, standard pace. ") +
+        "The legs and the lean are yours. The arms, the stick and how the skates tip are drawn the standard way. " +
+        "A one-time stumble does not show here; pick \"As filmed\" to see every picture as the AI saw it. " +
+        "When the replay ends, both skaters keep striding so you can keep comparing.";
+    } else {
+      text = "The orange skater shows the poses as the AI saw them, picture by picture. That is wobbly, because every picture is read on its own. " +
+        "Pick \"Smooth stride\" to see your stride rebuilt from all the good pictures together.";
+    }
+    el.kidNote.textContent = text;
+  }
+  Array.prototype.forEach.call(kidButtons, function (b) {
+    b.addEventListener("click", function () {
+      state.kidMode = b.getAttribute("data-kid");
+      kidLive = null;
+      showKidMode();
+      // (While the replay is playing, the next tick redraws by itself.)
+      if (state.frames && !state.playing) showFrame(state.index);
+    });
+  });
 
   // ---------- The report cards ----------------------------------------
 
@@ -427,7 +570,11 @@
       }
     }
     render(i, blend, videoRuns);
-    if (i >= last || (state.hasVideo && el.preview.ended)) setPlaying(false);
+    if (i >= last || (state.hasVideo && el.preview.ended)) {
+      setPlaying(false);
+      // The replay is over. In "Smooth stride" the skaters keep striding.
+      if (smoothOn()) startLoop();
+    }
   });
 
   // ---------- Starting a new report ------------------------------------
@@ -459,6 +606,9 @@
         state.frames = cleanUp();
       }
     }
+    kidLive = null;   // a new skater: forget the last one's numbers
+    // (In measuring mode we want to see every picture as it is.)
+    if (DEV) state.kidMode = "filmed";
     state.raw = { frames: rawFrames, weights: extra.weights || null }; // kept so we can check the clean-up in the browser
     state.flat = extra.flat || null;
     state.rhythm = M.strideSignal(state.frames);
@@ -480,7 +630,10 @@
   // Forget the report on screen (used when a new video is chosen).
   function clearReport() {
     setPlaying(false);
-    state.frames = state.analysis = state.rhythm = state.flat = state.track = null;
+    state.frames = state.analysis = state.rhythm = state.flat = state.track = state.rebuilt = state.kidNow = null;
+    kidLive = null;
+    state.looping = false;
+    showKidMode();
     state.hasVideo = false;
     state.index = 0;
     el.results.hidden = true;

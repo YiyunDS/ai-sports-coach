@@ -60,7 +60,7 @@ Paste the matching starter prompt from [`prompts/`](prompts/) into each one.
 
 ## 3D Visual Coach (branch `3d-coach`)
 
-This branch shows skating form in **3D**. A blue "pro" skater stands in a good hockey stance, and an orange skater copies **your** pose from a video so you can compare them side by side.
+This branch shows skating form in **3D**. A blue "pro" skater stands in a good hockey stance, and an orange skater skates **your** stride, rebuilt from your video, so you can compare them side by side.
 
 ### How to open it
 
@@ -82,7 +82,8 @@ Or run it from your own computer:
 4. **Pick your age** (6 to 12) and **Beginner** or **Experienced**.
 5. Press **Analyze video**. The coach zooms in on your skater about 20 times per second and draws a white skeleton on the video. **Check that the skeleton sits on the right skater.** If it does not, the numbers mean nothing: click the skater again on a clearer frame.
 6. **Read your report.** The orange skater is you. A ring around a joint turns green (inside the goal), yellow (almost) or red (work on this one). Each check gets a tip.
-7. **Watch the replay.** The video, your orange skater and the blue pro all move together: when you push with your right leg, the pro pushes with the right leg too, so you can compare the same moment of the stride. The coach looks at about 20 pictures per second and draws the moments in between, so the motion is smooth. The pro skates a real stride: the skate lands under the body, the hips slide over it, the leg drives out to the side and stays almost straight for a good part of the push (as measured on Connor McDavid) while the skate rolls onto its inside edge, then the skate swings back in low over the ice. The free arm swings opposite to the pushing leg, and the ice slides under the skaters like a treadmill. Every stride is a little different. The orange skater shows only the **useful moments** of your video: seen from the side, several clear pictures in a row, a pose a real skater can be in, and a real push happening. The other moments are left out (the coach tells you how many), and the replay jumps over them instead of showing a twisted or frozen skater. The colored stripes show every useful moment; a dark line marks a jump. Press **Jump to the biggest slip** to see where your form slipped the most.
+7. **Watch the replay.** The video, your orange skater and the blue pro all move together: when you push with your right leg, the pro pushes with the right leg too, so you can compare the same moment of the stride. The coach looks at about 20 pictures per second. The pro skates a real stride: the skate lands under the body, the hips slide over it, the leg drives out to the side and stays almost straight for a good part of the push (as measured on Connor McDavid) while the skate rolls onto its inside edge, then the skate swings back in low over the ice. The free arm swings opposite to the pushing leg, and the ice slides under the skaters like a treadmill. Every stride is a little different. The orange skater shows only the **useful moments** of your video: seen from the side, several clear pictures in a row, a pose a real skater can be in, and a real push happening. The other moments are left out (the coach tells you how many), and the replay jumps over them instead of showing a twisted or frozen skater. The colored stripes show every useful moment; a dark line marks a jump. Press **Jump to the biggest slip** to see where your form slipped the most.
+8. **Smooth stride or As filmed.** The AI reads every picture on its own, so one picture is always a bit wobbly. In **Smooth stride** (the normal setting) the orange skater does not copy the pictures one by one. The coach uses all the useful pictures together to work out *how you skate*: how bent your standing knee is, how far you lean, how far you push (your left and your right push, when it sees both clearly), and your rhythm. Then the orange skater skates exactly that way, with the same stride builder as the pro and on the same clock. So what looks different between the two skaters *is* different. The numbers follow the video, so if you stand taller near the end, the orange skater does too. What is **not** yours in this view: the arms, the stick and how the skates tip are drawn the standard way (so there are no elbow signs on the orange skater), and a one-time stumble does not show. Pick **As filmed** to see every picture as the AI saw it. If the clip has no full push, the coach says so and only shows As filmed; if it finds your numbers but not your rhythm, the orange skater strides at an even, standard pace.
 
 No video handy? Press **Load sample session** to see how it works. The **Angles** button hides the angle signs when you just want to look at the skaters.
 
@@ -152,6 +153,8 @@ The goal angles live in [`targets.json`](targets.json). There is one set for eac
 | `js/rigged-figure.js` | Draws the realistic 3D hockey player: a model with a skeleton inside, made in Blender |
 | `js/skater-model.js` | That 3D model, packed as text so the page works when you double-click it (made by `tools/pack_model.py`) |
 | `js/retarget.js` | Turns the model's bones so it takes our pose |
+| `js/rebuild.js` | Rebuilds *your* stride smoothly from the wobbly pictures of a video: a steady stride clock from the moments you change legs, and the middle value of your knee bend, lean and pushes around every moment. Run `node tests/rebuild.test.js` |
+| `js/skate.js` | Builds one hockey skate (boot, tongue, laces, holder, steel). Both skaters wear it |
 | `js/measure.js` | Measures a strong skater's stride from a video: cuts it into pushes, throws away broken ones, and takes the middle value. Run `node tests/measure.test.js` |
 | `js/figure.js` | The simpler skater built in code from shaped pieces. The page uses it if the realistic one cannot load |
 | `tools/blender/build_skater.py` | The recipe that builds the 3D model in Blender (body from MPFB2, gear modeled by the script) |
@@ -176,7 +179,7 @@ The goal angles live in [`targets.json`](targets.json). There is one set for eac
 ### Good to know
 
 - **Your video stays on your computer.** The page only downloads code: three.js from jsDelivr, MediaPipe from jsDelivr, the pose model from Google's MediaPipe storage, and the lettering (fonts) from Google Fonts.
-- The orange skater has no stick, because the AI finds body joints, not sticks.
+- The AI finds body joints, not sticks. In **Smooth stride** the orange skater holds a stick the standard way (it is drawn, not measured); in **As filmed** it has no stick.
 - **Knee bend** is always the knee of the leg you are standing on. **Push** is measured at the end of each real push; if the coach sees no push in the clip, it says so instead of making up a number. When enough of the clip is filmed from the side, the report uses only those moments (the others are dimmed in the replay bar).
 - The AI has to guess how deep things are from a flat video, so the 3D pose can wobble. Angles are most trustworthy from a clear side view.
 - Because of that, a video filmed from the front or from far away may leave only a second or two of useful moments. Film from the side, close up, and keep the skater in the picture to get more.

@@ -159,7 +159,14 @@ test("numbers but no rhythm: the skater strides at a standard, even pace", funct
   var r = R.build(c.frames, c.times, flat, c.analysis);
   assert.ok(r.ok && !r.rhythmFound);
   for (var i = 1; i < r.clock.cycle.length; i++) assert.ok(r.clock.cycle[i] > r.clock.cycle[i - 1]);
+  assert.ok(r.clock.cycle[0] >= 0 && r.clock.cycle[0] < 1, "the clock starts at " + r.clock.cycle[0]);
   assert.ok(Math.abs(R.at(r, 50, 0).kneeBend - 140) < 3);
+  // It is lined up with a push we saw: at the top of that push, the
+  // rebuilt skater's same leg is at the end of its push too.
+  var top = c.analysis.peaks[Math.floor(c.analysis.peaks.length / 2)], side = c.analysis.perFrame[top].m.pushSide;
+  var want = St.STRIDE.liftOff + (side === "l" ? 0.5 : 0);
+  assert.ok(apart(r.clock.cycle[top], want) < 1e-9, "the push top is at " + r.clock.cycle[top]);
+  assert.ok(apart(c.truth[top], want) < 0.08, "the real skater was at " + c.truth[top] + " there");
 });
 
 test("the rebuilt skater has the numbers we gave it", function () {
