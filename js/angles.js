@@ -323,19 +323,60 @@
     // The head looks up the ice, so it tips only half as much as the back.
     p.head = add(neck, pt(B.neckToHead * Math.sin(lean * 0.5), B.neckToHead * Math.cos(lean * 0.5), 0));
 
-    // --- Arms and stick: both hands in front, blade on the ice. ---
+    // --- Arms and stick: both hands on the stick, blade on the ice. ---
+    // The top (left) hand covers the end of the stick; the bottom (right)
+    // hand holds it lower down, about a forearm's length below.
     // With each push the hands and the stick blade sway a little to the side.
     var sway = real * side * push;
-    var topHand = add(hipMid, pt(0.22, 0.02, -0.02 - 0.07 * sway));  // left hand, top of the stick
+    var topHand = add(hipMid, pt(0.22, 0.02, -0.02 - 0.07 * sway));  // left wrist
     var blade = pt(hipX + 0.85, 0.02, 0.45 - 0.22 * sway);           // where the blade touches the ice
     var lArm = solveTwoBone(p.lShoulder, topHand, B.upperArm, B.foreArm, pt(-0.3, -0.5, -0.6));
-    var stickDir = norm(sub(blade, lArm.end));
-    var lowHand = add(lArm.end, scale(stickDir, 0.28));     // right hand, lower on the stick
-    var rArm = solveTwoBone(p.rShoulder, lowHand, B.upperArm, B.foreArm, pt(-0.3, -0.5, 0.6));
+    var shaft = norm(sub(blade, lArm.end));
+    var fist = gripPoint(lArm.end, lArm.mid, shaft);
+    shaft = norm(sub(blade, fist));
+    var knob = sub(fist, scale(shaft, KNOB_OUT));
+    // The bottom hand: its fist on the shaft, the wrist just behind it.
+    var low = add(knob, scale(shaft, KNOB_OUT + 0.3));
+    var fingers = gripFrame(sub(low, p.rShoulder), shaft).fingers;   // (the forearm points about from the shoulder to the hand)
+    var rArm = solveTwoBone(p.rShoulder, sub(low, scale(fingers, GRIP_REACH)), B.upperArm, B.foreArm, pt(-0.3, -0.5, 0.6));
     p.lElbow = lArm.mid; p.lWrist = lArm.end;
     p.rElbow = rArm.mid; p.rWrist = rArm.end;
-    if (opts.withStick) { p.stickTop = lArm.end; p.stickBlade = blade; }
+    if (opts.withStick) { p.stickTop = knob; p.stickBlade = blade; }
     return p;
+  }
+
+  // ---- Holding a stick ----
+  // A hand holds the stick in its fist: the shaft runs across the palm,
+  // and the fingers point as close to the forearm's way as they can. The
+  // middle of the fist is GRIP_REACH past the wrist. The top hand covers
+  // the end of the stick, so only KNOB_OUT of it sticks out past the fist.
+  var GRIP_REACH = 0.055, KNOB_OUT = 0.05;
+  var WRIST_BEND = 35 / DEG; // a wrist only cocks so far
+
+  // Which way the hand points when it holds the stick.
+  //   fore  = which way the forearm points (elbow to wrist)
+  //   shaft = which way the stick goes (toward the blade)
+  // Returns { fingers, knuckles }: the way the fingers point (wrist to
+  // knuckles) and the line of the knuckles (little finger to index
+  // finger, which points down the stick toward the blade).
+  // The fingers wrap around the shaft, so they like to point at a right
+  // angle to it. The wrist cocks toward that, but at most WRIST_BEND,
+  // so the shaft crosses the palm at a slant, like in a real grip.
+  function gripFrame(fore, shaft) {
+    fore = norm(fore); shaft = norm(shaft);
+    var c = clamp(dot(fore, shaft), -1, 1), across = sub(fore, scale(shaft, c)), s = len(across);
+    if (s < 1e-6) across = norm(cross(shaft, Math.abs(shaft.y) < 0.9 ? pt(0, 1, 0) : pt(1, 0, 0)));
+    else across = scale(across, 1 / s);
+    var now = Math.acos(c), want = now + Math.min(WRIST_BEND, Math.max(0, Math.PI / 2 - now));
+    var fingers = add(scale(shaft, Math.cos(want)), scale(across, Math.sin(want)));
+    var knuckles = norm(sub(shaft, scale(fingers, dot(shaft, fingers))));
+    return { fingers: fingers, knuckles: knuckles };
+  }
+
+  //   wrist, elbow = joint points,  shaft = which way the stick goes
+  //   returns the middle of the fist
+  function gripPoint(wrist, elbow, shaft) {
+    return add(wrist, scale(gripFrame(sub(wrist, elbow), shaft).fingers, GRIP_REACH));
   }
 
   // ---------- Turning camera poses into our kind of pose --------------
@@ -959,7 +1000,7 @@
     angleBetween: angleBetween, angleAt: angleAt, measurePose: measurePose,
     ageBand: ageBand, getTarget: getTarget, scoreAngle: scoreAngle,
     percentile: percentile, analyzeFrames: analyzeFrames,
-    BODY: BODY, solveTwoBone: solveTwoBone, makeStancePose: makeStancePose,
+    BODY: BODY, solveTwoBone: solveTwoBone, makeStancePose: makeStancePose, gripPoint: gripPoint, gripFrame: gripFrame, KNOB_OUT: KNOB_OUT,
     MP: MP, mediapipeToPose: mediapipeToPose, poseIsClear: poseIsClear,
     facingAngle: facingAngle, normalizeFrames: normalizeFrames,
     forwardVote: forwardVote, swapSides: swapSides, limbsLookRight: limbsLookRight,

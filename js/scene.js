@@ -198,14 +198,6 @@
   floor.rotation.x = -Math.PI / 2; floor.position.y = -0.02;
   scene.add(floor);
 
-  // A puck.
-  var puck = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.038, 0.038, 0.025, 20),
-    new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.5 })
-  );
-  puck.castShadow = true;
-  scene.add(puck);
-
   // ---------- 4. The skaters -----------------------------------------
   // The blue one is the PRO (or the goal for your age).
   // The realistic skater if its model loaded, otherwise the simpler one.
@@ -242,14 +234,14 @@
 
   var showAngles = true; // the "Angles" button turns the signs and slices off
   // Add the angle signs and "pizza slices" to a skater.
-  //   colors = { knee: "...", lean: "...", push: "..." }
+  //   colors = { knee: "...", lean: "...", push: "...", elbow: "..." (optional) }
   //   showPush = also label the pushing leg?
   //   shown    = (optional) the numbers to print on the signs. The report
   //              sometimes measures on the flat video picture, and the
   //              signs should say the same numbers as the report.
   function decorate(fig, pose, colors, showPush, shown) {
     var m = M.measurePose(pose);
-    if (!showAngles) { fig.hide("knee"); fig.hide("lean"); fig.hide("push"); return m; }
+    if (!showAngles) { ["knee", "lean", "push", "lElbow", "rElbow"].forEach(function (id) { fig.hide(id); }); return m; }
     if (shown) {
       m.kneeBend = shown.kneeBend; m.forwardLean = shown.forwardLean; m.strideExtension = shown.strideExtension;
       if (shown.glideSide) { m.glideSide = shown.glideSide; m.pushSide = shown.pushSide; }
@@ -275,6 +267,19 @@
     } else {
       fig.hide("push");
     }
+
+    // Elbows: how bent each arm is (180 = straight). The sign sits a
+    // little past the elbow, away from the shoulder, so it does not
+    // cover the arm.
+    ["l", "r"].forEach(function (s) {
+      var sh = pose[s + "Shoulder"], el = pose[s + "Elbow"], wr = pose[s + "Wrist"], id = s + "Elbow";
+      if (!sh || !el || !wr) { fig.hide(id); return; }
+      var deg = M.angleAt(sh, el, wr), color = colors.elbow || "#cbd5e1";
+      fig.setWedge(id, el, M.sub(sh, el), M.sub(wr, el), 0.11, color);
+      var away = el.x >= sh.x ? 1 : -1;  // in front of the shoulder: sign in front; behind: sign behind
+      fig.setLabel(id, { x: el.x + away * 0.3, y: el.y + (s === "l" ? 0.16 : 0.05), z: el.z },
+        (s === "l" ? "L" : "R") + " elbow " + Math.round(deg) + "°", color);
+    });
     return m;
   }
 
@@ -367,12 +372,7 @@
     }
     refFigure.update(pose, null, { edges: edges });
     var showPush = shown ? !!skating.pushSide : false;
-    decorate(refFigure, pose, { knee: BLUE, lean: BLUE, push: BLUE }, showPush, shown);
-    // Park the puck in front of the middle of the stick blade.
-    var at = refFigure.group.position;
-    var out = M.norm(M.pt(pose.stickBlade.x - pose.stickTop.x, 0, pose.stickBlade.z - pose.stickTop.z));
-    puck.position.set(at.x + pose.stickBlade.x + out.x * 0.13 + 0.07,
-                      0.0125, at.z + pose.stickBlade.z + out.z * 0.13);
+    decorate(refFigure, pose, { knee: BLUE, lean: BLUE, push: BLUE, elbow: BLUE }, showPush, shown);
   }
 
   // ---------- 5. Camera views ----------------------------------------
@@ -610,6 +610,8 @@
   window.Coach3D = {
     camera: camera,       // (for checking the view from the browser console)
     controls: controls,
+    renderer: renderer,   // (for taking pictures of the 3D view when we check our work)
+    scene: scene,
     refFigure: refFigure,
     kidFigure: kidFigure,
     decorate: decorate,

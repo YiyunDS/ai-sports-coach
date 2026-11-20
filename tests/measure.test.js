@@ -61,6 +61,20 @@ test("measuring finds the numbers we put in", function () {
   assert.strictEqual(r.curves.glideKnee.length, Me.STEPS + 1);
 });
 
+test("measuring finds the elbows we put in (free arm and stick arm)", function () {
+  var c = clip(11, 0), n = Me.measureStride(c.frames, c.times, c.rhythm).numbers, S = St.STRIDE;
+  // The pro's right arm is free, the left hand is on the stick.
+  assert.ok(Math.abs(n.rElbowStraightest.value - S.freeArmBack.elbow) < 4, "free arm straightest " + n.rElbowStraightest.value);
+  assert.ok(Math.abs(n.rElbowMostBent.value - S.freeArmForward.elbow) < 4, "free arm most bent " + n.rElbowMostBent.value);
+  assert.ok(Math.abs(n.lElbowStraightest.value - S.stickArmForward.elbow) < 4, "stick arm straightest " + n.lElbowStraightest.value);
+  assert.ok(Math.abs(n.lElbowMostBent.value - S.stickArmBack.elbow) < 4, "stick arm most bent " + n.lElbowMostBent.value);
+  // Picture by picture: one row per pose, with both elbows.
+  var rows = Me.everyPicture(c.frames, c.times);
+  assert.strictEqual(rows.length, c.frames.length);
+  assert.strictEqual(rows[5].length, 6);
+  assert.ok(rows[5][3] >= 90 && rows[5][3] <= 160 && rows[5][4] >= 90 && rows[5][4] <= 165);
+});
+
 test("wobbly poses still give the right numbers, with a bigger spread", function () {
   var c = clip(11, 0.03); // every joint wobbles up to 1.5 cm
   var r = Me.measureStride(c.frames, c.times, c.rhythm), n = r.numbers;

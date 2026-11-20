@@ -340,6 +340,9 @@
     var steelGeo = extrude(STEEL, 0.004, 0);
     this.skates = {};
     ["l", "r"].forEach(function (s) {
+      // The detailed skate from skate.js (its steel is kept short here, so
+      // the blade still ends 9 cm under the ankle like our poses expect).
+      if (root.CoachSkate) { self.skates[s] = add(root.CoachSkate.build({ bottom: -0.03 })); return; }
       var g = new THREE.Group();
       g.add(new THREE.Mesh(bootGeo, P.boot));
       g.add(new THREE.Mesh(holderGeo, P.holder));
@@ -473,6 +476,8 @@
       }
       sk.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(along, upright, side));
       sk.scale.set(length / SKATE_LENGTH, 1, 1);
+      // The top of the boot bends forward with the shin.
+      if (sk.setFlex) sk.setFlex(root.CoachSkate.flexFor(P[s + "Knee"], P[s + "Ankle"], heel, toe));
     });
 
     this.placeStickAndRings(P, grades);
@@ -487,7 +492,7 @@
     this.shaft.visible = this.grip.visible = this.bladeGroup.visible = hasStick;
     if (hasStick) {
       var down = new THREE.Vector3().subVectors(P.stickBlade, P.stickTop).normalize();
-      var top = P.stickTop.clone().addScaledVector(down, -0.14); // a bit pokes out above the top hand
+      var top = P.stickTop.clone(); // the knob, just past the top hand
       var len = placeBetween(this.shaft, top, P.stickBlade, Y_AXIS);
       this.shaft.scale.set(1, len, 1);
       var gripEnd = top.clone().addScaledVector(down, 0.2);

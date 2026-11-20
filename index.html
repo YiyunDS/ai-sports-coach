@@ -19,6 +19,7 @@
     js/stride.js           how the pro skates: the stride keyframes (and the sample skater)
     js/measure.js          measures a strong skater's stride from a video (for the pro's numbers)
     js/default-targets.js  a copy of targets.json the page can always read
+    js/skate.js            builds one hockey skate (boot, tongue, laces, holder, steel)
     js/figure.js           draws the simpler 3D skater, built from shaped pieces (the backup)
     js/rigged-figure.js    draws the realistic 3D skater (the model made in Blender)
     js/skater-model.js     the realistic skater's 3D model, packed as text
@@ -133,7 +134,7 @@
           </select>
         </div>
         <p id="target-info" class="small"></p>
-        <p class="small">The pro's knee bend (about 97°) and push (about 163°) were measured from a slow-motion clip of Connor McDavid. Its lean and the shape of its stride are still our estimates.</p>
+        <p class="small">The pro's knee bend (about 97°) and push (about 163°) were measured from a slow-motion clip of Connor McDavid. Its lean, the shape of its stride, its arm swing and elbow angles, how it holds its stick, and how its skates tip are still our estimates.</p>
         <details>
           <summary>Edit target angles</summary>
           <p class="small">Change the numbers in <code>targets.json</code>, then load the file here.</p>
@@ -432,7 +433,7 @@
   <script type="module">
     // Our own code, in the order it needs to load.
     var OURS = ["js/angles.js", "js/stride.js", "js/measure.js", "js/retarget.js", "js/tracker.js", "js/default-targets.js",
-                "js/figure.js", "js/rigged-figure.js", "js/scene.js", "js/coach.js", "js/positions.js", "js/board.js", "js/rink.js", "js/gamesim.js", "js/game.js",
+                "js/skate.js", "js/figure.js", "js/rigged-figure.js", "js/scene.js", "js/coach.js", "js/positions.js", "js/board.js", "js/rink.js", "js/gamesim.js", "js/game.js",
                 "js/refplays.js", "js/ref.js"];
     // Load one of our .js files and wait until it has run.
     function load(src) {

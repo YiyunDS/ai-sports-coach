@@ -19,7 +19,8 @@
 //                  body, low over the ice, ready to land again.
 //  The free arm swings forward and back, opposite to the pushing leg,
 //  and the shoulders turn a little with it. The top hand stays on the
-//  stick. The head stays up.
+//  stick and swings the other way, a bit less, so the stick blade
+//  sweeps along the ice. The head stays up.
 //
 //  We do not write down where the skate is. We write down HOW STRAIGHT
 //  the leg is at each moment and WHICH WAY the skate is from the hip.
@@ -74,20 +75,62 @@
     // from pushOutDegrees.)
     direction: [[0, -25], [0.15, 35], [0.25, 96], [0.35, 110], [0.45, 118], [0.55, 123]],
 
-    // How high the skate lifts off the ice on its way back (meters).
-    lift:    [[0, 0], [0.15, 0], [0.3, 0], [0.45, 0], [0.6, 0], [0.68, 0.03], [0.8, 0.065], [0.92, 0.03], [0.98, 0.004]],
-    // How far the skate rolls onto its inside edge (degrees).
+    // How high the skate lifts off the ice on its way back (meters). Right
+    // after the push it comes up behind the skater (the toe flicks off the
+    // ice last), then it swings forward low over the ice.
+    lift:    [[0, 0], [0.15, 0], [0.3, 0], [0.45, 0], [0.6, 0], [0.66, 0.035], [0.73, 0.075], [0.8, 0.085], [0.88, 0.05], [0.94, 0.02], [0.98, 0.004]],
+    // A first guess of how far the skate rolls onto its inside edge
+    // (degrees). The real roll is worked out from the shin (see below):
+    // a skate boot is stiff from side to side, so the skate tips exactly
+    // as far as the shin leans in. This guess is only the starting point.
     edge:    [[0, -2], [0.15, 3], [0.3, 14], [0.45, 28], [0.6, 36], [0.7, 12], [0.85, 0]],
+    edgeLimits: [-10, 55],  // the skate never rolls farther than this (degrees)
+
+    // THE PUSH. A real skater pushes at a right angle to the blade, so
+    // the blade stays turned out ("toe-out") while the leg drives out to
+    // the side. A blade slides only the way it points, but late in the
+    // push, with the leg almost straight, a skater's blade also skids
+    // sideways a little. So during the push we turn the blade part of the
+    // way from "the way it slides" toward "at a right angle to the leg".
+    pushTurnOut: [[0.22, 0], [0.32, 0.25], [0.42, 0.55], [0.6, 0.6], [0.66, 0.45], [0.76, 0]],
+
+    // THE SKATE IN THE AIR tips with the shin. A boot holds the ankle, so
+    // when the shin leans far forward (the skate trailing behind the knee)
+    // the toe points down. Right after the push the toe flicks down extra.
+    cuffRest: 25,           // in the air, the shin rests this far forward in the boot (degrees)
+    toeFlick: [[0.6, 0], [0.64, 22], [0.7, 18], [0.8, 6], [0.9, 0]], // extra toe-down after the push (degrees)
 
     weightShift: 0.06,      // how far the hips slide sideways over the standing skate (m)
     shiftAt: 0.05,          // the hips are farthest over a skate just after it lands,
                             // so the weight is already on it when the other skate lifts off
     hipBob: 0.012,          // how much the hips rise and sink (m)
-    shoulderTurn: 8,        // how far the shoulders turn with the arm swing (degrees)
-    armSwing: 0.24,         // how far the free hand swings forward and back (m)
-    stickHandSwing: 0.06,   // the top hand on the stick moves much less (m)
-    stickSway: 8,           // the stick blade sways side to side (degrees)
-    stickLength: 1.15       // from the top hand to the blade (m)
+    shoulderTurn: 11,       // how far the shoulders turn with the arm swing (degrees)
+
+    // ARMS. Each arm swings like a pendulum from the shoulder, the other
+    // way from the leg on its side. We write down which way the hand is
+    // from the shoulder at the back and at the front of the swing, and
+    // how bent the ELBOW is there (180 = straight). The computer slides
+    // between them.
+    armPhase: 0.05,         // the free arm is farthest back just before the right push ends
+    // Free (right) arm: while the right leg pushes, it drives back almost
+    // straight, past the line of the back (the skater leans forward, so
+    // "back" means behind the body, not just down), the hand behind and a
+    // little above the hip and out to the side. Then it swings forward,
+    // bending, and across toward the middle, hand in front of the chest.
+    freeArmBack:    { dir: [-0.85, -0.45, 0.25], elbow: 160 },
+    freeArmForward: { dir: [0.8, -0.35, -0.35], elbow: 95 },
+    // Top (left) hand on the stick: swings the other way. Forward, it
+    // reaches out in front at about waist height, the forearm almost
+    // level, the wrist cocked so the stick drops toward the ice; back, it
+    // comes in by the left hip with the elbow bent.
+    stickArmBack:    { dir: [0.05, -1, -0.25], elbow: 100 },
+    stickArmForward: { dir: [0.75, -0.62, 0.16], elbow: 132 },
+    stickSway: 11,          // the stick blade sways side to side, a moment after the hand (degrees)
+    // The stick: for a skater our size (a kid), from the knob to the
+    // blade. With one hand the stick rides with its blade on the ice,
+    // out in front and a little to the stick side (a right shot: the
+    // left hand on top, the blade on the right).
+    stickLength: 1.05
   };
 
   // ---------- Smooth curves through keyframes -----------------------
@@ -139,11 +182,47 @@
   // ---------- Building the pro's pose for one moment ----------------
   //   t    = where we are in the cycle, 0 to 1 (0 = right skate touches down)
   //   opts = { kneeBend, forwardLean, strideExtension } in degrees
-  // Returns { pose, edges, glideSide, pushSide, feet }.
+  // Returns { pose, edges, shin, glideSide, pushSide }.
   //   pose      = joint positions (the skater faces +x, left is -z)
   //   edges     = how far each skate rolls onto its inside edge (degrees)
+  //   shin      = how far each shin leans, seen from its skate: { forward, side } (degrees)
   //   glideSide = the leg carrying the weight, pushSide = the leg pushing (or null)
   function makeStridePose(t, opts) {
+    return buildPose(t, opts, edgeRule(opts));
+  }
+
+  // ---------- How far the skate rolls: as far as the shin leans --------
+  // We build the stride with a first guess of the roll, measure how far
+  // the shin leans in at 48 moments of the cycle, and use those numbers
+  // as the roll. Twice, so the guess settles. (The answer is kept, so
+  // this happens only once for each set of angles.)
+  var edgeRules = {};
+  function edgeRule(opts) {
+    var key = opts.kneeBend.toFixed(1) + "|" + opts.strideExtension.toFixed(1);
+    if (edgeRules[key]) return edgeRules[key];
+    var S = STRIDE, room = roomFor(opts.kneeBend, opts.strideExtension);
+    var rule = function (s) { return curve(S.edge, s) * room; };
+    for (var round = 0; round < 2; round++) {
+      var keys = [];
+      for (var k = 0; k < 48; k++) {
+        var s = k / 48;
+        keys.push([s, M.clamp(buildPose(s, opts, rule).shin.r.side, S.edgeLimits[0], S.edgeLimits[1])]);
+      }
+      rule = (function (keys) { return function (s) { return curve(keys, s); }; })(keys);
+    }
+    var names = Object.keys(edgeRules);
+    if (names.length > 40) delete edgeRules[names[0]]; // do not keep too many
+    return (edgeRules[key] = rule);
+  }
+
+  // How much "room" the stride has: a skater who sits low has a push
+  // leg much longer than the bent glide leg, so they can rise, sink and
+  // sway. A skater who stands tall has almost no room, so those
+  // movements get smaller (0.15 to 1).
+  function roomFor(knee, ext) { return M.clamp((legReach(ext) - legReach(knee)) / 0.08, 0.15, 1); }
+
+  //   edgeOf(s) = how far the skate rolls at its own clock s (degrees)
+  function buildPose(t, opts, edgeOf) {
     var B = M.BODY, S = STRIDE;
     t = ((t % 1) + 1) % 1;
     var knee = opts.kneeBend, ext = opts.strideExtension, lean = opts.forwardLean / DEG;
@@ -157,12 +236,8 @@
     // (A skater who stands tall takes small strides and sways less: see "room" below.)
     function hipsSide(at) { return S.weightShift * room * Math.cos(2 * Math.PI * (at - S.shiftAt)); }
     // The hips sink lowest while the glide knee is bent the most.
-    // How much "room" the stride has: a skater who sits low has a push
-    // leg much longer than the bent glide leg, so they can rise, sink and
-    // roll the skates onto their edges. A skater who stands tall has
-    // almost no room, so those movements get smaller (0.15 to 1).
-    var room = M.clamp((legReach(ext) - legReach(knee)) / 0.08, 0.15, 1);
-    function edgeAt(s) { return curve(S.edge, s) * room; }
+    var room = roomFor(knee, ext);
+    var edgeAt = edgeOf;
     function hipsBob(at) { return -S.hipBob * room * Math.cos(4 * Math.PI * (at - S.deepest)); }
 
     // How high is the ankle? A skate standing straight up has the ankle
@@ -235,8 +310,16 @@
       return pt(rel.f, y, hipsSide(at) + sign * (B.hipHalf + rel.o));
     }
 
-    var p = {}, edges = {};
+    var p = {}, edges = {}, shin = {};
     var hipMid = pt(0, hipHeight(t), hipsSide(t));
+
+    // How far may the skate tip toe-down (or heel-down, a minus number)
+    // before its blade would touch the ice? ankleY = how high the ankle is.
+    function tipRoom(ankleY, length) {
+      var H = B.ankleHeight, R = Math.sqrt(H * H + length * length), Y = ankleY - 0.004;
+      if (Y >= R) return 90;
+      return Math.max(0, (Math.atan2(length, H) - Math.acos(Math.min(1, Y / R))) * DEG);
+    }
     var speed = S.metersPerCycle; // meters per cycle (t goes up by 1 per cycle)
 
     ["l", "r"].forEach(function (side) {
@@ -257,21 +340,52 @@
       // In the air the skate does not have to follow its blade, so it
       // mostly points forward.
       var heading = norm(lifted ? add(scale(norm(move), 0.4), pt(0.6, 0, 0)) : move);
-      // The bottom of the boot is 6 cm under the ankle (less when tipped).
-      var lift = Math.max(0, curve(S.lift, s));
-      var sole = leg.end.y - lift - 0.06 * Math.cos(edgeAt(s) / DEG);
-      var toeY = sole + lift * (lifted ? 0.6 : 1), heelY = sole + lift * (lifted ? 1.3 : 1);
-      p[side + "Toe"] = pt(leg.end.x + B.footFront * heading.x, toeY, leg.end.z + B.footFront * heading.z);
-      p[side + "Heel"] = pt(leg.end.x - B.footBack * heading.x, heelY, leg.end.z - B.footBack * heading.z);
+      // During the push, turn the blade part of the way toward a right
+      // angle to the leg (seen from above), pointing forward.
+      var turnOut = track(S.pushTurnOut, s);
+      if (turnOut > 0) {
+        var legLine = pt(ankle.x - hip.x, 0, ankle.z - hip.z);
+        var across = norm(pt(legLine.z * sign, 0, -legLine.x * sign));   // a right angle to the leg, forward
+        if (across.x > 0) heading = norm(add(scale(heading, 1 - turnOut), scale(across, turnOut)));
+      }
+
+      // How does the shin lean? Forward (toward the toe of the skate) and
+      // sideways (in toward the other skate, across the skater's path).
+      // The skate's roll comes from the sideways lean (see edgeRule above).
+      var shinUp = sub(leg.mid, leg.end);
+      shin[side] = {
+        forward: Math.atan2(M.dot(shinUp, heading), shinUp.y) * DEG,
+        side: Math.atan2(-shinUp.z * sign, shinUp.y) * DEG
+      };
+
+      // Tip the skate toe-down in the air: as far as the shin leans past
+      // its resting spot in the boot, plus the toe flick after the push,
+      // but never so far that the blade touches the ice.
+      var tip = 0;
+      if (s > S.liftOff) {
+        tip = shin[side].forward - S.cuffRest + track(S.toeFlick, s);
+        tip = M.clamp(tip, -tipRoom(leg.end.y, B.footBack), tipRoom(leg.end.y, B.footFront));
+      }
+      var e = edgeAt(s) / DEG, a = tip / DEG;
+      // Along the blade (toe-down tips it), and the boot's "up" (tips forward with it).
+      var blade = add(scale(heading, Math.cos(a)), pt(0, -Math.sin(a), 0));
+      var bootUp = add(pt(0, Math.cos(a), 0), scale(heading, Math.sin(a)));
+      // The bottom of the boot is 6 cm under the ankle (less when rolled).
+      var sole = sub(leg.end, scale(bootUp, 0.06 * Math.cos(e)));
+      p[side + "Toe"] = add(sole, scale(blade, B.footFront));
+      p[side + "Heel"] = sub(sole, scale(blade, B.footBack));
       edges[side] = edgeAt(s);
     });
 
     // ---- Upper body: lean forward, shoulders turn with the arm swing ----
-    var swing = Math.cos(2 * Math.PI * t);   // +1 = right arm forward, -1 = right arm back
+    // The arms swing a moment ahead of the legs' clock (armPhase). The
+    // shoulders turn with them: the shoulder of the arm swinging forward
+    // comes forward too.
+    var armSwing = Math.cos(2 * Math.PI * (t - S.armPhase)); // +1 = free arm forward, -1 = back
     var leanNow = lean + (1.2 / DEG) * Math.sin(4 * Math.PI * t);
     var neck = add(hipMid, pt(B.trunk * Math.sin(leanNow), B.trunk * Math.cos(leanNow), 0));
     p.neck = neck;
-    var turn = (S.shoulderTurn / DEG) * swing;
+    var turn = (S.shoulderTurn / DEG) * armSwing;
     var acrossShoulders = pt(B.shoulderHalf * Math.sin(turn), 0, B.shoulderHalf * Math.cos(turn));
     p.lShoulder = sub(neck, acrossShoulders);
     p.rShoulder = add(neck, acrossShoulders);
@@ -279,21 +393,40 @@
     p.head = add(neck, pt(B.neckToHead * Math.sin(lean * 0.5), B.neckToHead * Math.cos(lean * 0.5), 0));
 
     // ---- Arms ----
-    // Free (right) hand: swings forward and back, a little higher in front.
-    var freeHand = add(p.rShoulder, pt(0.05 + S.armSwing * swing, -0.4 + 0.1 * Math.max(0, swing), 0.1 + 0.04 * Math.max(0, -swing)));
-    var rArm = M.solveTwoBone(p.rShoulder, freeHand, B.upperArm, B.foreArm, pt(-0.3, -0.5, 0.6));
-    // Top (left) hand on the stick, in front of the hips.
-    var topHand = add(hipMid, pt(0.22 - S.stickHandSwing * swing, 0.02, -0.02));
-    var lArm = M.solveTwoBone(p.lShoulder, topHand, B.upperArm, B.foreArm, pt(-0.3, -0.5, -0.6));
+    // One arm at "forwardness" u (0 = back of the swing, 1 = front): the
+    // hand's direction from the shoulder and the elbow angle slide from
+    // the back keyframe to the front one. The elbow angle tells us how
+    // far the hand is from the shoulder (the triangle upper arm, forearm,
+    // shoulder-to-hand), so the elbow bends to exactly that angle.
+    function armAt(shoulder, back, front, u, hint) {
+      var d = norm(add(scale(norm(pt.apply(null, back.dir)), 1 - u), scale(norm(pt.apply(null, front.dir)), u)));
+      var bend = (back.elbow + (front.elbow - back.elbow) * u) / DEG;
+      var a = B.upperArm, b = B.foreArm, reach = Math.sqrt(a * a + b * b - 2 * a * b * Math.cos(bend));
+      return M.solveTwoBone(shoulder, add(shoulder, scale(d, reach)), a, b, hint);
+    }
+    var rArm = armAt(p.rShoulder, S.freeArmBack, S.freeArmForward, (1 + armSwing) / 2, pt(-0.3, -0.5, 0.6));
+    var lArm = armAt(p.lShoulder, S.stickArmBack, S.stickArmForward, (1 - armSwing) / 2, pt(-0.3, -0.5, -0.6));
     p.lElbow = lArm.mid; p.lWrist = lArm.end;
     p.rElbow = rArm.mid; p.rWrist = rArm.end;
 
     // ---- Stick: always the same length, blade flat on the ice ----
-    var yaw = (28 + S.stickSway * Math.sin(2 * Math.PI * t)) / DEG; // which way the stick points, seen from above
-    var drop = lArm.end.y - 0.02;
-    var flatStick = Math.sqrt(Math.max(0, S.stickLength * S.stickLength - drop * drop));
-    p.stickTop = lArm.end;
-    p.stickBlade = pt(lArm.end.x + flatStick * Math.cos(yaw), 0.02, lArm.end.z + flatStick * Math.sin(yaw));
+    var yaw = (28 + S.stickSway * Math.sin(2 * Math.PI * (t - S.armPhase))) / DEG; // which way the stick points, seen from above
+    // Where the blade lands if the stick starts at "top".
+    function bladeFrom(top) {
+      var drop = top.y - 0.02, flat = Math.sqrt(Math.max(0, S.stickLength * S.stickLength - drop * drop));
+      return pt(top.x + flat * Math.cos(yaw), 0.02, top.z + flat * Math.sin(yaw));
+    }
+    // The top hand holds the end of the stick in its fist (see gripPoint
+    // in angles.js): the shaft runs across the palm, and only the knob
+    // sticks out past the fist. (Twice, because where the fist is and
+    // which way the stick goes depend on each other a little.)
+    var shaft = norm(sub(bladeFrom(lArm.end), lArm.end)), knob = lArm.end;
+    for (var g = 0; g < 2; g++) {
+      knob = sub(M.gripPoint(lArm.end, lArm.mid, shaft), scale(shaft, M.KNOB_OUT));
+      shaft = norm(sub(bladeFrom(knob), knob));
+    }
+    p.stickTop = knob;
+    p.stickBlade = bladeFrom(knob);
 
     // ---- Which leg is gliding, which is pushing? ----
     var sR = legTime("r", t), sL = legTime("l", t);
@@ -303,7 +436,7 @@
     // The other leg counts as "pushing" while both skates are on the ice.
     var pushSide = sOther >= 0.5 && sOther <= S.liftOff + 0.02 ? other : null;
 
-    return { pose: p, edges: edges, glideSide: glideSide, pushSide: pushSide };
+    return { pose: p, edges: edges, shin: shin, glideSide: glideSide, pushSide: pushSide };
   }
 
   // The sample skater and the video give us "which leg is pushing and how
