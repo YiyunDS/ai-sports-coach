@@ -564,7 +564,7 @@ Why this is right: the AI reads every picture on its own, so one picture
 is wobbly. The middle value of many pictures is trustworthy. It is the
 same method we use to measure the pro (`js/measure.js`).
 
-- New `js/rebuild.js` (12 tests in `tests/rebuild.test.js`):
+- New `js/rebuild.js` (13 tests in `tests/rebuild.test.js`):
   - THE CLOCK: the moments the skater changes legs give a steady stride
     clock for the whole clip (one change = half a stride). Flickers and
     holes are handled; the clock never runs backward. We find where a
@@ -584,10 +584,24 @@ same method we use to measure the pro (`js/measure.js`).
   orange skater is showing and what is not measured. When the replay
   ends, both skaters keep striding (a loop) with the report's numbers;
   the button on the 3D picture starts and stops the loop.
-- Fallbacks: no full push in the clip -> only "As filmed", with the
-  reason. Numbers but no rhythm (fewer than two leg changes) -> the
+- Fallbacks: numbers but no rhythm (fewer than two leg changes) -> the
   skater strides at an even, standard pace, lined up with the top of a
-  push we did see, and the note says so.
+  push we did see, and the note says so. No full push in the clip ->
+  knee bend and lean are still the skater's, the push is drawn at the
+  low end of the goal for the age and the note says it is NOT measured
+  (no push sign). Fewer than 3 pictures -> only "As filmed".
+- Fix after the first try by the team leader ("after analysis the two
+  skaters are not moving at all"). I could not make it freeze with four
+  different clicks and window sizes, but I closed every way I found
+  that leaves both skaters standing still:
+  1. "No full push seen" used to switch to "As filmed", which stops
+     after the short replay. Now the stride is rebuilt anyway (above).
+  2. An old copy of one script kept by the browser next to new copies
+     of the others gives the old behavior. Every file's address now
+     ends in a version number (`VERSION` in `index.html`).
+  3. Clicking the video, moving the video's frame slider, changing the
+     age or level, or switching back to "Smooth stride" stopped the
+     skaters. Now they keep striding.
 
 Checked on the test clip (headless Chrome, 1280 x 800; 20 useful
 pictures in 2 pieces, 2.2 to 3.45 s):

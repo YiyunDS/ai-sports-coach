@@ -199,7 +199,7 @@
   }
 
   //   perFrame = analysis.perFrame from analyzeFrames (angles.js)
-  //   opts = { secondsPerCycle, sideOnly, rhythm }
+  //   opts = { secondsPerCycle, sideOnly, rhythm, standardPush }
   //          sideOnly = the report only trusts the side-view pictures
   // Returns { kneeBend[], forwardLean[], pushRight[], pushLeft[],
   //           pushSeen, sidesApart } with one value for each pose.
@@ -233,8 +233,13 @@
     var apart = right.length >= 2 && left.length >= 2 && Math.abs(valueOf(right) - valueOf(left)) >= 4;
     var pushRight = [], pushLeft = [];
     times.forEach(function (t, i) {
-      // No push seen at all: a small one, just past the knee bend.
-      if (!peaks.length) { pushRight.push(Math.min(178, knee[i] + 8)); pushLeft.push(Math.min(178, knee[i] + 8)); return; }
+      // No push seen at all: the standard push (never less than a little
+      // past the knee bend, so the push leg is the straighter one).
+      if (!peaks.length) {
+        var standard = M.clamp(opts.standardPush || 160, knee[i] + 8, 178);
+        pushRight.push(standard); pushLeft.push(standard);
+        return;
+      }
       pushRight.push(near(apart ? right : peaks, t));
       pushLeft.push(near(apart ? left : peaks, t));
     });
@@ -247,30 +252,33 @@
   // ---------- Everything together -------------------------------------
   //   frames, times, rhythm = the cleaned-up poses of the clip
   //   analysis = from analyzeFrames (the report's numbers)
-  // Returns { ok, why, clock, angles, overall, rhythmFound, pictures }.
+  //   opts = { standardPush }: the push angle to draw when the clip
+  //          shows no full push at all (it is then NOT a measurement)
+  // Returns { ok, why, clock, angles, overall, rhythmFound, pushSeen, pictures }.
   //   ok = false: we cannot rebuild a stride (why says so in words).
   //   rhythmFound = false: we have the numbers but not the rhythm; the
   //                 skater then strides at a standard, even pace.
-  function build(frames, times, rhythm, analysis) {
-    if (!frames || frames.length < 8) return { ok: false, why: "There are too few good pictures to rebuild a stride." };
-    if (!analysis || !analysis.peaks || !analysis.peaks.length) {
-      return { ok: false, why: "No full push was seen in this clip, so there is no stride to rebuild." };
-    }
-    var s = analysis.summary;
+  //   pushSeen = false: the knee bend and the lean are measured, but no
+  //                 full push was seen; the push is the standard one.
+  function build(frames, times, rhythm, analysis, opts) {
+    opts = opts || {};
+    if (!frames || frames.length < 3 || !analysis) return { ok: false, why: "There are too few good pictures to rebuild a stride." };
+    var s = analysis.summary, pushSeen = !!(analysis.peaks && analysis.peaks.length && s.strideExtension);
+    var standardPush = M.clamp(opts.standardPush || 160, s.kneeBend.value + 8, 178);
     var overall = {
       kneeBend: s.kneeBend.value, forwardLean: s.forwardLean.value,
-      strideExtension: s.strideExtension ? s.strideExtension.value : Math.min(178, s.kneeBend.value + 8)
+      strideExtension: pushSeen ? s.strideExtension.value : standardPush
     };
     var clock = strideClock(times, rhythm, changeMoment(tidy(overall)));
     var rhythmFound = clock.ok;
     if (!clock.ok) {
       // No rhythm found (too few leg changes). The skater then strides at
-      // a standard, even pace. We still line it up with the one thing we
-      // did see: the top of a push, where the pushing knee is straightest.
-      // In the model that is the moment the push skate lifts off.
+      // a standard, even pace. If we saw a push, we still line the stride
+      // up with it: at the top of a push the pushing knee is straightest,
+      // and in the model that is the moment the push skate lifts off.
       var pace = St.STRIDE.secondsPerCycle;
-      var top = analysis.peaks[Math.floor(analysis.peaks.length / 2)];
-      var topCycle = St.STRIDE.liftOff + (analysis.perFrame[top].m.pushSide === "l" ? 0.5 : 0);
+      var top = pushSeen ? analysis.peaks[Math.floor(analysis.peaks.length / 2)] : 0;
+      var topCycle = pushSeen ? St.STRIDE.liftOff + (analysis.perFrame[top].m.pushSide === "l" ? 0.5 : 0) : 0;
       var first = topCycle + (times[0] - times[top]) / pace;
       var shift = topCycle - Math.floor(first);   // start counting near zero
       clock = {
@@ -278,8 +286,13 @@
         cycle: times.map(function (t) { return shift + (t - times[top]) / pace; })
       };
     }
-    var angles = strideAngles(analysis.perFrame, times, { secondsPerCycle: clock.secondsPerCycle, sideOnly: analysis.sideOn > 0, rhythm: rhythm });
-    return { ok: true, why: "", clock: clock, angles: angles, overall: overall, rhythmFound: rhythmFound, pictures: frames.length };
+    var angles = strideAngles(analysis.perFrame, times, {
+      secondsPerCycle: clock.secondsPerCycle, sideOnly: analysis.sideOn > 0, rhythm: rhythm, standardPush: standardPush
+    });
+    return {
+      ok: true, why: "", clock: clock, angles: angles, overall: overall,
+      rhythmFound: rhythmFound, pushSeen: pushSeen, pictures: frames.length
+    };
   }
 
   // The clock and the numbers at one moment of the replay.

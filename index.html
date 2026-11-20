@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#0b0f14">
   <title>AI Sports Coach - 3D Visual Coach</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=15.1">
 </head>
 <body>
   <!--
@@ -444,11 +444,16 @@
     var OURS = ["js/angles.js", "js/stride.js", "js/measure.js", "js/rebuild.js", "js/retarget.js", "js/tracker.js", "js/default-targets.js",
                 "js/skate.js", "js/figure.js", "js/rigged-figure.js", "js/scene.js", "js/coach.js", "js/positions.js", "js/board.js", "js/rink.js", "js/gamesim.js", "js/game.js",
                 "js/refplays.js", "js/ref.js"];
+    // Our files belong together: a new coach.js with an old scene.js (kept
+    // by the browser from an earlier visit) does not work. This number
+    // goes on the end of every file's address, so after an update the
+    // browser fetches all of them fresh. RAISE IT whenever a .js file changes.
+    var VERSION = "15.1";
     // Load one of our .js files and wait until it has run.
     function load(src) {
       return new Promise(function (done, fail) {
         var s = document.createElement("script");
-        s.src = src; s.onload = done; s.onerror = fail;
+        s.src = src + "?v=" + VERSION; s.onload = done; s.onerror = fail;
         document.head.appendChild(s);
       });
     }
@@ -480,7 +485,7 @@
     }
     OURS.forEach(function (src) {
       var s = document.createElement("script");
-      s.src = src;
+      s.src = src + "?v=" + VERSION;
       s.async = false; // run them one after another, in this order
       document.head.appendChild(s);
     });

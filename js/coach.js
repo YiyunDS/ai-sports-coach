@@ -171,13 +171,17 @@
     state.target = target;
     if (state.frames) {
       state.analysis = M.analyzeFrames(state.frames, target, state.targets.yellowZone, state.span, state.flat, state.rhythm);
-      state.rebuilt = Rb ? Rb.build(state.frames, state.times, state.rhythm, state.analysis) : null;
+      // (If the clip shows no full push, the rebuilt skater's push is drawn
+      //  at the low end of the goal for this age. The note says so.)
+      state.rebuilt = Rb ? Rb.build(state.frames, state.times, state.rhythm, state.analysis, { standardPush: target.strideExtension.min }) : null;
       showKidMode();
       drawCards(target);
       drawTimeline();
       // (While the replay is playing, the next tick redraws by itself.
       //  Redrawing here would make the video jump back a little.)
-      if (!state.playing) showFrame(state.index);
+      // If the skaters were striding in the loop, they keep striding.
+      if (state.looping && smoothOn()) startLoop();
+      else if (!state.playing) showFrame(state.index);
     }
   }
 
@@ -294,7 +298,7 @@
     var kneeGrade = M.scoreAngle(kidLive.kneeBend, target.kneeBend, zone).grade;
     var leanGrade = M.scoreAngle(kidLive.forwardLean, target.forwardLean, zone).grade;
     var pushGrade = M.scoreAngle(pushing === "r" ? kidLive.pushRight : kidLive.pushLeft, target.strideExtension, zone).grade;
-    var showPush = !!skating.pushSide && state.rebuilt.angles.pushSeen;
+    var showPush = !!skating.pushSide && state.rebuilt.pushSeen;   // no push sign if no push was measured
     var grades = {};
     grades[glide + "Knee"] = kneeGrade;
     grades.lHip = grades.rHip = grades.neck = leanGrade;
@@ -336,6 +340,12 @@
     state.looping = false;
     if (state.frames) showFrame(state.index);   // back to the moment the replay is at
   }
+  // The replay was stopped by something other than the replay's own
+  // buttons (a click on the video, the video's frame slider). The 3D
+  // skaters then go on striding instead of standing frozen.
+  function keepStriding() {
+    if (state.frames && smoothOn() && !state.looping) startLoop();
+  }
 
   // The "Smooth stride / As filmed" switch, and the line that says what
   // the orange skater is showing.
@@ -356,8 +366,11 @@
     } else if (smoothOn()) {
       var o = r.overall, a = r.angles;
       text = "The orange skater is your stride, rebuilt from " + r.pictures + " good pictures: knee bend " +
-        Math.round(o.kneeBend) + "°, lean " + Math.round(o.forwardLean) + "°, push " + Math.round(o.strideExtension) + "°" +
+        Math.round(o.kneeBend) + "°, lean " + Math.round(o.forwardLean) + "°" +
+        (r.pushSeen ? ", push " + Math.round(o.strideExtension) + "°" : "") +
         (r.rhythmFound ? ", one stride every " + r.clock.secondsPerCycle.toFixed(1) + " s" : "") + ". " +
+        (r.pushSeen ? "" : "The coach saw no full push in this clip, so the push is NOT yours: it is drawn at a standard " +
+          Math.round(o.strideExtension) + "°. ") +
         (a.sidesApart ? "Your right push and your left push differ: " + Math.round(M.percentile(a.pushRight, 0.5)) + "° and " +
           Math.round(M.percentile(a.pushLeft, 0.5)) + "°. " : "") +
         (r.rhythmFound ? "" : "We could not find your rhythm in this clip, so it strides at an even, standard pace. ") +
@@ -376,7 +389,10 @@
       kidLive = null;
       showKidMode();
       // (While the replay is playing, the next tick redraws by itself.)
-      if (state.frames && !state.playing) showFrame(state.index);
+      if (state.frames && !state.playing) {
+        // Smooth stride: the skaters stride right away. As filmed: one picture.
+        if (smoothOn()) startLoop(); else showFrame(state.index);
+      }
     });
   });
 
@@ -607,6 +623,7 @@
       }
     }
     kidLive = null;   // a new skater: forget the last one's numbers
+    state.looping = false;
     // (In measuring mode we want to see every picture as it is.)
     if (DEV) state.kidMode = "filmed";
     state.raw = { frames: rawFrames, weights: extra.weights || null }; // kept so we can check the clean-up in the browser
@@ -633,6 +650,7 @@
     state.frames = state.analysis = state.rhythm = state.flat = state.track = state.rebuilt = state.kidNow = null;
     kidLive = null;
     state.looping = false;
+    state.useful = null;
     showKidMode();
     state.hasVideo = false;
     state.index = 0;
@@ -721,6 +739,7 @@
   el.pickTime.addEventListener("input", function () {
     if (state.busy) return;
     setPlaying(false);
+    keepStriding();
     var t = Number(el.pickTime.value);
     el.pickOut.textContent = t.toFixed(1) + " s";
     try { el.preview.currentTime = t; } catch (e) { /* video not ready - no problem */ }
@@ -731,6 +750,7 @@
   el.overlay.addEventListener("click", function (ev) {
     if (state.busy || !el.preview.videoWidth) return;
     setPlaying(false);
+    keepStriding();
     var box = el.overlay.getBoundingClientRect();
     state.seed = {
       t: el.preview.currentTime,

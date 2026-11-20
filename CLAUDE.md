@@ -39,6 +39,10 @@ team leader) for the Presidential SI Challenge. All work happens on the
   the report and the sample session go in `docs/screenshots/`.
 - After each phase, open the page, take screenshots, and show before and
   after. Do not call a phase done until you have looked at it.
+- Whenever a `.js` file or `style.css` changes, raise `VERSION` in
+  `index.html` (and the `?v=` on the `style.css` link). Otherwise a
+  browser can keep an old copy of one file next to new copies of the
+  others, and the page breaks in confusing ways.
 - Small commits on `3d-coach`. Do not push until the team leader says so.
 
 ## The website

@@ -140,16 +140,41 @@ test("one wild picture hardly moves the smooth numbers", function () {
   }
 });
 
-test("no pushes, or too few pictures: we say so and rebuild nothing", function () {
+test("no full push seen: the knee and the lean are still yours, the push is the standard one", function () {
   // A skater who only glides in the stance.
   var frames = [], times = [];
   for (var i = 0; i < 40; i++) { frames.push(M.makeStancePose({ kneeBend: 140, forwardLean: 25, strideExtension: 165 })); times.push(i / 20); }
   var rhythm = M.strideSignal(frames), analysis = M.analyzeFrames(frames, TARGET, 10, 4, null, rhythm);
-  var glide = R.build(frames, times, rhythm, analysis);
-  assert.strictEqual(glide.ok, false);
-  assert.ok(/push/.test(glide.why));
-  var c = clip({ seconds: 0.3, angles: steady(140, 25, 165) });
-  assert.strictEqual(R.build(c.frames, c.times, c.rhythm, c.analysis).ok, false);
+  assert.strictEqual(analysis.peaks.length, 0);
+  var glide = R.build(frames, times, rhythm, analysis, { standardPush: 158 });
+  assert.ok(glide.ok && !glide.pushSeen && !glide.rhythmFound);
+  var a = R.at(glide, 20, 0);
+  assert.ok(Math.abs(a.kneeBend - 140) < 2 && Math.abs(a.forwardLean - 25) < 2, "knee " + a.kneeBend + ", lean " + a.forwardLean);
+  assert.strictEqual(a.pushRight, 158);
+  assert.strictEqual(glide.overall.strideExtension, 158);
+  // The clock still runs evenly, so the skater strides instead of standing still.
+  for (var k = 1; k < glide.clock.cycle.length; k++) assert.ok(glide.clock.cycle[k] > glide.clock.cycle[k - 1]);
+  // The rebuilt skater can be drawn at every moment (no broken numbers).
+  for (var j = 0; j < frames.length; j++) {
+    var p = R.poseAt(R.at(glide, j, 0).cycle, R.at(glide, j, 0)).pose;
+    assert.ok(isFinite(p.lKnee.x) && isFinite(p.rAnkle.y) && isFinite(p.neck.y), "broken pose at " + j);
+  }
+  // A skater standing very tall: the standard push is still straighter than the knee.
+  var tall = frames.map(function () { return M.makeStancePose({ kneeBend: 168, forwardLean: 8, strideExtension: 172 }); });
+  var tallRhythm = M.strideSignal(tall), tallReport = M.analyzeFrames(tall, TARGET, 10, 4, null, tallRhythm);
+  var t = R.build(tall, times, tallRhythm, tallReport, { standardPush: 158 });
+  assert.ok(t.ok && t.overall.strideExtension > t.overall.kneeBend + 7, "push " + t.overall.strideExtension);
+});
+
+test("only a few pictures still give a stride; one or two do not", function () {
+  var c = clip({ seconds: 0.3, angles: steady(140, 25, 165) });   // 6 pictures
+  var few = R.build(c.frames, c.times, c.rhythm, c.analysis, { standardPush: 158 });
+  assert.ok(few.ok, "6 pictures should be enough");
+  assert.ok(Math.abs(few.overall.kneeBend - c.analysis.summary.kneeBend.value) < 1e-9);
+  var two = clip({ seconds: 0.1, angles: steady(140, 25, 165) }); // 2 pictures
+  var none = R.build(two.frames, two.times, two.rhythm, two.analysis);
+  assert.strictEqual(none.ok, false);
+  assert.ok(/too few/.test(none.why));
 });
 
 test("numbers but no rhythm: the skater strides at a standard, even pace", function () {
