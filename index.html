@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#0b0f14">
   <title>AI Sports Coach - 3D Visual Coach</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
-  <link rel="stylesheet" href="style.css?v=16.0">
+  <link rel="stylesheet" href="style.css?v=16.1">
 </head>
 <body>
   <!--
@@ -192,6 +192,7 @@
       </section>
       <section id="results" class="panel" hidden>
         <h2>Session report</h2>
+        <!-- A warning, only when the numbers are rough (skater too small, or never seen from the side). -->
         <p id="quality-note" class="note" hidden></p>
         <!-- Layer 1: the answer at a glance. A ring that shows how many
              numbers are on target, and the ONE thing to work on next. -->
@@ -221,6 +222,10 @@
         <details id="kid-more" class="more" hidden>
           <summary>How the orange skater was made</summary>
           <p id="kid-long" class="small"></p>
+        </details>
+        <details id="quality-more" class="more" hidden>
+          <summary>How much of the video was used</summary>
+          <p id="quality-long" class="small"></p>
         </details>
         <div class="replay">
           <div class="replay-controls">
@@ -474,7 +479,7 @@
     // by the browser from an earlier visit) does not work. This number
     // goes on the end of every file's address, so after an update the
     // browser fetches all of them fresh. RAISE IT whenever a .js file changes.
-    var VERSION = "16.0";
+    var VERSION = "16.1";
     // Load one of our .js files and wait until it has run.
     function load(src) {
       return new Promise(function (done, fail) {

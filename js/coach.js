@@ -108,6 +108,7 @@
     verdictEyebrow: $("verdict-eyebrow"), verdictMain: $("verdict-main"), verdictRest: $("verdict-rest"),
     videoPanel: $("video-panel"), overlay: $("overlay"), pickTime: $("pick-time"), pickOut: $("pick-out"),
     seedInfo: $("seed-info"), trackInfo: $("track-info"), qualityNote: $("quality-note"),
+    qualityMore: $("quality-more"), qualityLong: $("quality-long"),
     kidTool: $("kid-tool"), kidNote: $("kid-note"), kidMore: $("kid-more"), kidLong: $("kid-long"),
     play: $("play-btn"), speed: $("speed"), worst: $("worst-btn"),
     frameInfo: $("frame-info"), timeline: $("timeline")
@@ -387,7 +388,9 @@
       text = "The orange skater shows the poses as the AI saw them. " + (r ? r.why : "");
     } else if (smoothOn()) {
       var o = r.overall, a = r.angles;
-      text = "The orange skater is your stride, rebuilt from " + r.pictures + " good pictures. " +
+      // (A real video: say how many pictures the coach could read in all.)
+      var outOf = state.useful && state.useful.total > r.pictures ? " (of " + state.useful.total + " the coach could read)" : "";
+      text = "The orange skater is your stride, rebuilt from " + r.pictures + " good pictures" + outOf + ". " +
         "The legs and the lean are yours. The arms, the stick and how the skates tip are drawn the standard way. " +
         (r.pushSeen ? "" : "The coach saw no full push in this clip, so the push is NOT yours: it is drawn at a standard " +
           Math.round(o.strideExtension) + "°. ") +
@@ -775,7 +778,7 @@
     state.hasVideo = hasVideo;
     state.track = track || null;
     state.index = 0;
-    if (!hasVideo) { el.qualityNote.hidden = true; clearOverlay(); }
+    if (!hasVideo) { el.qualityNote.hidden = true; el.qualityMore.hidden = true; clearOverlay(); }
     el.results.hidden = false;
     state.awaitReveal = true;   // a new report: it makes its entrance when it is seen
     state.shown = null;
@@ -800,6 +803,7 @@
     state.index = 0;
     el.results.hidden = true;
     el.qualityNote.hidden = true;
+    el.qualityMore.hidden = true;
     el.trackInfo.textContent = "";
     C.layout(false);
     C.setSync(null);   // the pro skates on its own again ("Play stride" works)
@@ -1166,7 +1170,9 @@
         (shown < clearCount ? " · " + shown + " useful ones shown" : "");
 
       // Be honest about how much to trust these numbers.
-      var notes = [];
+      //   warnings = "these numbers are rough": shown right at the top of the report
+      //   notes    = how much of the video was used: folded away under the cards
+      var notes = [], warnings = [];
       if (shown < clearCount) {
         notes.push("The orange skater shows only the " + shown + " useful moments (" +
           (state.useful.sideOnly ? "seen from the side, " : "") + "several pictures in a row, a pose that makes sense" +
@@ -1183,7 +1189,7 @@
       }
       var typical = M.percentile(heights, 0.5);
       if (typical < SMALL_SKATER) {
-        notes.push("The skater is small in this video (about " + Math.round(typical * 100) +
+        warnings.push("The skater is small in this video (about " + Math.round(typical * 100) +
           "% of the picture height), so the angles are rough estimates. Film closer for better numbers.");
       }
       if (raw.length < n * 0.5) {
@@ -1196,13 +1202,15 @@
         notes.push("Knee bend and lean come from the " + state.analysis.sideOn + " of " + shown +
           " frames where the skater was seen from the side. The other frames are dimmed in the replay bar.");
       } else if (sideCount > 0) {
-        notes.push("Only " + sideCount + " frames showed the skater from the side, too few to rely on, so knee bend and lean are rough estimates.");
+        warnings.push("Only " + sideCount + " frames showed the skater from the side, too few to rely on, so knee bend and lean are rough estimates.");
       } else {
-        notes.push("The skater was never seen from the side, so knee bend and lean are rough estimates.");
+        warnings.push("The skater was never seen from the side, so knee bend and lean are rough estimates.");
       }
       notes.push("Angles are most accurate when the skater is filmed from the side.");
-      el.qualityNote.textContent = notes.join(" ");
-      el.qualityNote.hidden = false;
+      el.qualityNote.textContent = warnings.join(" ");
+      el.qualityNote.hidden = !warnings.length;
+      el.qualityLong.textContent = notes.join(" ");
+      el.qualityMore.hidden = false;
       say("Analysis complete. Check the video below: the white skeleton should sit on your skater.");
     } catch (err) {
       console.error(err);

@@ -714,11 +714,17 @@ test browser; pictures in `docs/screenshots/phase16/`)
   report fades in.
 - Phone: no sideways scrolling on any of the four tabs, and nothing you
   tap is under 44 px.
+- The real test clip (`local-videos/test.mp4`, skater in black at
+  1.0 s): the report waits, makes its entrance, and the skaters keep
+  striding. With a real video the long text about the video used to sit
+  ABOVE the answer. Now only a real warning stays on top (the skater is
+  too small, or was never seen from the side). The rest is folded under
+  "How much of the video was used", and the line in plain sight says
+  "rebuilt from 16 good pictures (of 99 the coach could read)".
 - All 12 test files pass.
 
 **Limits, said plainly**
-- Checked in a test browser at phone size, not on a real phone, and not
-  yet with a real video (the report code is the same for both).
+- Checked in a test browser at phone size, not on a real phone.
 - The entrance was measured in a slow test browser. How it FEELS at
   full speed has to be judged by eye on a real screen.
 - The Positioning, Game and Referee tabs got the new surfaces, switches
