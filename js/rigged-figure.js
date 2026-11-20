@@ -21,12 +21,15 @@
   if (!THREE || !Rt || !Base || !root.SKATER_GLTF || !THREE.SkeletonUtils) return;
 
   var ICE_ANKLE = 0.09; // in our poses, a skate on the ice has its ankle this high (angles.js BODY)
+  var SKATE_BOTTOM = -0.046; // the steel reaches this far below the boot (a real holder is tall)
 
   // The bones we turn, parents before children.
   var ORDER = ["pelvis", "spine_01", "spine_02", "spine_03", "neck_01", "head",
     "thigh_l", "calf_l", "foot_l", "thigh_r", "calf_r", "foot_r",
     "upperarm_l", "lowerarm_l", "upperarm_r", "lowerarm_r"];
-  var REST_JOINTS = ORDER.concat(["ball_l", "ball_r", "hand_l", "hand_r"]);
+  var REST_JOINTS = ORDER.concat(["ball_l", "ball_r", "hand_l", "hand_r",
+    "index_01_l", "middle_01_l", "pinky_01_l", "index_01_r", "middle_01_r", "pinky_01_r"]);
+  var HANDS = ["hand_l", "hand_r"]; // turned only while they hold the stick
 
   // ---- A picture of fabric bumps (a "normal map"): it makes flat cloth
   //      catch the light like knitted material. Painted once, shared. ----
@@ -167,22 +170,44 @@
       b.getWorldQuaternion(q); quats[n] = [q.x, q.y, q.z, q.w];
     });
     this.rig = Rt.setup({ joints: joints, quats: quats });
+    // How each hand rests on its forearm (to go back to when it lets go of the stick).
+    this.handRest = {};
+    HANDS.forEach(function (n) { self.handRest[n] = self.bones[n].quaternion.clone(); });
+
+    // ---- Skates ----
+    // The model came with simple skates. We hide those and put on the
+    // better skates from skate.js, fastened to the foot bones so they
+    // move with the feet. They are fitted to the old skates: the same
+    // place under the foot and the same length.
+    var oldSkate = { boot: 1, holder: 1, steel: 1, cap: 1 };
+    if (root.CoachSkate) this.model.traverse(function (o) { if (o.isMesh && oldSkate[o.material.name]) o.visible = false; });
+    this.skates = {};
+    var SIZE = 1.097, TALL = 1.143, WIDE = 1.08;   // how much bigger this foot is than the 0.24 m skate
+    if (root.CoachSkate) {
+      ["l", "r"].forEach(function (s) {
+        var foot = self.bones["foot_" + s], a = joints["foot_" + s], b = joints["ball_" + s];
+        // Which way the foot points (seen from above), and where the heel is.
+        var fwd = new THREE.Vector3(b.x - a.x, 0, b.z - a.z).normalize();
+        var side = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 1, 0));
+        var heel = new THREE.Vector3(a.x, a.y - 0.06 * TALL, a.z).addScaledVector(fwd, -0.07 * SIZE);
+        var placeIt = new THREE.Matrix4().makeBasis(fwd, new THREE.Vector3(0, 1, 0), side).setPosition(heel)
+          .scale(new THREE.Vector3(SIZE, TALL, WIDE));
+        // Fasten it to the foot bone: where it sits, measured from the bone.
+        foot.updateWorldMatrix(true, false);
+        var fromBone = foot.matrixWorld.clone().invert().multiply(placeIt);
+        var skate = root.CoachSkate.build({ bottom: SKATE_BOTTOM });
+        fromBone.decompose(skate.position, skate.quaternion, skate.scale);
+        skate.traverse(function (m) { if (m.isMesh) m.receiveShadow = true; });
+        foot.add(skate);
+        self.skates[s] = skate;
+      });
+    }
 
     // Lift the model so its skate blades sit on the ice when our pose
-    // puts the ankle ICE_ANKLE above the ice.
-    if (ankleToIce === null) {
-      var lowest = Infinity;
-      this.model.traverse(function (o) {
-        if (o.isMesh && o.material.name === "steel") {
-          var pos = o.geometry.attributes.position;
-          for (var i = 0; i < pos.count; i++) {
-            v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
-            lowest = Math.min(lowest, v.y);
-          }
-        }
-      });
-      ankleToIce = isFinite(lowest) ? joints.foot_l.y - lowest : ICE_ANKLE;
-    }
+    // puts the ankle ICE_ANKLE above the ice. (The ankle is 6 cm above
+    // the bottom of the boot, and the steel reaches SKATE_BOTTOM below it,
+    // both stretched by TALL.)
+    if (ankleToIce === null) ankleToIce = root.CoachSkate ? (0.06 - SKATE_BOTTOM) * TALL : ICE_ANKLE;
     this.lift = ankleToIce - ICE_ANKLE;
 
     // The stick, the grade rings and the name sign (shared with figure.js).
@@ -231,8 +256,47 @@
       b.quaternion.copy(parentQ.invert().multiply(want));
       b.updateMatrixWorld(true);
     });
+    // Hands: wrapped around the stick if they hold it, otherwise resting.
+    HANDS.forEach(function (name) {
+      var b = self.bones[name], q = res.quats[name];
+      if (q) {
+        want.set(q[0], q[1], q[2], q[3]).premultiply(groupQ);
+        b.parent.getWorldQuaternion(parentQ);
+        b.quaternion.copy(parentQ.invert().multiply(want));
+      } else {
+        b.quaternion.copy(self.handRest[name]);
+      }
+      b.updateMatrixWorld(true);
+    });
+
+    // The top of each boot bends forward with its shin.
+    Object.keys(this.skates).forEach(function (s) {
+      if (P[s + "Heel"] && P[s + "Toe"]) self.skates[s].setFlex(root.CoachSkate.flexFor(P[s + "Knee"], P[s + "Ankle"], P[s + "Heel"], P[s + "Toe"]));
+    });
+
+    // The model's arms are not exactly as long as our pose's arms, so its
+    // hand is not exactly where the pose's wrist is. Hang the stick from
+    // the model's real fist (the top hand), keeping the blade on the ice.
+    if (P.stickTop && P.stickBlade && res.quats.hand_l) this.stickToFist(P);
 
     this.placeStickAndRings(P, grades);
+  };
+
+  var fistV = new THREE.Vector3(), knuckleV = new THREE.Vector3();
+  RiggedFigure.prototype.stickToFist = function (P) {
+    // The middle of the fist: most of the way from the wrist to the knuckles.
+    this.bones.hand_l.getWorldPosition(fistV);
+    this.bones.middle_01_l.getWorldPosition(knuckleV);
+    fistV.lerp(knuckleV, 0.7);
+    this.group.worldToLocal(fistV);
+    var shaft = new THREE.Vector3().subVectors(P.stickBlade, P.stickTop), length = shaft.length();
+    shaft.normalize();
+    var knob = fistV.clone().addScaledVector(shaft, -root.CoachMath.KNOB_OUT);
+    // Same way out over the ice as before, same length, blade on the ice.
+    var flatWay = new THREE.Vector3(shaft.x, 0, shaft.z).normalize();
+    var drop = knob.y - P.stickBlade.y, flat = Math.sqrt(Math.max(0, length * length - drop * drop));
+    P.stickTop = knob;
+    P.stickBlade = knob.clone().addScaledVector(flatWay, flat).setY(P.stickBlade.y);
   };
 
   root.RiggedFigure = RiggedFigure;

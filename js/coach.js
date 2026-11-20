@@ -959,7 +959,9 @@
       var out = {
         clip: el.fileName.textContent, measuredOn: new Date().toISOString().slice(0, 10),
         posesUsed: state.frames.length, sideViewPoses: state.analysis.sideOn,
-        pushesUsed: r.used, pushesDropped: r.dropped, numbers: r.numbers, curves: r.curves
+        pushesUsed: r.used, pushesDropped: r.dropped, numbers: r.numbers, curves: r.curves,
+        // every picture, one by one: [seconds, left knee, right knee, left elbow, right elbow, lean]
+        everyPicture: window.CoachMeasure.everyPicture(state.frames, state.times)
       };
       window.CoachStrideMeasured = out;
       var text = JSON.stringify(out, function (k, v) { return typeof v === "number" ? Math.round(v * 1000) / 1000 : v; }, 1);

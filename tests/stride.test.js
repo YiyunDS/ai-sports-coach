@@ -81,7 +81,7 @@ test("the hips shift over the glide skate", function () {
   assert.ok(M.mid(at(liftOffLeft).pose.lHip, at(liftOffLeft).pose.rHip).z > 0.04, "weight not over the right skate at left lift-off");
 });
 
-test("a skate on the ice slides only the way its blade points", function () {
+test("a skate on the ice slides the way its blade points (late in the push it may skid a little)", function () {
   var speed = St.STRIDE.metersPerCycle, dt = 0.001;
   eachMoment(function (t) {
     var rp = at(t), rq = at(t + dt), p = rp.pose, q = rq.pose;
@@ -90,7 +90,48 @@ test("a skate on the ice slides only the way its blade points", function () {
       var move = M.pt((q[s + "Ankle"].x - p[s + "Ankle"].x) / dt + speed, 0, (q[s + "Ankle"].z - p[s + "Ankle"].z) / dt);
       var blade = M.sub(p[s + "Toe"], p[s + "Heel"]); blade.y = 0;
       var off = M.angleBetween(move, blade);
-      assert.ok(off < 3, s + " skate skids " + off.toFixed(1) + "° at " + t.toFixed(3));
+      // While gliding: no skid. While the blade turns out in the push: a little.
+      var own = s === "r" ? t : (t + 0.5) % 1;
+      var allowed = 3 + 40 * St.track(St.STRIDE.pushTurnOut, own);
+      assert.ok(off < allowed, s + " skate skids " + off.toFixed(1) + "° at " + t.toFixed(3));
+    });
+  });
+});
+
+test("the push blade stays turned out until it leaves the ice", function () {
+  [0.35, 0.45, 0.55, St.STRIDE.liftOff].forEach(function (s) {
+    var p = at(s).pose, blade = M.sub(p.rToe, p.rHeel);
+    var toeOut = Math.atan2(blade.z, blade.x) * DEG;
+    assert.ok(toeOut > 12 && toeOut < 45, "toe-out " + toeOut.toFixed(0) + " at " + s);
+  });
+});
+
+test("the skate turns smoothly (no sudden twists)", function () {
+  eachMoment(function (t) {
+    var a = at(t).pose, b = at(t + 1 / STEPS).pose;
+    ["l", "r"].forEach(function (s) {
+      var u = M.sub(a[s + "Toe"], a[s + "Heel"]), v = M.sub(b[s + "Toe"], b[s + "Heel"]);
+      assert.ok(M.angleBetween(u, v) < 4, s + " skate twists " + M.angleBetween(u, v).toFixed(1) + "° at " + t.toFixed(3));
+    });
+  });
+});
+
+test("the skate tips with the shin: rolled as far as the shin leans in, toe down after the push", function () {
+  eachMoment(function (t) {
+    var r = at(t), lim = St.STRIDE.edgeLimits;
+    var want = M.clamp(r.shin.r.side, lim[0], lim[1]);
+    assert.ok(Math.abs(r.edges.r - want) < 4, "roll " + r.edges.r.toFixed(1) + " but shin " + want.toFixed(1) + " at " + t.toFixed(3));
+  });
+  // Just after the push, the skate trails behind with its toe pointing down.
+  var p = at(0.75).pose, blade = M.sub(p.rToe, p.rHeel);
+  assert.ok(blade.y < -0.05, "toe down after the push");
+  // And the tipped blade never goes under the ice. (Toe and heel are the
+  // bottom of the boot; the steel reaches 3 cm below them.)
+  eachMoment(function (t) {
+    var r = at(t), q = r.pose;
+    ["l", "r"].forEach(function (s) {
+      var lowest = Math.min(q[s + "Toe"].y, q[s + "Heel"].y);
+      assert.ok(lowest > 0.03 * Math.cos(r.edges[s] / DEG) - 0.004, s + " blade under the ice at " + t.toFixed(3));
     });
   });
 });
@@ -142,6 +183,67 @@ test("the free arm swings opposite to the pushing leg", function () {
   var rightPush = at(0.5).pose, leftPush = at(0).pose;
   assert.ok(rightPush.rWrist.x < rightPush.rShoulder.x - 0.1, "right arm back while the right leg pushes");
   assert.ok(leftPush.rWrist.x > leftPush.rShoulder.x + 0.1, "right arm forward while the left leg pushes");
+});
+
+test("the free arm swings back behind the body and forward across the chest", function () {
+  var back = at(0.55).pose, front = at(0.05).pose;
+  // At the back: the upper arm is behind the line of the back (the skater
+  // leans forward, so hanging straight down would still be in front of it),
+  // and the hand is behind the hips, a little out to the side.
+  var hip = M.mid(back.lHip, back.rHip), trunk = M.sub(back.neck, hip), arm = M.sub(back.rElbow, back.rShoulder);
+  var behind = trunk.x * arm.y - trunk.y * arm.x; // which side of the back line the arm is on (side view)
+  assert.ok(behind > 0, "the free arm does not reach behind the line of the back");
+  assert.ok(back.rWrist.x < hip.x - 0.03, "the hand is not behind the hips");
+  assert.ok(back.rWrist.z > back.rShoulder.z, "the hand swings back and out");
+  // At the front: the hand is in front of the shoulder and toward the middle.
+  assert.ok(front.rWrist.x > front.rShoulder.x + 0.25, "the hand is not in front");
+  assert.ok(front.rWrist.z < front.rShoulder.z - 0.08, "the hand does not come across toward the middle");
+  // The shoulders turn with the arm: the free arm's shoulder is ahead when the arm is in front.
+  assert.ok(front.rShoulder.x > front.lShoulder.x && back.rShoulder.x < back.lShoulder.x, "the shoulders do not turn with the arm");
+});
+
+test("the top hand on the stick swings too, the other way from the free hand", function () {
+  var rightPush = at(0.5).pose, leftPush = at(0).pose;
+  // Forward of the hips while the free hand is back, and back while it is in front.
+  var fwd = rightPush.lWrist.x - M.mid(rightPush.lHip, rightPush.rHip).x;
+  var back = leftPush.lWrist.x - M.mid(leftPush.lHip, leftPush.rHip).x;
+  assert.ok(fwd - back > 0.25, "the top hand swings " + (fwd - back).toFixed(2) + " m");
+  // It swings less than the free hand, because the stick drags on the ice.
+  var free = rightPush.rWrist.x - leftPush.rWrist.x;
+  assert.ok(fwd - back < Math.abs(free), "the top hand swings less than the free hand");
+  // And the stick blade stays down on the ice the whole time.
+  eachMoment(function (t) { assert.ok(Math.abs(at(t).pose.stickBlade.y - 0.02) < 1e-9, "blade on the ice at " + t); });
+});
+
+test("the top hand holds the end of the stick in its fist", function () {
+  eachMoment(function (t) {
+    var p = at(t).pose, shaft = M.norm(M.sub(p.stickBlade, p.stickTop));
+    var fist = M.gripPoint(p.lWrist, p.lElbow, shaft);
+    // The shaft goes through the middle of the fist...
+    var rel = M.sub(fist, p.stickTop), along = M.dot(rel, shaft);
+    assert.ok(M.len(M.sub(rel, M.scale(shaft, along))) < 0.01, "the stick misses the fist at " + t);
+    // ...and only the knob sticks out past it.
+    assert.ok(Math.abs(along - M.KNOB_OUT) < 0.01, "knob " + along.toFixed(3) + " at " + t);
+  });
+});
+
+test("a hand wraps around the stick like a real grip", function () {
+  [[M.pt(1, 0, 0), M.pt(0.9, -0.4, 0.1)], [M.pt(0.6, -0.8, 0), M.pt(0.5, -0.85, 0.2)], [M.pt(1, 0, 0), M.pt(1, 0, 0)]].forEach(function (c) {
+    var g = M.gripFrame(c[0], c[1]), shaft = M.norm(c[1]);
+    assert.ok(Math.abs(M.dot(g.fingers, g.knuckles)) < 1e-9, "fingers square to the knuckles");
+    assert.ok(M.angleBetween(g.fingers, c[0]) <= 35 + 1e-6, "the wrist cocks at most 35 degrees");
+    assert.ok(M.dot(g.knuckles, shaft) > 0, "the index finger points down the stick");
+  });
+});
+
+test("in the stance both hands hold the stick", function () {
+  var p = M.makeStancePose({ kneeBend: 110, forwardLean: 45, strideExtension: 171, withStick: true });
+  var shaft = M.norm(M.sub(p.stickBlade, p.stickTop));
+  ["l", "r"].forEach(function (s) {
+    var fist = M.gripPoint(p[s + "Wrist"], p[s + "Elbow"], shaft), rel = M.sub(fist, p.stickTop);
+    var off = M.len(M.sub(rel, M.scale(shaft, M.dot(rel, shaft))));
+    assert.ok(off < 0.03, s + " hand is " + off.toFixed(3) + " m off the stick");
+  });
 });
 
 test("the lean stays close to the target", function () {

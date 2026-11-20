@@ -93,6 +93,24 @@
 
   // ---------- 6. The numbers of ONE push (right leg pushing) ----------
   function knee(p, s) { return M.angleAt(p[s + "Hip"], p[s + "Knee"], p[s + "Ankle"]); }
+  // How bent an elbow is (180 = straight arm). NaN if the arm is missing.
+  function elbow(p, s) {
+    if (!p[s + "Shoulder"] || !p[s + "Elbow"] || !p[s + "Wrist"]) return NaN;
+    return M.angleAt(p[s + "Shoulder"], p[s + "Elbow"], p[s + "Wrist"]);
+  }
+
+  // ---------- Every picture, one by one ---------------------------------
+  // For looking at a clip picture by picture (a 30-pictures-per-second
+  // video has a picture every 1/30 s): the time, both knees, both elbows
+  // and the lean of every pose, rounded to whole degrees.
+  //   returns [[seconds, left knee, right knee, left elbow, right elbow, lean], ...]
+  function everyPicture(frames, times) {
+    return frames.map(function (p, i) {
+      var r = function (v) { return isFinite(v) ? Math.round(v) : null; };
+      return [Math.round(times[i] * 1000) / 1000, r(knee(p, "l")), r(knee(p, "r")), r(elbow(p, "l")), r(elbow(p, "r")),
+              r(M.measurePose(p).forwardLean)];
+    });
+  }
   function numbersOf(steps, seconds) {
     var glide = steps.map(function (p) { return knee(p, "l"); });   // the standing leg
     var push = steps.map(function (p) { return knee(p, "r"); });    // the pushing leg
@@ -143,9 +161,27 @@
       return s.side === "l" ? steps.map(mirrorPose) : steps;
     });
     var each = resampled.map(function (steps, i) { return numbersOf(steps, seconds[i]); });
+    // Elbows: measured on the real arms (not flipped), because a player
+    // holds the stick with the same hand on every push. One push is only
+    // half an arm swing, so we look at two pushes in a row (one whole
+    // swing, forward and back).
+    for (var i = 0; i + 1 < cut.strides.length; i++) {
+      var a = cut.strides[i], b = cut.strides[i + 1];
+      if (b.from - a.to > 2) continue;  // not one right after the other
+      ["l", "r"].forEach(function (side) {
+        var v = [];
+        for (var j = a.from; j <= b.to; j++) { var e = elbow(frames[j], side); if (isFinite(e)) v.push(e); }
+        if (v.length < 4) return;
+        each[i][side + "ElbowMostBent"] = Math.min.apply(null, v);
+        each[i][side + "ElbowStraightest"] = Math.max.apply(null, v);
+      });
+    }
     var numbers = {};
-    Object.keys(each[0]).forEach(function (name) {
-      var values = each.map(function (e) { return e[name]; });
+    var names = {};
+    each.forEach(function (e) { Object.keys(e).forEach(function (k) { names[k] = true; }); }); // every number any push has
+    Object.keys(names).forEach(function (name) {
+      var values = each.map(function (e) { return e[name]; }).filter(function (v) { return isFinite(v); });
+      if (!values.length) return;
       numbers[name] = {
         value: M.percentile(values, 0.5),
         // Half the distance between the low quarter and the high quarter.
@@ -200,7 +236,7 @@
   }
 
   var api = {
-    STEPS: STEPS, splitStrides: splitStrides, resampleStride: resampleStride, mirrorPose: mirrorPose,
+    STEPS: STEPS, splitStrides: splitStrides, resampleStride: resampleStride, mirrorPose: mirrorPose, elbow: elbow, everyPicture: everyPicture,
     averageStrides: averageStrides, numbersOf: numbersOf, measureStride: measureStride,
     pushesFromKnees: pushesFromKnees
   };

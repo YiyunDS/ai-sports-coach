@@ -132,6 +132,10 @@
       S.bones["lowerarm_" + s] = { dir: sub(wrist, elbow), pole: elbows };
       var foot = sub(J["ball_" + s], ankle);
       S.bones["foot_" + s] = { dir: pt(foot.x, 0, foot.z), pole: UP };
+      // The hand: the fingers point from the wrist to the middle knuckle,
+      // and the knuckles run from the little finger to the index finger.
+      var m1 = J["middle_01_" + s], i1 = J["index_01_" + s], p1 = J["pinky_01_" + s];
+      if (m1 && i1 && p1) S.bones["hand_" + s] = { dir: sub(m1, wrist), pole: sub(i1, p1) };
     });
     return S;
   }
@@ -186,6 +190,20 @@
       }
       var f = S.bones["foot_" + s];
       out["foot_" + s] = qMul(turnBetween(f.dir, f.pole, blade, upright), R["foot_" + s]);
+
+      // A hand that holds the stick (its wrist is right next to the
+      // shaft) wraps around it: the shaft crosses the palm, the index
+      // finger toward the blade (see gripFrame in angles.js). A free hand
+      // just follows the forearm.
+      var hb = S.bones["hand_" + s];
+      if (hb && R["hand_" + s] && pose.stickTop && pose.stickBlade) {
+        var shaft = norm(sub(pose.stickBlade, pose.stickTop));
+        var rel = sub(P("Wrist"), pose.stickTop), along = dot(rel, shaft);
+        if (len(sub(rel, scale(shaft, along))) < 0.14 && along > -0.12 && along < 0.7) {
+          var grip = M.gripFrame(sub(P("Wrist"), P("Elbow")), shaft);
+          out["hand_" + s] = qMul(turnBetween(hb.dir, hb.pole, grip.fingers, grip.knuckles), R["hand_" + s]);
+        }
+      }
     });
 
     // Where the pelvis bone starts: from the middle of the hips, turned with them.
