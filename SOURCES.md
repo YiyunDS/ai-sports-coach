@@ -57,6 +57,20 @@ run inside the browser.
 | Pose Landmarker models: heavy (used first), full and lite (backups) | https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker | Apache 2.0 |
 | three.js 0.187.0 with OrbitControls and RoomEnvironment (the 3D drawing code) | https://github.com/mrdoob/three.js | MIT |
 
+## Ideas for the look and the movement of the page
+
+We read these to learn how well-made tools look and move (read on
+2026-11-20). They are ideas we learned from; we copied no code, pictures
+or text from them.
+
+| What we learned | Where it came from |
+|---|---|
+| Movement should usually be shorter than 0.3 seconds, start fast and stop gently, and move only things that are cheap to draw | Emil Kowalski, "Great Animations", https://emilkowal.ski/ui/great-animations |
+| How long each kind of movement takes (a press, a switch, a panel, one longer "main" moment), no bounce, and what "reduce motion" should keep | Impeccable, "animate" reference, https://raw.githubusercontent.com/pbakaus/impeccable/main/skill/reference/animate.md |
+| A report in three layers (one answer, then details, then the raw data), and color only where it means something | 925Studios, "WHOOP Design Breakdown", https://www.925studios.co/blog/whoop-design-breakdown |
+| A dark page looks calm with soft borders and small steps of brightness instead of heavy shadows | Linear, "Behind the latest design refresh", https://linear.app/blog/behind-the-latest-design-refresh |
+| Movement must have a purpose, be short, and never be the only way to learn something | Apple Human Interface Guidelines, "Motion", https://developer.apple.com/design/human-interface-guidelines/motion |
+
 ## Hockey rules used in the Referee game
 
 We wrote the plays and the explanations ourselves. The rules they teach come from these pages (read on 2026-11-19):

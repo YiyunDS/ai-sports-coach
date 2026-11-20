@@ -632,6 +632,100 @@ Limits, stated plainly:
   so it shows the same thing.
 - Checked in a phone-size browser window, not on a real phone.
 
+### Phase 16: A report you read at a glance, and a page that moves (done, first version)
+
+The team leader's note: the page works, but it does not pull you in. We
+looked at how well-made tools do it (links in `SOURCES.md`). What they
+agree on:
+
+- A premium look comes from holding back: a near-black page, thin
+  borders, one action color, and color used only when it means something.
+- Movement is short. A press answers in about 120 ms, a switch in about
+  200 ms, a panel in about 320 ms. Only ONE moment on the page may take
+  longer (about 700 ms): ours is the report appearing.
+- Things arrive fast and settle gently (one "ease-out" curve for the
+  whole page). Nothing bounces.
+- Things you do again and again (dragging the timeline) do not animate.
+- Someone who turned on "reduce motion" on their device gets fades only.
+- A report has three layers: one answer you see at a glance, then the
+  numbers, then how they were measured.
+
+What we found on our page: not one transition in `style.css`, and a
+report that opens with five sentences while "1 of 3 on target" sits in
+a corner.
+
+**Step 1: the report in three layers**
+1. The answer: a ring with "1 / 3 on target", and ONE thing to work on
+   next (the number farthest from its target), plus what already goes
+   well.
+2. The numbers: the three cards, with a thicker ruler.
+3. How it was measured: the long explanation, folded away. Anything
+   that is NOT the skater's own (a standard push, a standard rhythm)
+   stays in plain sight.
+
+**Step 2: the report appears (the one long moment)**
+The ring fills, the numbers count up, the ruler marks slide to their
+place, the cards rise one after another. It plays when the report comes
+into view, so on a phone you see it after scrolling down. When the age
+or level changes, the numbers and marks glide to their new place.
+
+**Step 3: one set of movements for the whole page**
+Buttons press in. The line under the tabs and the lit part of every
+switch slide. A tab's content fades in. Side / Front / Top glides the
+camera instead of jumping. The score in the games gives a small pulse.
+
+**Step 4: surfaces**
+Softer borders, a faint light on top of each panel, a soft glow behind
+the top of the page, quieter headings, bigger numbers.
+
+Rules kept: no library and no server, phone first (375 px, 44 px
+buttons), only `transform` and `opacity` move, all tests pass, new math
+(which number to work on next, the count-up curve) gets tests.
+
+**What was built**
+- `js/ui.js` (new): the sliding light behind every switch and the line
+  under the tabs, the counting numbers, "play it when it is seen", and
+  the score's pulse. Its math is checked by `tests/ui.test.js` (5 tests).
+- `M.nextFocus` in `js/angles.js` picks the one thing to work on next
+  (a red number before a yellow one, then the most degrees to go), with
+  a test in `tests/angles.test.js`.
+- `js/coach.js`: the report's top block (ring, one headline, the other
+  checks in a few words), cards whose numbers, marks and green goals
+  glide, and the long explanation folded under "How the orange skater
+  was made".
+- `js/scene.js`: Side / Front / Top glides the camera around the
+  skaters in 0.45 s; the skaters slide to their spots at the same time.
+  Grabbing the camera or a skater stops the glide.
+- `style.css`: the times and the curve in one place at the top, softer
+  borders, light on top of the panels, a glow behind the top of the
+  page, a new progress bar, and a "reduce motion" section.
+
+**Checked** (sample session, desktop 1280 px and phone 375 px, in a
+test browser; pictures in `docs/screenshots/phase16/`)
+- The entrance waits until the report is on screen, then plays once:
+  the ring fills, 60 -> 150 counts up, the marks slide, the cards rise
+  about 0.07 s apart.
+- A change of age or level: the headline, the ring and the green goals
+  move to the new values; nothing re-enters.
+- No push seen: the ring counts "of 2", the third card says "Not seen",
+  and the line "the push is NOT yours" is in plain sight.
+- All on target: a green ring and "All on target".
+- "Reduce motion": the camera jumps, nothing slides or counts, the
+  report fades in.
+- Phone: no sideways scrolling on any of the four tabs, and nothing you
+  tap is under 44 px.
+- All 12 test files pass.
+
+**Limits, said plainly**
+- Checked in a test browser at phone size, not on a real phone, and not
+  yet with a real video (the report code is the same for both).
+- The entrance was measured in a slow test browser. How it FEELS at
+  full speed has to be judged by eye on a real screen.
+- The Positioning, Game and Referee tabs got the new surfaces, switches
+  and pulses, but their layouts were not redesigned.
+- At phone width the buttons on top of the 3D picture still take two
+  rows (as before).
+
 ### Phase 5: Check the pro against a real skater (needs a video)
 
 - Run a good side-view video of a strong skater through the Phase 1

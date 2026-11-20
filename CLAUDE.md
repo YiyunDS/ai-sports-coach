@@ -8,6 +8,10 @@ team leader) for the Presidential SI Challenge. All work happens on the
 
 - Runs with no server-side code. Video never leaves the computer.
 - Keep the dark, professional analysis-tool look. No emojis, no toy look.
+- Movement on the page follows the rules at the top of `js/ui.js`, with
+  the times and the curve from the top of `style.css` (`--t-press`,
+  `--t-switch`, `--t-panel`, `--ease`). Short, no bounce, only
+  `transform` and `opacity` move, and "reduce motion" gets fades only.
 - Keep code comments in plain language a 3rd grader's parent can read
   aloud with them.
 - Keep all tests passing:
@@ -19,7 +23,8 @@ team leader) for the Presidential SI Challenge. All work happens on the
   `node tests/measure.test.js` (added in Phase 8),
   `node tests/gamesim.test.js` (added in Phase 12),
   `node tests/refplays.test.js` (added in Phase 14),
-  `node tests/rebuild.test.js` (added in Phase 15).
+  `node tests/rebuild.test.js` (added in Phase 15),
+  `node tests/ui.test.js` (added in Phase 16).
   Add tests for new math.
 - Do not break the Positioning tab. The Game tab is a separate game
   (`js/gamesim.js` = rules and chances, `js/game.js` = the page); it
