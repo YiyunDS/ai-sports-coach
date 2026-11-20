@@ -553,6 +553,71 @@ not confirm the exact wording (see `SOURCES.md`). A coach or referee
 should read the explanations once.
 Next idea: "Cut the angle", a goalie geometry game (idea B above).
 
+### Phase 15: The orange skater skates YOUR stride, rebuilt smoothly (done, first version)
+
+The team leader's note: the orange 3D skater still looks bad, because
+not every picture is captured well. Idea: use the pictures we did
+capture to work out how the skater skates, let a smooth 3D skater skate
+that way, and compare THAT with the pro.
+
+Why this is right: the AI reads every picture on its own, so one picture
+is wobbly. The middle value of many pictures is trustworthy. It is the
+same method we use to measure the pro (`js/measure.js`).
+
+- New `js/rebuild.js` (12 tests in `tests/rebuild.test.js`):
+  - THE CLOCK: the moments the skater changes legs give a steady stride
+    clock for the whole clip (one change = half a stride). Flickers and
+    holes are handled; the clock never runs backward. We find where a
+    leg change sits in the model's stride by watching the model with the
+    same leg-change finder.
+  - THE NUMBERS: around every moment, the middle value of knee bend and
+    lean over one stride, and of the nearest pushes. Left and right push
+    are shown apart only when each was seen twice and they differ by 4
+    degrees or more. If you stand taller near the end, it shows.
+  - THE SKATER: `makeStridePose` (the pro's stride builder) with those
+    numbers, on the same clock as the pro.
+- `js/scene.js`: one shared stride clock; the orange skater is drawn
+  right after the pro at the same moment. No elbow signs on the rebuilt
+  skater (its arms are not measured).
+- `js/coach.js` + page: a switch "Smooth stride | As filmed" under the
+  3D picture, and a line in the report that says in words what the
+  orange skater is showing and what is not measured. When the replay
+  ends, both skaters keep striding (a loop) with the report's numbers;
+  the button on the 3D picture starts and stops the loop.
+- Fallbacks: no full push in the clip -> only "As filmed", with the
+  reason. Numbers but no rhythm (fewer than two leg changes) -> the
+  skater strides at an even, standard pace, lined up with the top of a
+  push we did see, and the note says so.
+
+Checked on the test clip (headless Chrome, 1280 x 800; 20 useful
+pictures in 2 pieces, 2.2 to 3.45 s):
+- Rebuilt with knee 131, lean 27, push 180 (the report's numbers).
+- Only one push is seen in those 20 pictures, so the rhythm is NOT
+  found: this clip uses the even, standard pace.
+- Smoothness, drawn 60 times a second: the biggest jump of a knee, an
+  ankle or the neck between two drawn pictures went from 8.4 cm (As
+  filmed) to 3.0 cm (Smooth stride); the usual jump from 1.85 cm to
+  0.41 cm; the right knee changed direction 8 times before, 1 time now.
+Pictures (3D view only): `docs/screenshots/phase15/`. Pictures that
+show the video are in `local-videos/screenshots/phase15/`.
+
+Limits, stated plainly:
+- Smooth stride is a MODEL of how you skate, not a recording. A
+  one-time stumble does not show. That is what "As filmed" is for.
+- Yours: knee bend, lean, push length, rhythm (when found), left and
+  right push (when both are clear). Not yours: the arms, the stick, how
+  the skates tip, and the timing inside one stride (when the push
+  happens). Those are the pro's stride shape.
+- The test clip is too short to find a rhythm, so its smooth skater
+  strides at the standard pace of 2 seconds per stride, which is slower
+  than a real kid. A longer side-view clip (3 or more pushes in a row)
+  is needed to see the rhythm part work on a real video; so far it is
+  proven only on built clips in the tests.
+- The push number of this clip (180) is as straight as a leg can be;
+  the clean-up may be forcing it. The rebuilt skater copies the report,
+  so it shows the same thing.
+- Checked in a phone-size browser window, not on a real phone.
+
 ### Phase 5: Check the pro against a real skater (needs a video)
 
 - Run a good side-view video of a strong skater through the Phase 1
