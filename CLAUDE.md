@@ -18,7 +18,8 @@ team leader) for the Presidential SI Challenge. All work happens on the
   `node tests/retarget.test.js` (added in Phase 6),
   `node tests/measure.test.js` (added in Phase 8),
   `node tests/gamesim.test.js` (added in Phase 12),
-  `node tests/refplays.test.js` (added in Phase 14).
+  `node tests/refplays.test.js` (added in Phase 14),
+  `node tests/rebuild.test.js` (added in Phase 15).
   Add tests for new math.
 - Do not break the Positioning tab. The Game tab is a separate game
   (`js/gamesim.js` = rules and chances, `js/game.js` = the page); it
