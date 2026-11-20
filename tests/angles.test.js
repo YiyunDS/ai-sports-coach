@@ -125,6 +125,25 @@ test("analyzing the pretend kid finds the slips", () => {
   for (const c of Object.keys(rp.summary)) assert.strictEqual(rp.summary[c].grade, "good", c);
 });
 
+test("the report picks ONE thing to work on next: the number farthest from its target", () => {
+  const ids = ["kneeBend", "forwardLean", "strideExtension"];
+  const s = (grade, off) => ({ value: 0, off: off, grade: grade });
+  // Two yellow ones: the one with more degrees to go.
+  assert.strictEqual(M.nextFocus({ kneeBend: s("close", 5), forwardLean: s("close", -9), strideExtension: s("good", 0) }, ids), "forwardLean");
+  // A red one comes before a yellow one, even with fewer degrees.
+  assert.strictEqual(M.nextFocus({ kneeBend: s("close", 9), forwardLean: s("good", 0), strideExtension: s("far", -4) }, ids), "strideExtension");
+  // A tie: the first one in the list.
+  assert.strictEqual(M.nextFocus({ kneeBend: s("close", 5), forwardLean: s("close", -5), strideExtension: s("good", 0) }, ids), "kneeBend");
+  // Everything on target, or a check we could not measure: nothing to pick.
+  assert.strictEqual(M.nextFocus({ kneeBend: s("good", 0), forwardLean: s("good", 0), strideExtension: null }, ids), null);
+  // The pretend kid: it picks one of the two yellow ones, the one with more degrees to go.
+  const target = M.getTarget(targets, 9, "beginner");
+  const r = M.analyzeFrames(M.normalizeFrames(M.makeDemoFrames()), target, targets.yellowZone);
+  const pick = M.nextFocus(r.summary, ids), other = pick === "kneeBend" ? "forwardLean" : "kneeBend";
+  assert.ok(pick === "kneeBend" || pick === "forwardLean", "picked " + pick);
+  assert.ok(Math.abs(r.summary[pick].off) >= Math.abs(r.summary[other].off));
+});
+
 test("js/default-targets.js is the same as targets.json", () => {
   assert.deepStrictEqual(DEFAULTS, targets);
 });

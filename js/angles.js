@@ -111,6 +111,24 @@
     return { value: value, off: off, grade: grade };
   }
 
+  // Which ONE thing should the skater work on next? The check that is
+  // farthest from its target: a red one before a yellow one, and after
+  // that the one with the most degrees to go.
+  //   summary = the report's numbers (see analyzeFrames below)
+  //   ids     = the checks, in the order we show them
+  // Gives back the name of the check (like "kneeBend"), or null when
+  // everything we could measure is on target.
+  function nextFocus(summary, ids) {
+    var best = null, bestSize = 0;
+    ids.forEach(function (id) {
+      var s = summary[id];
+      if (!s || s.grade === "good") return;   // not measured, or already fine
+      var size = (s.grade === "far" ? 1000 : 0) + Math.abs(s.off);
+      if (size > bestSize) { best = id; bestSize = size; }
+    });
+    return best;
+  }
+
   // ---------- Looking at a whole video (many poses) ------------------
 
   function sorted(nums) { return nums.slice().sort(function (a, b) { return a - b; }); }
@@ -998,7 +1016,7 @@
     pt: pt, add: add, sub: sub, scale: scale, dot: dot, cross: cross, len: len,
     norm: norm, mid: mid, lerp: lerp, clamp: clamp,
     angleBetween: angleBetween, angleAt: angleAt, measurePose: measurePose,
-    ageBand: ageBand, getTarget: getTarget, scoreAngle: scoreAngle,
+    ageBand: ageBand, getTarget: getTarget, scoreAngle: scoreAngle, nextFocus: nextFocus,
     percentile: percentile, analyzeFrames: analyzeFrames,
     BODY: BODY, solveTwoBone: solveTwoBone, makeStancePose: makeStancePose, gripPoint: gripPoint, gripFrame: gripFrame, KNOB_OUT: KNOB_OUT,
     MP: MP, mediapipeToPose: mediapipeToPose, poseIsClear: poseIsClear,
