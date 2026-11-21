@@ -743,8 +743,11 @@ details.more p { max-width: 85ch; }
 
   /* THE 3D PICTURE. With a report, it gets smaller and STAYS at the top
      of the screen while you read the report under it. */
-  /* The picture goes from edge to edge of the phone. */
-  .stage-wrap { margin-inline: -16px; border-inline: 0; border-radius: 0; }
+  /* The picture goes from edge to edge of the phone. (It has square
+     corners here, so nothing needs to be cut off at its edge. That also
+     lets the help sheet, which lives inside it, cover the whole screen
+     width in every browser.) */
+  .stage-wrap { margin-inline: -16px; border-inline: 0; border-radius: 0; overflow: visible; }
   .has-report .stage-wrap { position: sticky; top: 0; z-index: 15; }
   .has-report #stage { height: 40vh; min-height: 250px; }
   .stage-top, .stage-bottom { left: 8px; right: 8px; gap: 6px; }
@@ -797,6 +800,8 @@ details.more p { max-width: 85ch; }
   .scorebar { margin-bottom: 0; }
   .score .big { min-width: 46px; font-size: 1.8rem; }
   .score .team { padding: 0 9px; }
+  .score-mid { padding: 4px 6px; letter-spacing: 0.04em; }
+  .score-mid .small { font-size: 0.78rem; }
   .level-row .tool-label, .level-note { display: none; }
   .level-row { justify-content: center; }
   .big { font-size: 2rem; }
