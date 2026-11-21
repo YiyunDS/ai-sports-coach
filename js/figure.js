@@ -520,14 +520,18 @@
 
     // The name sign floats above the head.
     if (this.name) {
-      this.setLabel("name", { x: P.head.x, y: P.head.y + 0.32, z: P.head.z }, this.name, this.nameColor);
+      // (A bigger sign must sit a little higher, or it would touch the helmet.)
+      this.setLabel("name", { x: P.head.x, y: P.head.y + 0.21 + 0.11 * (this.signScale || 1), z: P.head.z }, this.name, this.nameColor);
     }
   };
 
   // Put a floating sign at a spot. id is any name, like "knee".
   // A "sprite" is a flat picture that always turns to face the camera,
   // so you can read it from any side.
-  Figure.prototype.setLabel = function (id, at, text, color) {
+  //   from = (optional) the joint this sign is about. A thin line is
+  //          drawn from the joint to the sign, so the sign can stand
+  //          away from the body and you still see what it belongs to.
+  Figure.prototype.setLabel = function (id, at, text, color, from) {
     if (!this.labelsOn) { this.hide(id); return; }
     var L = this.labels[id];
     if (!L) {
@@ -540,7 +544,29 @@
       sprite.renderOrder = 10; // draw on top of everything
       sprite.layers.set(SIGNS_LAYER);
       this.group.add(sprite);
-      L = this.labels[id] = { canvas: canvas, texture: texture, sprite: sprite, key: "" };
+      L = this.labels[id] = { canvas: canvas, texture: texture, sprite: sprite, key: "", lead: null };
+    }
+    // signScale: scene.js makes the signs bigger when the camera is far away.
+    var size = this.signScale || 1;
+    L.sprite.scale.set(0.46 * size, 0.158 * size, 1);
+    if (from) {
+      if (!L.lead) {
+        var leadGeo = new THREE.BufferGeometry();
+        leadGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(6), 3));
+        L.lead = new THREE.Line(leadGeo, new THREE.LineBasicMaterial({ color: color, transparent: true, opacity: 0.8, depthTest: false, toneMapped: false }));
+        L.lead.renderOrder = 9;   // on top of the body, under the sign itself
+        L.lead.frustumCulled = false;
+        L.lead.layers.set(SIGNS_LAYER);
+        this.group.add(L.lead);
+      }
+      var ends = L.lead.geometry.attributes.position;
+      ends.setXYZ(0, from.x, from.y, from.z);
+      ends.setXYZ(1, at.x, at.y, at.z);
+      ends.needsUpdate = true;
+      L.lead.material.color.set(color);
+      L.lead.visible = true;
+    } else if (L.lead) {
+      L.lead.visible = false;
     }
     // Only repaint the sign when the words or color really changed.
     var key = text + "|" + color + "|" + fontEpoch;
@@ -606,8 +632,26 @@
 
   // Hide a sign or a slice we do not need right now.
   Figure.prototype.hide = function (id) {
-    if (this.labels[id]) this.labels[id].sprite.visible = false;
+    if (this.labels[id]) {
+      this.labels[id].sprite.visible = false;
+      if (this.labels[id].lead) this.labels[id].lead.visible = false;
+    }
     if (this.wedges[id]) this.wedges[id].visible = false;
+  };
+
+  // Make a sign and its slice stronger or fainter.
+  //   k = 1 is normal, a small number is faint. (When you tap a card in
+  //   the report, the sign it is about stays strong and the others fade.)
+  Figure.prototype.setStrength = function (id, k) {
+    var L = this.labels[id], W = this.wedges[id];
+    if (L) {
+      L.sprite.material.opacity = k;
+      if (L.lead) L.lead.material.opacity = 0.8 * k;
+    }
+    if (W) {
+      W.material.opacity = 0.4 * k;
+      W.outline.material.opacity = 0.95 * k;
+    }
   };
 
   // Turn the skater into a see-through blue outline (used for Overlay

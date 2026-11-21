@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#0b0f14">
   <title>AI Sports Coach - 3D Visual Coach</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
-  <link rel="stylesheet" href="style.css?v=16.1">
+  <link rel="stylesheet" href="style.css?v=17.0">
 </head>
 <body>
   <!--
@@ -29,6 +29,7 @@
     js/tracker.js          follows the one skater you clicked through the video
     js/coach.js            reads your video, finds your pose, makes the report
     js/ui.js               the little movements of the page: sliding switches, counting numbers
+    js/chart.js            the curve in the report: the angle in every picture, over the target band
     js/positions.js        the playbook: where each position should stand
     js/board.js            the positioning board you drag your marker on
     js/gamesim.js          the simulation game: the rules and the chances
@@ -45,10 +46,23 @@
         <span class="brand-sub">Skating Lab</span>
       </div>
       <nav class="tabs" aria-label="Sections">
-        <button type="button" data-tab="form" aria-pressed="true">Form analysis</button>
-        <button type="button" data-tab="position" aria-pressed="false">Positioning</button>
-        <button type="button" data-tab="game" aria-pressed="false">Game</button>
-        <button type="button" data-tab="ref" aria-pressed="false">Referee</button>
+        <!-- The little pictures are only shown on a phone, where the tabs sit at the bottom. -->
+        <button type="button" data-tab="form" aria-pressed="true">
+          <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 19h15M4.5 19 14 5.5"/><path d="M11.5 19a7 7 0 0 0-2.3-5.2"/></svg>
+          <span>Form<span class="tab-long"> analysis</span></span>
+        </button>
+        <button type="button" data-tab="position" aria-pressed="false">
+          <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><circle class="solid" cx="12" cy="12" r="2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></svg>
+          <span>Positioning</span>
+        </button>
+        <button type="button" data-tab="game" aria-pressed="false">
+          <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3.5 13.6 16c.5 1.2 1.4 1.8 2.7 1.8h4.2"/><ellipse class="solid" cx="6.5" cy="18.6" rx="2.9" ry="1.4"/></svg>
+          <span>Game</span>
+        </button>
+        <button type="button" data-tab="ref" aria-pressed="false">
+          <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="15" cy="14" r="5.5"/><path d="M15 8.5H3v4h6.6"/><path d="M12.5 3.5v2M16.5 4l-.8 1.8"/></svg>
+          <span>Referee</span>
+        </button>
       </nav>
       <div class="bar-meta">Team PHL</div>
     </div>
@@ -67,32 +81,73 @@
           <button type="button" data-view="top">Top</button>
         </div>
         <div class="stage-top-right">
-          <button type="button" id="angles-btn" class="ghost-btn" aria-pressed="true" title="Show or hide the angle signs">Angles</button>
           <button type="button" id="stride-btn" class="ghost-btn" aria-pressed="false">Play stride</button>
+          <button type="button" id="help-btn" class="ghost-btn round" data-pop="help-pop" aria-expanded="false" aria-controls="help-pop"
+                  aria-label="Reading the view, and what to show">?</button>
         </div>
       </div>
-      <div class="stage-bottom">
-        <div class="tool">
-          <span class="tool-label">Compare</span>
-          <div class="seg" role="group" aria-label="How to compare the two skaters">
-            <button type="button" data-compare="side" aria-pressed="true" disabled>Side by side</button>
-            <button type="button" data-compare="overlay" aria-pressed="false" disabled>Overlay</button>
+      <!-- The help box: what the colors and the words mean, and what to show. -->
+      <div id="help-pop" class="popover" role="dialog" aria-label="Reading the view" hidden>
+        <div class="pop-head">
+          <h2>Reading the view</h2>
+          <button type="button" class="flat-btn" data-pop-close>Close</button>
+        </div>
+        <ul class="legend">
+          <li><span class="dot good"></span>In the target range</li>
+          <li><span class="dot close"></span>Close to the target</li>
+          <li><span class="dot far"></span>Outside the target</li>
+        </ul>
+        <dl class="glossary">
+          <dt>Knee</dt><dd>Angle at the glide knee. A smaller number means a deeper bend and more power.</dd>
+          <dt>Lean</dt><dd>How far the back tips forward from straight up.</dd>
+          <dt>Push</dt><dd>Angle of the pushing leg at the end of each push. Close to 180° is a full extension.</dd>
+        </dl>
+        <h3>Show</h3>
+        <label class="tick"><input type="checkbox" id="angles-on" checked> Angle signs</label>
+        <label class="tick"><input type="checkbox" id="elbows-on"> Elbow angles too</label>
+        <h3>Move the view</h3>
+        <p class="small">Drag the ice to turn the camera. Scroll or pinch to zoom. Drag a skater to move it. Tap a card in the report to look at that joint.</p>
+      </div>
+      <!-- The start: shown until a video or the sample is chosen. -->
+      <div id="start-card" class="start-card">
+        <div class="start-text">
+          <div class="eyebrow">Start here</div>
+          <p class="start-main">Compare your stride with the pro</p>
+          <p class="small">Your video stays on this device. It is never uploaded.</p>
+        </div>
+        <div class="start-go">
+          <button type="button" id="start-video" class="primary">Use your video</button>
+          <button type="button" id="start-demo">Try the sample</button>
+        </div>
+      </div>
+      <!-- One bar with the tools for comparing (appears when there are two skaters). -->
+      <div class="stage-bottom" id="stage-tools" hidden>
+        <div class="toolbar" id="toolbar">
+          <div class="tool">
+            <span class="tool-label">Compare</span>
+            <div class="seg" role="group" aria-label="How to compare the two skaters">
+              <button type="button" data-compare="side" aria-pressed="true" disabled>Side by side</button>
+              <button type="button" data-compare="overlay" aria-pressed="false" disabled>Overlay</button>
+            </div>
           </div>
-        </div>
-        <div class="tool" id="kid-tool" hidden>
-          <span class="tool-label">You</span>
-          <div class="seg" role="group" aria-label="How the orange skater moves">
-            <button type="button" data-kid="smooth" aria-pressed="true" title="Your stride, rebuilt smoothly from all the good pictures">Smooth stride</button>
-            <button type="button" data-kid="filmed" aria-pressed="false" title="The poses the AI saw, picture by picture">As filmed</button>
+          <div class="tool extra" id="kid-tool" hidden>
+            <span class="tool-label">You</span>
+            <div class="seg" role="group" aria-label="How the orange skater moves">
+              <button type="button" data-kid="smooth" aria-pressed="true" title="Your stride, rebuilt smoothly from all the good pictures">Smooth stride</button>
+              <button type="button" data-kid="filmed" aria-pressed="false" title="The poses the AI saw, picture by picture">As filmed</button>
+            </div>
           </div>
+          <div class="tool extra">
+            <label class="tool-label" for="gap">Spacing</label>
+            <input type="range" id="gap" min="1" max="5" step="0.1" value="2.5" disabled>
+            <output id="gap-out" for="gap">2.5 m</output>
+          </div>
+          <div class="tool extra">
+            <button type="button" id="reset-pos" class="flat-btn" title="Put the skaters and the camera back">Reset</button>
+          </div>
+          <!-- On a phone the bar shows only "Compare"; this button opens the rest. -->
+          <button type="button" id="tools-more" class="flat-btn more-btn" aria-expanded="false">More</button>
         </div>
-        <div class="tool">
-          <label class="tool-label" for="gap">Spacing</label>
-          <input type="range" id="gap" min="1" max="5" step="0.1" value="2.5" disabled>
-          <output id="gap-out" for="gap">2.5 m</output>
-        </div>
-        <button type="button" id="reset-pos" class="ghost-btn">Reset positions</button>
-        <span class="hint">Drag a skater to move it &middot; drag the ice to orbit &middot; scroll to zoom</span>
       </div>
     </section>
 
@@ -106,10 +161,6 @@
           </label>
           <div id="file-name" class="small">No video selected</div>
           <div class="small">Best results: filmed from the side, close enough that the skater fills a good part of the frame.</div>
-        </div>
-        <div class="field">
-          <span class="field-label">Skater to follow</span>
-          <div id="seed-info" class="small">Choose a video, then click the skater in it.</div>
         </div>
         <div class="field row">
           <label for="age">Age</label>
@@ -126,10 +177,8 @@
           </div>
         </fieldset>
         <div class="go">
-          <button type="button" id="analyze-btn" class="primary" disabled>Analyze video</button>
           <button type="button" id="demo-btn">Load sample session</button>
         </div>
-        <div id="progress" hidden><progress id="progress-bar" max="1"></progress></div>
         <p id="status" class="status" role="status" aria-live="polite"></p>
       </section>
 
@@ -155,24 +204,10 @@
           </label>
         </details>
       </section>
-
-      <section class="panel">
-        <h2>Reading the view</h2>
-        <ul class="legend">
-          <li><span class="dot good"></span>In the target range</li>
-          <li><span class="dot close"></span>Close to the target</li>
-          <li><span class="dot far"></span>Outside the target</li>
-        </ul>
-        <dl class="glossary">
-          <dt>Knee</dt><dd>Angle at the glide knee. A smaller number means a deeper bend and more power.</dd>
-          <dt>Lean</dt><dd>How far the back tips forward from straight up.</dd>
-          <dt>Push</dt><dd>Angle of the pushing leg at the end of each push. Close to 180° is a full extension.</dd>
-        </dl>
-      </section>
     </aside>
 
     <!-- The report (appears after a session is analyzed) -->
-    <section class="report">
+    <section class="report" id="report">
       <!-- The video, with the tracking drawn on top (appears when a video is chosen) -->
       <section id="video-panel" class="panel video-panel" hidden>
         <div class="results-head">
@@ -189,6 +224,27 @@
           <output id="pick-out" for="pick-time" class="num">0.0 s</output>
         </div>
         <p class="small">Slide to a frame where the skater is easy to see, then click the middle of the skater's body. The coach follows that one skater through the clip, and draws what it sees here so you can check it.</p>
+        <div class="go analyze-row">
+          <!-- While the coach reads the video, this button fills up like a bar. -->
+          <button type="button" id="analyze-btn" class="primary work" disabled><span class="work-fill" aria-hidden="true"></span><span id="analyze-label" class="work-label">Analyze video</span></button>
+          <span id="seed-info" class="small">Click the skater in the video.</span>
+        </div>
+        <!-- The same words as the status line in the Session panel, next to the button. -->
+        <p id="video-status" class="status" aria-hidden="true"></p>
+      </section>
+      <!-- While the coach reads the video: the steps it goes through, and the shape of the report to come. -->
+      <section id="loading" class="panel loading" hidden>
+        <h2>Reading your video</h2>
+        <ol id="steps" class="steps">
+          <li data-step="load"><span class="step-mark" aria-hidden="true"></span><span>Getting the pose finder ready</span></li>
+          <li data-step="find"><span class="step-mark" aria-hidden="true"></span><span>Finding the skater you clicked</span></li>
+          <li data-step="follow"><span class="step-mark" aria-hidden="true"></span><span>Following the skater through the video <span id="step-percent" class="num"></span></span></li>
+          <li data-step="measure"><span class="step-mark" aria-hidden="true"></span><span>Measuring the angles and rebuilding the stride</span></li>
+        </ol>
+        <div class="skeleton" aria-hidden="true">
+          <div class="sk-verdict"><i class="sk-ring"></i><div class="sk-lines"><i></i><i></i><i></i></div></div>
+          <div class="sk-cards"><i></i><i></i><i></i></div>
+        </div>
       </section>
       <section id="results" class="panel" hidden>
         <h2>Session report</h2>
@@ -241,17 +297,19 @@
             <button type="button" id="worst-btn">Jump to biggest slip</button>
             <span id="frame-info" class="small num"></span>
           </div>
-          <div class="timeline-wrap">
-            <div class="timeline-names" aria-hidden="true"><span>Knee</span><span>Lean</span><span>Push</span></div>
-            <canvas id="timeline" tabindex="0" role="slider" aria-label="Replay timeline. Use the left and right arrow keys to step through frames."></canvas>
+          <div class="curve-head">
+            <div class="seg" role="group" aria-label="What the curve shows">
+              <button type="button" data-curve="kneeBend" aria-pressed="true">Knee</button>
+              <button type="button" data-curve="forwardLean" aria-pressed="false">Lean</button>
+              <button type="button" data-curve="strideExtension" aria-pressed="false">Push</button>
+            </div>
+            <span id="curve-key" class="small curve-key"></span>
           </div>
-          <p class="small">Each block is one frame of the session. Click or drag to scrub. The Push row is graded only at the top of each stride.</p>
+          <div id="curve" class="curve" tabindex="0" role="slider"
+               aria-label="Replay. The line is the angle in every picture of the session. Use the left and right arrow keys to step through the pictures."></div>
+          <p id="curve-note" class="small"></p>
         </div>
       </section>
-      <div class="panel report-empty">
-        <h2>Session report</h2>
-        <p>No session yet. Analyze a skating video, or load the sample session, to see knee bend, forward lean and stride extension graded frame by frame against the target for the skater's age.</p>
-      </div>
     </section>
   </main>
 
@@ -323,12 +381,12 @@
   <main id="view-game" class="layout pos-layout game-layout" hidden>
     <section class="board-wrap" aria-label="Simulation game">
       <div class="scorebar" role="status" aria-live="polite">
-        <div class="score"><span class="team">US</span><span id="game-us" class="num big">0</span></div>
+        <div class="score us"><span class="team">US</span><span id="game-us" class="num big">0</span></div>
         <div class="score-mid">
           <span id="game-info" class="small"></span>
           <span id="game-tally" class="small num"></span>
         </div>
-        <div class="score"><span id="game-them" class="num big">0</span><span class="team">THEM</span></div>
+        <div class="score them"><span id="game-them" class="num big">0</span><span class="team">THEM</span></div>
       </div>
       <svg id="game-rink" viewBox="0 0 200 85" role="group" tabindex="0"
            aria-label="The whole rink seen from above. Without the puck, drag your marker or use the arrow keys, then press Enter."></svg>
@@ -377,7 +435,10 @@
           <button type="button" id="game-call" hidden>Call for a pass</button>
           <label class="inline"><input type="checkbox" id="game-hint"> Show my best spot</label>
         </div>
-        <div id="game-result" class="pos-result" role="status" aria-live="polite" hidden></div>
+        <div id="game-result" class="pos-result call-result" role="status" aria-live="polite" hidden>
+          <div id="game-result-kind" class="eyebrow"></div>
+          <p id="game-result-text" class="result-main"></p>
+        </div>
         <div id="game-spot" class="pos-result" hidden>
           <div class="pos-result-head">
             <span id="game-spot-grade" class="chip"></span>
@@ -398,12 +459,22 @@
   <main id="view-ref" class="layout pos-layout game-layout" hidden>
     <section class="board-wrap" aria-label="You make the call">
       <div class="scorebar" role="status" aria-live="polite">
-        <div class="score"><span class="team">RIGHT</span><span id="ref-right" class="num big">0</span></div>
+        <div class="score us"><span class="team">RIGHT</span><span id="ref-right" class="num big">0</span></div>
         <div class="score-mid">
           <span id="ref-info" class="small"></span>
           <span id="ref-streak" class="small num"></span>
         </div>
-        <div class="score"><span id="ref-total" class="num big">0</span><span class="team">PLAYS</span></div>
+        <div class="score plain"><span id="ref-total" class="num big">0</span><span class="team">PLAYS</span></div>
+      </div>
+      <!-- The level switch sits above the rink, so the answer sheet never covers it. -->
+      <div class="level-row">
+        <span class="tool-label">Level</span>
+        <div class="seg" role="group" aria-label="Level">
+          <button type="button" data-rlevel="1">1 Rookie</button>
+          <button type="button" data-rlevel="2">2 Linesman</button>
+          <button type="button" data-rlevel="3">3 Pro</button>
+        </div>
+        <span id="ref-level-note" class="small level-note"></span>
       </div>
       <p id="ref-banner" class="ref-banner" hidden>Blue is killing a penalty: one skater short</p>
       <svg id="ref-rink" viewBox="0 0 200 85" role="img" aria-label="A short hockey play seen from above. The blue team attacks."></svg>
@@ -423,27 +494,15 @@
           <button type="button" class="call" data-call="icing" disabled>Icing</button>
           <button type="button" class="call" data-call="ok" disabled>Good play</button>
         </div>
-        <div id="ref-result" class="pos-result" role="status" aria-live="polite" hidden>
-          <div class="pos-result-head">
-            <span id="ref-verdict" class="chip"></span>
-            <span id="ref-answer" class="num"></span>
-          </div>
+        <div id="ref-result" class="pos-result call-result" role="status" aria-live="polite" hidden>
+          <div id="ref-verdict" class="eyebrow"></div>
+          <p id="ref-answer" class="result-main"></p>
           <p id="ref-why"></p>
         </div>
         <div class="go">
           <button type="button" id="ref-next" class="primary">Start</button>
           <button type="button" id="ref-again" disabled>Watch again</button>
         </div>
-      </section>
-
-      <section class="panel">
-        <h2>Level</h2>
-        <div class="seg" role="group" aria-label="Level">
-          <button type="button" data-rlevel="1">1 Rookie</button>
-          <button type="button" data-rlevel="2">2 Linesman</button>
-          <button type="button" data-rlevel="3">3 Pro</button>
-        </div>
-        <p id="ref-level-note" class="small"></p>
       </section>
 
       <section class="panel">
@@ -473,13 +532,13 @@
   <script type="module">
     // Our own code, in the order it needs to load.
     var OURS = ["js/angles.js", "js/stride.js", "js/measure.js", "js/rebuild.js", "js/retarget.js", "js/tracker.js", "js/default-targets.js",
-                "js/skate.js", "js/figure.js", "js/rigged-figure.js", "js/scene.js", "js/ui.js", "js/coach.js", "js/positions.js", "js/board.js", "js/rink.js", "js/gamesim.js", "js/game.js",
+                "js/skate.js", "js/figure.js", "js/rigged-figure.js", "js/ui.js", "js/scene.js", "js/chart.js", "js/coach.js", "js/positions.js", "js/board.js", "js/rink.js", "js/gamesim.js", "js/game.js",
                 "js/refplays.js", "js/ref.js"];
     // Our files belong together: a new coach.js with an old scene.js (kept
     // by the browser from an earlier visit) does not work. This number
     // goes on the end of every file's address, so after an update the
     // browser fetches all of them fresh. RAISE IT whenever a .js file changes.
-    var VERSION = "16.1";
+    var VERSION = "17.0";
     // Load one of our .js files and wait until it has run.
     function load(src) {
       return new Promise(function (done, fail) {

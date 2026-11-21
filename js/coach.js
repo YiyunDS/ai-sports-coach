@@ -10,7 +10,8 @@
 //    3. We measure your angles (the math is in angles.js).
 //    4. We compare them with the goal numbers from targets.json.
 //    5. The orange 3D skater copies your pose. Joints turn
-//       green / yellow / red, and the replay shows where form slips.
+//       green / yellow / red, and the replay's curve shows where form
+//       slips. Tap a card in the report and the 3D view goes to that joint.
 //
 //  Your video never leaves your computer. All of this runs in the
 //  browser. (The page only downloads the AI itself from the internet.)
@@ -59,9 +60,10 @@
   // The three checks, with the words we show for each one.
   //   tip   = the advice on the card
   //   short = the same advice in a few words, for the top of the report
+  //   line  = what the curve in the replay shows for this check
   var CHECKS = [
     {
-      id: "kneeBend", name: "Knee bend", low: 60, high: 180,
+      id: "kneeBend", name: "Knee bend", low: 60, high: 180, line: "your knee angle",
       short: function (off) {
         return off > 0 ? "Bend your knees about " + off + "° more" : "Come up about " + (-off) + "°, your bend is very deep";
       },
@@ -72,7 +74,7 @@
       }
     },
     {
-      id: "forwardLean", name: "Forward lean", low: 0, high: 90,
+      id: "forwardLean", name: "Forward lean", low: 0, high: 90, line: "your forward lean",
       short: function (off) {
         return off < 0 ? "Lean your chest forward about " + (-off) + "° more" : "Lift your chest about " + off + "°";
       },
@@ -83,7 +85,7 @@
       }
     },
     {
-      id: "strideExtension", name: "Stride extension", low: 90, high: 180,
+      id: "strideExtension", name: "Stride extension", low: 90, high: 180, line: "the angle of your pushing leg",
       short: function (off) {
         return off < 0 ? "Straighten the pushing leg about " + (-off) + "° more" : "Keep a slight bend at the end of the push";
       },
@@ -100,8 +102,10 @@
   function $(id) { return document.getElementById(id); }
   var el = {
     videoFile: $("video-file"), fileName: $("file-name"), age: $("age"),
-    analyze: $("analyze-btn"), demo: $("demo-btn"), progress: $("progress"),
-    progressBar: $("progress-bar"), status: $("status"), refMode: $("ref-mode"),
+    analyze: $("analyze-btn"), analyzeLabel: $("analyze-label"), demo: $("demo-btn"),
+    status: $("status"), videoStatus: $("video-status"), refMode: $("ref-mode"),
+    loading: $("loading"), steps: $("steps"), stepPercent: $("step-percent"),
+    view: $("view-form"), report: $("report"), startVideo: $("start-video"), startDemo: $("start-demo"),
     targetInfo: $("target-info"), targetsFile: $("targets-file"),
     results: $("results"), cards: $("cards"), preview: $("preview"),
     verdict: $("verdict"), ring: $("ring"), ringFill: $("ring-fill"), ringCount: $("ring-count"), ringTotal: $("ring-total"),
@@ -111,8 +115,10 @@
     qualityMore: $("quality-more"), qualityLong: $("quality-long"),
     kidTool: $("kid-tool"), kidNote: $("kid-note"), kidMore: $("kid-more"), kidLong: $("kid-long"),
     play: $("play-btn"), speed: $("speed"), worst: $("worst-btn"),
-    frameInfo: $("frame-info"), timeline: $("timeline")
+    frameInfo: $("frame-info"), curve: $("curve"), curveKey: $("curve-key"), curveNote: $("curve-note")
   };
+  // The curve in the replay (chart.js draws it).
+  var curve = window.CoachChart && el.curve ? new window.CoachChart.Curve(el.curve) : null;
 
   // Everything the coach remembers while the page is open.
   var state = {
@@ -134,6 +140,9 @@
     shown: null,      // the numbers the report cards show now (so they can glide to new ones)
     reveal: null,     // what must move when the waiting report is seen (numbers, marks, the ring)
     stopWatching: null, // calls off the wait for the report to be seen
+    stopCurve: null,  // calls off the wait for the curve to be seen
+    curve: "kneeBend",// which check the curve in the replay shows
+    focus: null,      // the check whose card you tapped: the 3D view looks at that joint (or null)
     index: 0,         // which pose we are showing now
     playing: false,
     playClock: 0,
@@ -144,7 +153,12 @@
   // Lets us look inside from the browser's console while testing.
   window.CoachState = state;
 
-  function say(text) { el.status.textContent = text; }
+  // Say something in the status line (and in its twin next to the video,
+  // so you also see it there on a phone).
+  function say(text) {
+    el.status.textContent = text;
+    if (el.videoStatus) el.videoStatus.textContent = text;
+  }
 
   // ---------- Settings: age, level, targets --------------------------
 
@@ -195,7 +209,7 @@
       state.rebuilt = Rb ? Rb.build(state.frames, state.times, state.rhythm, state.analysis, { standardPush: target.strideExtension.min }) : null;
       showKidMode();
       drawCards(target);
-      drawTimeline();
+      drawCurve();
       // (While the replay is playing, the next tick redraws by itself.
       //  Redrawing here would make the video jump back a little.)
       // If the skaters were striding in the loop, they keep striding.
@@ -261,13 +275,14 @@
       var part = Math.asin(Math.sqrt(M.clamp(push / r.peak, 0, 1))) / Math.PI;
       C.setSync({ push: push, side: r.side, phase: r.rising ? part : 1 - part, stride: r.stride });
     }
-    el.timeline.setAttribute("aria-valuenow", String(i + 1));
-    el.timeline.setAttribute("aria-valuemin", "1");
-    el.timeline.setAttribute("aria-valuemax", String(n));
+    el.curve.setAttribute("aria-valuenow", String(i + 1));
+    el.curve.setAttribute("aria-valuemin", "1");
+    el.curve.setAttribute("aria-valuemax", String(n));
 
     var now = blend > 0 ? M.lerpNum(state.times[i], state.times[i + 1], blend) : state.times[i];
-    el.frameInfo.textContent = "Frame " + (i + 1) + " / " + n + "  ·  " + now.toFixed(1) + " s";
-    drawTimeline();
+    var info = "Frame " + (i + 1) + " / " + n + "  ·  " + now.toFixed(1) + " s";
+    if (el.frameInfo.textContent !== info) el.frameInfo.textContent = info;
+    if (curve) curve.cursor(i, blend);   // the marker on the curve
 
     // Show the same moment in the video, with what the AI saw drawn on top.
     if (state.hasVideo) {
@@ -525,6 +540,12 @@
       }
       var card = make("div", "check " + s.grade + (fresh ? " enter" : ""));
       card.style.setProperty("--i", n);   // which card this is: the later ones rise a moment later
+      // The card is also a button: tap it and the 3D view goes to that joint.
+      card.setAttribute("role", "button");
+      card.tabIndex = 0;
+      card.setAttribute("data-check", check.id);
+      card.setAttribute("aria-label", check.name + ": " + Math.round(s.value) + " degrees, " + GRADE_WORDS[s.grade].toLowerCase() +
+        ". Show this on the skater.");
       var head = make("div", "check-head");
       head.appendChild(make("span", "check-name", check.name));
       head.appendChild(make("span", "chip", GRADE_WORDS[s.grade]));
@@ -550,6 +571,7 @@
       card.appendChild(ruler);
 
       card.appendChild(make("p", "tip", check.tip(Math.round(s.off))));
+      card.appendChild(make("span", "check-look"));
       el.cards.appendChild(card);
 
       // Where the mark and the number START: at the low end for a new
@@ -572,6 +594,7 @@
       now[check.id] = { spot: spot, value: value, zoneLeft: zoneLeft, zoneWide: zoneWide };
     });
     state.shown = now;
+    lightCards();
 
     function go() { movers.forEach(function (move) { move(); }); }
     if (!fresh) {
@@ -595,66 +618,104 @@
     }
   }
 
-  // ---------- The replay timeline --------------------------------------
-  // Three colored stripes. Each little block is one moment of the video.
-  //   stripe 1 = knee bend, stripe 2 = forward lean,
-  //   stripe 3 = the pushes (only colored at the top of each push)
-
-  var ROW_H = 22, ROW_GAP = 4;
-
-  function drawTimeline() {
-    if (!state.analysis) return;
-    var canvas = el.timeline, frames = state.analysis.perFrame, n = frames.length;
-    var dpr = window.devicePixelRatio || 1;
-    var w = canvas.clientWidth || 600, h = 3 * ROW_H + 2 * ROW_GAP;
-    if (canvas.width !== Math.round(w * dpr)) canvas.width = Math.round(w * dpr);
-    if (canvas.height !== Math.round(h * dpr)) canvas.height = Math.round(h * dpr);
-    var g = canvas.getContext("2d");
-    g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    g.clearRect(0, 0, w, h);
-    var cell = w / n;
-    for (var i = 0; i < n; i++) {
-      var f = frames[i], x = i * cell;
-      var rows = [
-        COLORS[f.scores.kneeBend.grade],
-        COLORS[f.scores.forwardLean.grade],
-        pushAt(i) ? COLORS[pushAt(i).scores.strideExtension.grade] : COLORS.none
-      ];
-      for (var r = 0; r < 3; r++) {
-        g.fillStyle = rows[r];
-        g.fillRect(x, r * (ROW_H + ROW_GAP), Math.ceil(cell), ROW_H);
-      }
-      // Moments NOT seen from the side are dimmed: their knee and lean
-      // numbers are rough, and the summary does not use them.
-      if (state.analysis.sideOn && !f.m.fromPicture) {
-        g.fillStyle = "rgba(11,15,20,0.62)";
-        g.fillRect(x, 0, Math.ceil(cell), 2 * ROW_H + ROW_GAP);
-      }
-    }
-    // A dark line wherever moments were left out in between.
-    g.fillStyle = "#0b0f14";
-    for (var k = 1; k < n; k++) {
-      if (state.times[k] - state.times[k - 1] > HOLE) g.fillRect(Math.round(k * cell) - 2, 0, 4, h);
-    }
-    // A bright box around the moment we are showing now.
-    g.strokeStyle = "#ffffff"; g.lineWidth = 2;
-    g.strokeRect(state.index * cell + 1.5, 1.5, Math.max(cell - 3, 3), h - 3);
+  // ---------- Tap a card: look at that joint ----------------------------
+  // Tapping a card does three things at once: the card lights up, the
+  // 3D camera glides to that joint (the other signs fade), and the
+  // curve in the replay shows that same number. Tap it again (or pick
+  // Side, Front or Top) to see the whole skaters again.
+  function lightCards() {
+    Array.prototype.forEach.call(el.cards.querySelectorAll("[data-check]"), function (card) {
+      var on = card.getAttribute("data-check") === state.focus;
+      card.setAttribute("aria-pressed", String(on));
+      card.querySelector(".check-look").textContent = on ? "Showing on the skater" : "Show on the skater";
+    });
   }
+  function setFocus(id) {
+    state.focus = id;
+    lightCards();
+    if (id && state.curve !== id) pickCurve(id);
+    C.focus(id);
+  }
+  function cardOf(ev) { return ev.target.closest ? ev.target.closest("[data-check]") : null; }
+  el.cards.addEventListener("click", function (ev) {
+    var card = cardOf(ev);
+    if (!card || !state.frames) return;
+    var id = card.getAttribute("data-check");
+    setFocus(state.focus === id ? null : id);
+  });
+  // Enter or the space bar press the card, like any button.
+  el.cards.addEventListener("keydown", function (ev) {
+    if (ev.key !== "Enter" && ev.key !== " ") return;
+    var card = cardOf(ev);
+    if (!card) return;
+    ev.preventDefault();
+    card.click();
+  });
+  // The 3D view ended the close look by itself (you picked Side, Front or Top).
+  C.onFocus = function () { state.focus = null; lightCards(); };
 
-  // Click or drag on the timeline to jump to that moment.
-  function timelineJump(ev) {
-    if (!state.frames || state.busy) return;
-    var box = el.timeline.getBoundingClientRect();
-    var part = (ev.clientX - box.left) / Math.max(1, box.width);
+  // ---------- The replay's curve ----------------------------------------
+  // One line: the angle in every picture of the session, over a green
+  // band (the target for this age). The switch above it picks which of
+  // the three numbers it shows. chart.js does the drawing.
+
+  var curveButtons = document.querySelectorAll("[data-curve]");
+
+  function drawCurve() {
+    if (!state.analysis || !curve) return;
+    var id = state.curve, frames = state.analysis.perFrame, range = state.target[id];
+    var check = CHECKS.filter(function (c) { return c.id === id; })[0];
+    var push = id === "strideExtension";
+    // The top of each push, with its grade.
+    var peaks = [];
+    frames.forEach(function (f, i) { if (f.isPeak) peaks.push({ i: i, grade: f.scores.strideExtension.grade }); });
+    // Moments NOT seen from the side: their knee and lean numbers are
+    // rough, and the summary does not use them. They are faded.
+    var rough = !push && state.analysis.sideOn ? frames.map(function (f) { return !f.m.fromPicture; }) : null;
+    var anyRough = !!rough && rough.some(function (r) { return r; });
+    curve.set({
+      values: frames.map(function (f) { return push ? f.m.strideExtension : f.scores[id].value; }),
+      times: state.times, hole: HOLE, range: range, zone: state.targets.yellowZone,
+      // The push leg is only graded at the top of each push, so its line
+      // is plain and only the dots have a color.
+      graded: !push, rough: anyRough ? rough : null, peaks: peaks, peaksOnLine: push
+    });
+    curve.cursor(state.index, 0);
+    Array.prototype.forEach.call(curveButtons, function (b) {
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-curve") === id));
+    });
+    el.curveKey.textContent = "Green band: the target, " + rangeText(range);
+    el.curveNote.textContent = "The line is " + check.line + " in every picture. " +
+      (push ? "Only the top of each push is graded: the dots should reach the green band. "
+            : "Inside the green band is on target. ") +
+      "Drag along the curve to move through the session." +
+      (peaks.length && !push ? " The small marks along the bottom are the top of each push." : "") +
+      (anyRough ? " The faded parts were not seen from the side, so they are rougher." : "");
+  }
+  // Show another number on the curve. The line draws itself again.
+  function pickCurve(id) {
+    state.curve = id;
+    if (curve && state.analysis && !state.stopCurve) curve.shut();
+    drawCurve();
+    if (curve && state.analysis && !state.stopCurve) curve.open();
+  }
+  Array.prototype.forEach.call(curveButtons, function (b) {
+    b.addEventListener("click", function () { pickCurve(b.getAttribute("data-curve")); });
+  });
+
+  // Click or drag on the curve to jump to that moment.
+  function curveJump(ev) {
+    if (!state.frames || state.busy || !curve) return;
     setPlaying(false);
-    showFrame(Math.floor(part * state.frames.length));
+    showFrame(curve.indexFrom(ev));
   }
   var dragging = false;
-  el.timeline.addEventListener("pointerdown", function (ev) { dragging = true; timelineJump(ev); });
-  el.timeline.addEventListener("pointermove", function (ev) { if (dragging) timelineJump(ev); });
+  el.curve.addEventListener("pointerdown", function (ev) { dragging = true; curveJump(ev); });
+  el.curve.addEventListener("pointermove", function (ev) { if (dragging) curveJump(ev); });
   window.addEventListener("pointerup", function () { dragging = false; });
+  window.addEventListener("pointercancel", function () { dragging = false; });
   // Arrow keys work too.
-  el.timeline.addEventListener("keydown", function (ev) {
+  el.curve.addEventListener("keydown", function (ev) {
     if (!state.frames || state.busy) return;
     if (ev.key === "ArrowLeft" || ev.key === "ArrowRight") {
       ev.preventDefault();
@@ -662,7 +723,14 @@
       showFrame(state.index + (ev.key === "ArrowRight" ? 1 : -1));
     }
   });
-  window.addEventListener("resize", drawTimeline);
+  // The curve is drawn to fit its box, so it is drawn again when the box changes size.
+  var curveWide = 0;
+  function fitCurve() {
+    var wide = el.curve.clientWidth;
+    if (wide && wide !== curveWide) { curveWide = wide; drawCurve(); }
+  }
+  if (window.ResizeObserver) new ResizeObserver(fitCurve).observe(el.curve);
+  window.addEventListener("resize", fitCurve);
 
   // ---------- Playing the replay ---------------------------------------
 
@@ -779,12 +847,43 @@
     state.track = track || null;
     state.index = 0;
     if (!hasVideo) { el.qualityNote.hidden = true; el.qualityMore.hidden = true; clearOverlay(); }
+    // The report goes ABOVE the video now: the answer comes first.
+    el.report.insertBefore(el.results, el.report.firstChild);
     el.results.hidden = false;
+    // (These two words tell style.css how to lay out the page: with a
+    //  report, a phone keeps a smaller 3D picture on top while you read.)
+    el.view.classList.add("has-session", "has-report");
     state.awaitReveal = true;   // a new report: it makes its entrance when it is seen
     state.shown = null;
+    state.focus = null;
     C.layout(true);
     refresh();
+    // The curve starts on the number to work on next. Its line draws
+    // itself when the curve is seen.
+    var first = M.nextFocus(state.analysis.summary, CHECKS.map(function (c) { return c.id; })) || "kneeBend";
+    if (first !== state.curve) { state.curve = first; drawCurve(); }
+    if (curve && UI) {
+      if (state.stopCurve) state.stopCurve();
+      curve.shut();
+      state.stopCurve = UI.whenSeen(el.curve, function () { state.stopCurve = null; curve.open(); });
+    }
     setPlaying(true);
+    showAnswer();
+  }
+
+  // Bring the answer into view. The 3D picture and the report start at
+  // the very top of the page, so going to the top shows both: always
+  // on a phone (everything is in one column there), and on a wide
+  // screen whenever the report's top block fits on the first screen.
+  // If it does not fit, we scroll just far enough to see that block.
+  function showAnswer() {
+    var gently = UI && UI.calm() ? "auto" : "smooth";
+    requestAnimationFrame(function () {
+      var oneColumn = window.matchMedia("(max-width: 900px)").matches;
+      var bottom = el.verdict.getBoundingClientRect().bottom + window.scrollY;   // where the top block ends on the page
+      if (oneColumn || bottom <= window.innerHeight) window.scrollTo({ top: 0, behavior: gently });
+      else if (el.verdict.scrollIntoView) el.verdict.scrollIntoView({ block: "nearest", behavior: gently });
+    });
   }
 
   // Forget the report on screen (used when a new video is chosen).
@@ -797,11 +896,15 @@
     state.awaitReveal = false;
     state.shown = null;
     if (state.stopWatching) { state.stopWatching(); state.stopWatching = null; }
+    if (state.stopCurve) { state.stopCurve(); state.stopCurve = null; }
+    state.focus = null;
     el.results.classList.remove("waiting", "reveal");
+    el.view.classList.remove("has-report");
     showKidMode();
     state.hasVideo = false;
     state.index = 0;
     el.results.hidden = true;
+    el.report.appendChild(el.results);   // back under the video, for the next report
     el.qualityNote.hidden = true;
     el.qualityMore.hidden = true;
     el.trackInfo.textContent = "";
@@ -978,8 +1081,32 @@
     el.play.disabled = on; el.worst.disabled = on; el.speed.disabled = on;
     el.age.disabled = on; el.refMode.disabled = on;
     Array.prototype.forEach.call(document.querySelectorAll('input[name="level"]'), function (r) { r.disabled = on; });
-    el.progress.hidden = !on;
+    el.loading.hidden = !on;
+    el.analyze.classList.toggle("working", on);
     updateAnalyzeButton();
+  }
+
+  // The steps the coach goes through while it reads a video. The step
+  // it is on now is lit; the ones before it get a check mark.
+  //   name = "load", "find", "follow" or "measure"
+  function setStep(name) {
+    var reached = false;
+    Array.prototype.forEach.call(el.steps.children, function (li) {
+      var mine = li.getAttribute("data-step") === name;
+      li.className = mine ? "now" : reached ? "" : "done";
+      if (mine) reached = true;
+    });
+  }
+  // How far along the reading is (0 to 1). The Analyze button itself
+  // fills up like a bar, and says the number.
+  function setProgress(part, words) {
+    el.analyze.style.setProperty("--p", String(M.clamp(part, 0, 1)));
+    el.analyzeLabel.textContent = words;
+  }
+  // Wait until the browser has drawn the page once (so a new step is
+  // really seen before the next piece of work starts).
+  function nextPicture() {
+    return new Promise(function (done) { requestAnimationFrame(function () { setTimeout(done, 0); }); });
   }
 
   // A tiny gray copy of the whole picture, used to notice when the
@@ -1086,7 +1213,12 @@
     if (state.busy || !el.videoFile.files.length || !state.seed) return;
     setBusy(true);
     setPlaying(false);
-    el.progressBar.removeAttribute("value"); // "thinking" look
+    // An older report makes room for the steps and the shape of the new one.
+    el.results.hidden = true;
+    setStep("load");
+    setProgress(0, "Getting ready...");
+    el.stepPercent.textContent = "";
+    var worked = false;
     try {
       say("Loading the pose-detection model. The first run takes a little while.");
       var finder = await loadPoseFinder();
@@ -1099,6 +1231,8 @@
       }
 
       say("Finding the skater you clicked...");
+      setStep("find");
+      setProgress(0, "Finding the skater...");
       var start = await findClickedSkater(finder, video, state.seed, W, H);
       if (!start) {
         throw new Error("No skater was found where you clicked. Slide to a frame where the skater is easier to see and click the middle of their body.");
@@ -1111,11 +1245,14 @@
       var times = plan.times, n = times.length, found = new Array(n), done = 0;
       found[plan.seedIndex] = start;
       var lastPercent = -1;
+      setStep("follow");
       function onStep() {
         done++;
-        el.progressBar.value = done / Math.max(1, n - 1);
+        var part = done / Math.max(1, n - 1), whole = Math.min(100, Math.round(part * 100));
+        setProgress(part, "Reading the video " + whole + "%");
+        el.stepPercent.textContent = whole + "%";
         // Say it every 5% (not 400 times, which is hard on screen readers).
-        var percent = Math.round(done / Math.max(1, n - 1) * 20) * 5;
+        var percent = Math.round(part * 20) * 5;
         if (percent !== lastPercent) { lastPercent = percent; say("Following the skater: " + percent + "%"); }
       }
       var forward = [], backward = [];
@@ -1123,6 +1260,11 @@
       for (var b = plan.seedIndex - 1; b >= 0; b--) backward.push(b);
       var stopLater = await follow(finder, video, times, forward, start, W, H, found, onStep, startPicture, gap);
       var stopEarlier = await follow(finder, video, times, backward, start, W, H, found, onStep, startPicture, gap);
+
+      setStep("measure");
+      setProgress(1, "Measuring...");
+      el.stepPercent.textContent = "";
+      await nextPicture();
 
       // Keep the moments where we found the skater AND can trust the legs.
       var raw = [], keptTimes = [], track = [], tracked = 0, heights = [], weights = [], flat = [], sides = [], sideCount = 0, cutOff = 0;
@@ -1211,7 +1353,8 @@
       el.qualityNote.hidden = !warnings.length;
       el.qualityLong.textContent = notes.join(" ");
       el.qualityMore.hidden = false;
-      say("Analysis complete. Check the video below: the white skeleton should sit on your skater.");
+      say("Analysis complete. Check the video under the report: the white skeleton should sit on your skater.");
+      worked = true;
     } catch (err) {
       console.error(err);
       var msg = err && err.message ? err.message : String(err);
@@ -1223,8 +1366,13 @@
           "(Some online previews block it. If so, download the project and open index.html on your computer.)";
       }
       say(msg);
+      // The reading failed: an older report (if there is one) comes back.
+      el.results.hidden = !state.frames;
     } finally {
       setBusy(false);
+      // The button that filled up now says how it went.
+      el.analyzeLabel.textContent = worked ? "Done" : "Analyze video";
+      if (worked) setTimeout(function () { if (!state.busy) el.analyzeLabel.textContent = "Analyze again"; }, 1600);
     }
   }
 
@@ -1242,11 +1390,21 @@
     videoUrl = URL.createObjectURL(file);
     clearReport();   // the old report belongs to the old video
     el.videoPanel.hidden = false;
+    el.view.classList.add("has-session");   // the start card goes; on a phone the video comes right under the 3D picture
     el.seedInfo.textContent = "Click the skater in the video.";
+    el.analyzeLabel.textContent = "Analyze video";
     el.preview.src = videoUrl;
     el.preview.load();
     say("Video ready. Click the skater you want to analyze.");
+    // Bring the video into view: the next thing to do is click the skater in it.
+    requestAnimationFrame(function () {
+      if (el.videoPanel.scrollIntoView) el.videoPanel.scrollIntoView({ block: "start", behavior: UI && UI.calm() ? "auto" : "smooth" });
+    });
   });
+  // The two buttons of the start card on the 3D picture do the same as
+  // the two buttons in the Session panel.
+  if (el.startVideo) el.startVideo.addEventListener("click", function () { el.videoFile.click(); });
+  if (el.startDemo) el.startDemo.addEventListener("click", function () { el.demo.click(); });
   // When the video knows how long it is, set up the frame slider.
   el.preview.addEventListener("loadedmetadata", function () {
     var d = isFinite(el.preview.duration) ? el.preview.duration : 0;

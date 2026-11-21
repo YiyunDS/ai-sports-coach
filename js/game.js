@@ -27,7 +27,8 @@
     start: $("game-start"), begin: $("game-new"), prompt: $("game-prompt"), choices: $("game-choices"),
     go: $("game-go"), call: $("game-call"), spot: $("game-spot"), spotGrade: $("game-spot-grade"), spotFeet: $("game-spot-feet"),
     spotTip: $("game-spot-tip"), hint: $("game-hint"), log: $("game-log"), us: $("game-us"), them: $("game-them"),
-    info: $("game-info"), tally: $("game-tally"), result: $("game-result")
+    info: $("game-info"), tally: $("game-tally"), result: $("game-result"),
+    resultKind: $("game-result-kind"), resultText: $("game-result-text")
   };
 
   // What the game remembers.
@@ -38,6 +39,7 @@
   var busy = false;         // true while a beat is being played out on screen
   var preview = null;       // the choice your mouse is over (drawn as a dotted line)
   var showRings = null;     // the best spot we are showing rings for (after a beat, or as a hint)
+  var lastTrail = null;     // the path the puck took in the last beat (drawn as a thin line)
 
   var tall = window.matchMedia("(max-width: 700px)");
   var calm = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -48,6 +50,10 @@
   function clamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
   function mix(p, q, t) { return { a: p.a + (q.a - p.a) * t, d: p.d + (q.d - p.d) * t }; }
   function ease(t) { return t * t * (3 - 2 * t); }   // start gently, stop gently
+  // A path as the drawing wants it: "x,y x,y x,y" (x = feet up the ice, y = feet across).
+  function pathOf(spots) {
+    return spots.map(function (p) { return p.d.toFixed(1) + "," + p.a.toFixed(1); }).join(" ");
+  }
 
   // The rink lies on its side on a wide screen and stands up on a phone.
   // A phone is small, so there we only show the 120 feet of ice around
@@ -112,7 +118,11 @@
       shape("line", { x1: at.puck.d, y1: at.puck.a, x2: preview.d, y2: preview.a, class: "preview" }, live);
     }
 
-    parts = { us: {}, them: {} };
+    // The puck's path: a thin line that grows behind the puck while the
+    // beat plays, and stays (fainter) so you can see what just happened.
+    var trail = shape("polyline", { class: "trail" + (busy ? "" : " done"), points: !busy && lastTrail ? pathOf(lastTrail) : "" }, live);
+
+    parts = { us: {}, them: {}, trail: trail };
     P.ROLES.forEach(function (r) { parts.them[r] = marker(at.them[r], r, "opp"); });
     P.ROLES.forEach(function (r) { if (r !== game.you) parts.us[r] = marker(at.us[r], r, "mate"); });
     parts.us[game.you] = marker(mine, game.you, "you");
@@ -132,6 +142,7 @@
     });
     parts.puck.setAttribute("cx", at.puck.d);
     parts.puck.setAttribute("cy", at.puck.a);
+    if (at.trail) parts.trail.setAttribute("points", pathOf(at.trail));
   }
 
   // ---------- The words around the rink --------------------------------
@@ -183,8 +194,13 @@
     el.begin.className = !has || game.over ? "primary" : "";
     el.result.hidden = !(has && game.over);
     if (has && game.over) {
-      el.result.className = "pos-result " + (game.over.kind === "goal-us" ? "good" : game.over.kind === "goal-them" ? "far" : "close");
-      el.result.textContent = game.over.text;
+      // How the shift ended, said like the top of the skating report:
+      // a small colored word, then the sentence.
+      var kind = game.over.kind;
+      el.result.className = "pos-result call-result " + (kind === "goal-us" ? "good" : kind === "goal-them" ? "far" : "close");
+      el.resultKind.textContent = kind === "goal-us" ? "Goal" : kind === "goal-them" ? "Goal against" : kind === "offside" ? "Offside"
+        : kind === "change" ? "Line change" : "Whistle";
+      el.resultText.textContent = game.over.text;
     }
     var mine = has && !game.over && G.youHavePuck(game);
     el.go.hidden = !has || game.over || mine;
@@ -229,7 +245,7 @@
     var from = { us: JSON.parse(JSON.stringify(before.us)), them: before.them, puck: before.puck };
     if (!G.youHavePuck(before)) from.us[before.you] = G.toward(before.us[before.you], target || before.us[before.you], G.REACH);
     game = after;
-    busy = true; target = null; preview = null;
+    busy = true; target = null; preview = null; lastTrail = null;
     // Keep the whole beat in the picture: where the puck starts, where it goes, and you.
     fit([before.puck.d].concat(result.events.map(function (e) { return e.puck.d; }), [from.us[before.you].d]));
     showRings = after.lastSpot ? after.lastSpot.ideal : null;
@@ -248,10 +264,13 @@
   function animate(from, to, events, done) {
     var said = -1, finished = false;
     function say(upTo) { while (said < upTo) { said++; addLog(events[said].text); } }
+    // Every spot the puck went through in this beat.
+    var stops = [from.puck].concat(events.map(function (e) { return e.puck; }));
     function finish() {
       if (finished) return;
       finished = true;
       say(events.length - 1);
+      lastTrail = stops.length > 1 ? stops : null;
       done();
     }
     if (calm.matches || !events.length) { finish(); return; }
@@ -268,7 +287,8 @@
       while (k < spans.length - 1 && t > sofar + spans[k]) { sofar += spans[k]; k++; }
       say(k);
       var puck = mix(k ? events[k - 1].puck : from.puck, events[k].puck, ease(clamp((t - sofar) / spans[k], 0, 1)));
-      var w = ease(clamp(t / total, 0, 1)), now10 = { us: {}, them: {}, puck: puck };
+      // The line behind the puck: every stop it has passed, then the puck itself.
+      var w = ease(clamp(t / total, 0, 1)), now10 = { us: {}, them: {}, puck: puck, trail: stops.slice(0, k + 1).concat([puck]) };
       P.ROLES.forEach(function (r) {
         now10.us[r] = mix(from.us[r], to.us[r], w);
         now10.them[r] = mix(from.them[r], to.them[r], w);
@@ -290,7 +310,7 @@
   function newShift() {
     if (busy) return;
     game = G.newShift(el.start.value, role, dice, game);   // the score carries over
-    target = null; preview = null;
+    target = null; preview = null; lastTrail = null;
     showRings = el.hint.checked ? hintSpot() : null;
     el.spot.hidden = true;
     addLog("Shift " + game.stats.shifts + ": " + game.intro, "shift");
@@ -368,7 +388,7 @@
   el.begin.addEventListener("click", newShift);
   $("game-reset").addEventListener("click", function () {
     if (busy) return;
-    game = null; target = null; preview = null; showRings = null;
+    game = null; target = null; preview = null; showRings = null; lastTrail = null;
     el.log.textContent = "";
     el.spot.hidden = true;
     refresh();

@@ -154,7 +154,8 @@
   function refresh() {
     el.right.textContent = score.right;
     el.total.textContent = score.total;
-    el.info.textContent = "Level " + level + (play ? " · " + (play.rule === "offside" ? "watch the blue line" : "watch the puck") : "");
+    // (The level itself is on the switch right under the scoreboard.)
+    el.info.textContent = play ? (play.rule === "offside" ? "Watch the blue line" : "Watch the puck") : "Level " + level;
     el.streak.textContent = score.best ? "In a row: " + score.streak + " (best " + score.best + ")" : "";
     el.banner.hidden = !(play && play.shorthanded);
     el.levelNote.textContent = LEVELS[level];
@@ -174,7 +175,7 @@
     el.result.hidden = phase !== "answered";
     if (phase === "answered") {
       var ok = picked === truth.call;
-      el.result.className = "pos-result " + (ok ? "good" : "far");
+      el.result.className = "pos-result call-result " + (ok ? "good" : "far");
       el.verdict.textContent = ok ? "Correct" : "Not quite";
       el.answer.textContent = "The call: " + F.CALL_WORDS[truth.call];
       el.why.textContent = F.explain(play, truth);
@@ -182,7 +183,7 @@
     el.prompt.textContent = !play ? "Press Start. Watch the play, then make the call."
       : phase === "playing" ? "Watch the play..."
       : phase === "ask" ? "What is the call?"
-      : "This is the moment that decided it. Watch it again, or go to the next play.";
+      : "This is the moment that decided it.";
   }
 
   Array.prototype.forEach.call(callButtons, function (b) {

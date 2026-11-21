@@ -14,6 +14,7 @@
 (function () {
   "use strict";
   var M = window.CoachMath;
+  var UI = window.CoachUI;   // the camera math lives in ui.js (so the tests can check it)
   var stage = document.getElementById("stage");
   var problem = document.getElementById("stage-problem");
 
@@ -232,7 +233,36 @@
   // A phone's picture is narrow: start the skaters closer so both fit in it.
   if (window.matchMedia && window.matchMedia("(max-width: 700px)").matches) gap = 1.5;
 
-  var showAngles = true; // the "Angles" button turns the signs and slices off
+  var showAngles = true;   // "Angle signs" in the help box turns the signs and slices off
+  var showElbows = false;  // "Elbow angles too" adds the two elbow signs
+  // The signs stand a little BESIDE their joint, as the camera sees it:
+  // the knee sign to the right of the knee, the lean sign up and to the
+  // left of the back, the push sign to the left of the pushing knee. A
+  // thin line joins each sign to its joint. That way no sign covers the
+  // body, from whichever side you look.
+  var camRight = new THREE.Vector3(1, 0, 0), camUp = new THREE.Vector3(0, 1, 0);
+  var signSize = 1;   // how much bigger the signs are drawn right now (see signScale in ui.js)
+  // A spot "right" meters to the camera's right of a joint and "up" meters above it.
+  function beside(from, right, up) {
+    // Bigger signs stand a little farther out, but never very far: on
+    // a phone they would end up on top of the other skater.
+    var grow = Math.min(signSize, 1.35);
+    right *= grow; up *= grow;
+    return { x: from.x + camRight.x * right + camUp.x * up, y: from.y + camRight.y * right + camUp.y * up, z: from.z + camRight.z * right + camUp.z * up };
+  }
+
+  // When you tap a card in the report, the camera goes to that joint
+  // and its sign stays strong while the other signs fade ("focus").
+  //   sign = which sign belongs to the check
+  //   y    = how high above the ice the camera looks, tall = how much it shows
+  var FOCUS = {
+    kneeBend: { sign: "knee", y: 0.55, tall: 1.0 },
+    forwardLean: { sign: "lean", y: 1.3, tall: 1.2 },
+    strideExtension: { sign: "push", y: 0.55, tall: 1.0 }
+  };
+  var focusId = null;   // the check the camera is looking at closely (null = the whole skaters)
+  function focusSign() { return focusId ? FOCUS[focusId].sign : null; }
+
   // Add the angle signs and "pizza slices" to a skater.
   //   colors = { knee: "...", lean: "...", push: "...", elbow: "..." (optional) }
   //            elbow: false = no elbow signs (when the arms were not measured)
@@ -247,41 +277,56 @@
       m.kneeBend = shown.kneeBend; m.forwardLean = shown.forwardLean; m.strideExtension = shown.strideExtension;
       if (shown.glideSide) { m.glideSide = shown.glideSide; m.pushSide = shown.pushSide; }
     }
-    var g = m.glideSide, p = m.pushSide;
+    var g = m.glideSide, p = m.pushSide, lit = focusSign();
+    // The slice of the check you tapped is drawn a little bigger.
+    function size(id, radius) { return id === lit ? radius * 1.3 : radius; }
 
     // Knee angle of the glide leg.
     var knee = pose[g + "Knee"];
-    fig.setWedge("knee", knee, M.sub(pose[g + "Hip"], knee), M.sub(pose[g + "Ankle"], knee), 0.2, colors.knee);
-    fig.setLabel("knee", { x: knee.x + 0.44, y: knee.y + 0.02, z: knee.z }, "Knee " + Math.round(m.kneeBend) + "°", colors.knee);
+    fig.setWedge("knee", knee, M.sub(pose[g + "Hip"], knee), M.sub(pose[g + "Ankle"], knee), size("knee", 0.2), colors.knee);
+    fig.setLabel("knee", beside(knee, 0.44, 0.03), "Knee " + Math.round(m.kneeBend) + "°", colors.knee, knee);
 
     // Forward lean: the slice between "straight up" and the back.
     var hipMid = M.mid(pose.lHip, pose.rHip);
     var back = M.sub(M.mid(pose.lShoulder, pose.rShoulder), hipMid);
-    fig.setWedge("lean", hipMid, M.pt(0, 1, 0), back, 0.4, colors.lean);
-    fig.setLabel("lean", { x: hipMid.x - 0.3, y: hipMid.y + 0.52, z: hipMid.z }, "Lean " + Math.round(m.forwardLean) + "°", colors.lean);
+    fig.setWedge("lean", hipMid, M.pt(0, 1, 0), back, size("lean", 0.4), colors.lean);
+    // (The sign's line starts on the back, a third of the way up.)
+    var onBack = { x: hipMid.x + back.x * 0.35, y: hipMid.y + back.y * 0.35, z: hipMid.z + back.z * 0.35 };
+    fig.setLabel("lean", beside(onBack, -0.38, 0.34), "Lean " + Math.round(m.forwardLean) + "°", colors.lean, onBack);
 
     // Push leg (only while pushing).
     if (showPush) {
       var pk = pose[p + "Knee"];
-      fig.setWedge("push", pk, M.sub(pose[p + "Hip"], pk), M.sub(pose[p + "Ankle"], pk), 0.16, colors.push);
-      fig.setLabel("push", { x: pk.x - 0.4, y: pk.y - 0.05, z: pk.z }, "Push " + Math.round(m.strideExtension) + "°", colors.push);
+      fig.setWedge("push", pk, M.sub(pose[p + "Hip"], pk), M.sub(pose[p + "Ankle"], pk), size("push", 0.16), colors.push);
+      fig.setLabel("push", beside(pk, -0.44, -0.04), "Push " + Math.round(m.strideExtension) + "°", colors.push, pk);
     } else {
       fig.hide("push");
     }
 
-    // Elbows: how bent each arm is (180 = straight). The sign sits a
-    // little past the elbow, away from the shoulder, so it does not
-    // cover the arm.
+    // Elbows: how bent each arm is (180 = straight). Only when asked
+    // for in the help box: three signs are easier to read than five.
     ["l", "r"].forEach(function (s) {
       var sh = pose[s + "Shoulder"], el = pose[s + "Elbow"], wr = pose[s + "Wrist"], id = s + "Elbow";
-      if (!sh || !el || !wr || colors.elbow === false) { fig.hide(id); return; }
+      if (!showElbows || !sh || !el || !wr || colors.elbow === false) { fig.hide(id); return; }
       var deg = M.angleAt(sh, el, wr), color = colors.elbow || "#cbd5e1";
       fig.setWedge(id, el, M.sub(sh, el), M.sub(wr, el), 0.11, color);
-      var away = el.x >= sh.x ? 1 : -1;  // in front of the shoulder: sign in front; behind: sign behind
-      fig.setLabel(id, { x: el.x + away * 0.3, y: el.y + (s === "l" ? 0.16 : 0.05), z: el.z },
-        (s === "l" ? "L" : "R") + " elbow " + Math.round(deg) + "°", color);
+      fig.setLabel(id, beside(el, s === "l" ? 0.4 : -0.4, s === "l" ? 0.2 : 0.12),
+        (s === "l" ? "L" : "R") + " elbow " + Math.round(deg) + "°", color, el);
     });
     return m;
+  }
+
+  // The signs of the check you tapped stay strong; the others fade.
+  // (They glide there in about a tenth of a second.)
+  var strength = { knee: 1, lean: 1, push: 1, lElbow: 1, rElbow: 1 };
+  function fadeSigns(dt) {
+    var lit = focusSign(), ease = 1 - Math.exp(-dt / 0.1);
+    Object.keys(strength).forEach(function (id) {
+      var want = !lit || id === lit ? 1 : 0.18;
+      strength[id] += (want - strength[id]) * ease;
+      refFigure.setStrength(id, strength[id]);
+      kidFigure.setStrength(id, strength[id]);
+    });
   }
 
   // ---- Making the pro move like a real person ----
@@ -390,6 +435,7 @@
   //   front = from in front (best for the push out to the side)
   //   top   = from above
   var lastView = "side";
+  var toolsBar = document.getElementById("stage-tools");   // the bar with the compare tools
   var VIEW_DIRECTIONS = { side: [0, 0.24, 1], front: [1, 0.24, 0], top: [0, 1, 0.14] };
   var viewButtons = document.querySelectorAll("[data-view]");
 
@@ -412,16 +458,42 @@
       target = new THREE.Vector3((x0 + x1) / 2, 0.2, (z0 + z1) / 2);
     } else {
       wide = name === "front" ? z1 - z0 : x1 - x0;
-      tall = 1.9; // from the ice to just above the name signs
-      target = new THREE.Vector3((x0 + x1) / 2, 0.8, (z0 + z1) / 2);
+      // From the ice to just above the name signs. (On a small picture
+      // the signs are drawn bigger, so they reach higher: nameTop.)
+      tall = nameTop + 0.15;
+      target = new THREE.Vector3((x0 + x1) / 2, (nameTop - 0.15) / 2, (z0 + z1) / 2);
     }
-    // How far back must the camera be to see all of it? (The camera sees
-    // a wedge: "half" is how much it widens for each meter of distance.)
-    var half = Math.tan((camera.fov / 2) * Math.PI / 180), aspect = camera.aspect || 1.6;
-    var dist = 1.15 * Math.max(tall / 2 / half, wide / 2 / (half * aspect)) + 0.6;
+    var aspect = camera.aspect || 1.6;
+    if (focusId && hasKid && name === "side") {
+      // A CLOSE LOOK at one joint (you tapped a card in the report): only
+      // the height around that joint. Both skaters if that brings us a
+      // good deal closer; on a narrow phone picture it does not, so there
+      // we look at the orange skater alone.
+      var F = FOCUS[focusId];
+      var whole = UI.cameraDistance(wide, tall, camera.fov, aspect);
+      if (UI.cameraDistance(wide, F.tall, camera.fov, aspect) > whole * 0.8) { x0 = k.x - 0.85; x1 = k.x + 0.95; }
+      wide = x1 - x0; tall = F.tall;
+      target = new THREE.Vector3((x0 + x1) / 2, F.y, (z0 + z1) / 2);
+    }
+    // Buttons float over the top of the picture, and the tool bar (or
+    // the start card) over the bottom. The skaters must fit in the part
+    // in between, so the camera shows a little more than their height.
+    var high = stage.clientHeight || 500, coverTop = 0, coverBottom = 0;
+    if (name !== "top") {
+      coverTop = 52;
+      coverBottom = floatingAtBottom();
+      tall = tall / Math.max(0.5, 1 - (coverTop + coverBottom) / high);
+    }
+    // How far back must the camera be to see all of it? (cameraDistance
+    // is in ui.js.) A little extra room around it.
+    var dist = 1.15 * UI.cameraDistance(wide, tall, camera.fov, aspect) + 0.6;
     // Stay inside the rink (on a narrow phone screen the camera would
     // otherwise back up through the glass).
     if (name === "side") dist = Math.min(dist, (RINK_D / 2 - 0.7 - target.z) / dir.z);
+    // Look a little lower (or higher), so the skaters sit in the middle
+    // of the free part of the picture and not behind the tool bar.
+    var seen = 2 * dist * Math.tan(camera.fov / 2 * Math.PI / 180);   // meters of height the picture shows
+    target.y += (coverTop - coverBottom) / 2 / high * seen;
     var calm = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (smooth && !calm) {
       // Remember where the camera is and where it should end up. The
@@ -437,10 +509,39 @@
       camera.position.copy(target).addScaledVector(dir, dist);
       controls.update();
     }
+    // Now we know how far away the camera sits, so we know how big the
+    // signs will be drawn, and how high the name signs reach. If that is
+    // not what we planned with, plan once more with the better number.
+    var size = UI.signScale(dist, camera.fov, high, signPixels(), 0.158);
+    var top = 1.62 + 0.3 * size;
+    if (Math.abs(top - nameTop) > 0.03 && !replanning) {
+      nameTop = top;
+      replanning = true;
+      frameView(smooth);
+      replanning = false;
+      return;
+    }
     userMovedCamera = false;
     Array.prototype.forEach.call(viewButtons, function (b) {
       b.setAttribute("aria-pressed", String(b.getAttribute("data-view") === name));
     });
+  }
+
+  var nameTop = 1.9;        // how high above the ice the name signs reach (meters)
+  var replanning = false;   // frameView is having its second go (see the end of frameView)
+  // How tall a sign should look on the screen, in pixels. A little
+  // smaller on a narrow phone picture, where two skaters share the room.
+  function signPixels() { return (stage.clientWidth || 800) < 500 ? 21 : 25; }
+
+  // How many pixels at the bottom of the picture are covered by the
+  // tool bar or by the start card?
+  var startCard = document.getElementById("start-card");
+  function floatingAtBottom() {
+    var cover = 0;
+    [toolsBar, startCard].forEach(function (box) {
+      if (box && box.offsetParent !== null) cover = Math.max(cover, box.offsetHeight + 22);
+    });
+    return cover;
   }
 
   // ---------- The camera glides to a new view ------------------------
@@ -507,11 +608,20 @@
     }
   }
 
+  // Look closely at one check ("kneeBend", "forwardLean" or
+  // "strideExtension"), or at the whole skaters again (null).
+  function focus(id) {
+    focusId = FOCUS[id] && hasKid ? id : null;
+    setView("side", true);   // knee, lean and push are all seen best from the side
+  }
+
   // Show one skater, or two.
   function layout(showKid) {
     var changed = showKid !== hasKid;
     hasKid = showKid;
     kidFigure.group.visible = showKid;
+    if (toolsBar) toolsBar.hidden = !showKid;   // nothing to compare with one skater
+    if (!showKid) focusId = null;
     syncCompareUi();
     if (changed) { lastView = "side"; place(); }
   }
@@ -540,11 +650,18 @@
     if (stage.offsetParent === null) { requestAnimationFrame(tick); return; }
     // Other files go first (coach.js picks the kid's pose and tells the
     // pro where in the stride to be), then we draw the pro to match.
+    // Which way is "right" and "up" for the camera, and how big must the
+    // signs be drawn so they can be read from this far away?
+    camRight.setFromMatrixColumn(camera.matrixWorld, 0);
+    camUp.setFromMatrixColumn(camera.matrixWorld, 1);
+    signSize = UI.signScale(camera.position.distanceTo(controls.target), camera.fov, stage.clientHeight || 500, signPixels(), 0.158);
+    refFigure.signScale = kidFigure.signScale = signSize;
     onTick.forEach(function (fn) { fn(dt); });
     drawReference(dt);
     // The rebuilt orange skater strides on the very same clock as the
     // pro, so we draw it right after, at exactly the same moment.
     if (sync && sync.drawKid) sync.drawKid(cycleTime, dt);
+    fadeSigns(dt);
     if (glide) stepGlide(dt);
     controls.update();
     renderer.render(scene, camera);
@@ -554,14 +671,17 @@
 
   // ---------- 7. Buttons on top of the 3D picture --------------------
   Array.prototype.forEach.call(document.querySelectorAll("[data-view]"), function (btn) {
-    btn.addEventListener("click", function () { setView(btn.getAttribute("data-view"), true); });
+    btn.addEventListener("click", function () {
+      // Picking a view ends the close look at one joint (coach.js is told,
+      // so the card in the report is no longer lit).
+      if (focusId) { focusId = null; if (api.onFocus) api.onFocus(null); }
+      setView(btn.getAttribute("data-view"), true);
+    });
   });
-  // The "Angles" button shows or hides the angle signs and slices.
-  var anglesBtn = document.getElementById("angles-btn");
-  if (anglesBtn) anglesBtn.addEventListener("click", function () {
-    showAngles = !showAngles;
-    anglesBtn.setAttribute("aria-pressed", String(showAngles));
-  });
+  // The two boxes in the help box: show the angle signs? the elbows too?
+  var anglesBox = document.getElementById("angles-on"), elbowsBox = document.getElementById("elbows-on");
+  if (anglesBox) anglesBox.addEventListener("change", function () { showAngles = anglesBox.checked; });
+  if (elbowsBox) elbowsBox.addEventListener("change", function () { showElbows = elbowsBox.checked; });
   var strideBtn = document.getElementById("stride-btn");
   strideBtn.addEventListener("click", function () {
     // While synced, the kid's stride drives the pro. (coach.js may give
@@ -599,7 +719,11 @@
     syncCompareUi();
     place();
   });
-  if (resetBtn) resetBtn.addEventListener("click", place);
+  if (resetBtn) resetBtn.addEventListener("click", function () {
+    // "Reset" also ends the close look at one joint.
+    if (focusId) { focusId = null; if (api.onFocus) api.onFocus(null); }
+    place();
+  });
   syncCompareUi();
 
   // Dragging: press on a skater and slide it across the ice.
@@ -674,7 +798,7 @@
   window.addEventListener("pointercancel", letGo);
 
   // ---------- 9. What other files can use ----------------------------
-  window.Coach3D = {
+  var api = window.Coach3D = {
     camera: camera,       // (for checking the view from the browser console)
     controls: controls,
     renderer: renderer,   // (for taking pictures of the 3D view when we check our work)
@@ -684,6 +808,10 @@
     decorate: decorate,
     layout: layout,
     setView: setView,
+    // Look closely at one check of the report (or null for the whole
+    // skaters). onFocus is called when the close look ends by itself.
+    focus: focus,
+    onFocus: null,
     onTick: onTick,
     // Change what the blue skater shows. name is "PRO" or "GOAL".
     setReference: function (angles, name) {
@@ -704,7 +832,7 @@
       if (was !== !!s) strideOn = false;
       // The button: "Play stride" when the pro is alone. While synced it
       // says so, or does the job coach.js gives it (s.label, s.onButton).
-      var words = s ? (s.label || "Pro synced to skater") : "Play stride";
+      var words = s ? (s.label || "Pro in step") : "Play stride";
       var off = !!s && !s.onButton, pressed = String(!!(s && s.pressed));
       if (strideBtn.textContent !== words) strideBtn.textContent = words;
       if (strideBtn.disabled !== off) strideBtn.disabled = off;
