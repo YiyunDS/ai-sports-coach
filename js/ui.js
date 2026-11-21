@@ -42,7 +42,28 @@
     return { around: around, hidden: around * (1 - share) };
   }
 
-  var api = { easeOut: easeOut, countAt: countAt, ringDash: ringDash };
+  // The camera sees a wedge that gets wider the farther it looks. How
+  // far back must it sit to see a box "wide" by "tall" meters?
+  //   fovDeg = how wide the camera's eye is open, top to bottom (degrees)
+  //   aspect = the picture's width divided by its height
+  function cameraDistance(wide, tall, fovDeg, aspect) {
+    var half = Math.tan(fovDeg / 2 * Math.PI / 180);   // how much the wedge widens for each meter
+    return Math.max(tall / 2 / half, wide / 2 / (half * aspect));
+  }
+
+  // The angle signs float in the 3D world, so from far away they get
+  // tiny (on a phone the camera is far away). signScale says how much
+  // bigger to draw a sign so that it looks "wantPx" pixels tall.
+  //   distance   = meters from the camera to the skaters
+  //   viewPx     = the height of the 3D picture in pixels
+  //   baseMeters = the sign's own height in the 3D world
+  // Never smaller than 0.8 times and never bigger than 2.2 times.
+  function signScale(distance, fovDeg, viewPx, wantPx, baseMeters) {
+    var metersPerPixel = 2 * distance * Math.tan(fovDeg / 2 * Math.PI / 180) / Math.max(1, viewPx);
+    return Math.max(0.8, Math.min(2.2, wantPx * metersPerPixel / baseMeters));
+  }
+
+  var api = { easeOut: easeOut, countAt: countAt, ringDash: ringDash, cameraDistance: cameraDistance, signScale: signScale };
   // In node (the tests) there is no page, so we stop here.
   if (typeof document === "undefined") { module.exports = api; return; }
 
@@ -88,6 +109,7 @@
   // We add one small box, the "pill", and slide it behind the button
   // that is on. For the tabs at the top the pill is the thin blue line.
   // If anything here fails, the buttons still light up the old way.
+  var phone = window.matchMedia ? window.matchMedia("(max-width: 700px)") : { matches: false };
   function addPill(group, isLine) {
     var pill = document.createElement("i");
     pill.className = "pill";
@@ -100,7 +122,9 @@
       // (offsetWidth is 0 while the switch is on a hidden tab.)
       if (!on || !group.offsetWidth) { group.classList.remove("has-pill"); placed = false; return; }
       var x = on.offsetLeft, y = on.offsetTop, w = on.offsetWidth, h = on.offsetHeight;
-      if (isLine) { y = y + h - 2; h = 2; }
+      // The tabs' line: under the tab, or above it on a phone (there the
+      // tabs sit at the bottom of the screen).
+      if (isLine) { y = phone.matches ? y : y + h - 2; h = 2; }
       // The first time, it is simply there. After that, it slides.
       if (!placed) pill.style.transition = "none";
       pill.style.width = w + "px";
@@ -142,6 +166,39 @@
       if (box) pulseOnChange(box);
     });
   }
+
+  // ---------- 7. Boxes that open and close ----------------------------
+  // A button with data-pop="some-id" opens the box with that id (the
+  // help box on the 3D picture). It closes again with the same button,
+  // its own Close button, the Escape key, or a click anywhere else.
+  Array.prototype.forEach.call(document.querySelectorAll("[data-pop]"), function (btn) {
+    var pop = document.getElementById(btn.getAttribute("data-pop"));
+    if (!pop) return;
+    function show(on) {
+      pop.hidden = !on;
+      btn.setAttribute("aria-expanded", String(on));
+    }
+    btn.addEventListener("click", function () { show(pop.hidden); });
+    Array.prototype.forEach.call(pop.querySelectorAll("[data-pop-close]"), function (x) {
+      x.addEventListener("click", function () { show(false); btn.focus(); });
+    });
+    document.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape" && !pop.hidden) { show(false); btn.focus(); }
+    });
+    document.addEventListener("pointerdown", function (ev) {
+      if (!pop.hidden && !pop.contains(ev.target) && !btn.contains(ev.target)) show(false);
+    });
+  });
+
+  // On a phone the tool bar under the skaters shows only "Compare".
+  // The "More" button opens the rest of it.
+  var moreBtn = document.getElementById("tools-more"), toolbar = document.getElementById("toolbar");
+  if (moreBtn && toolbar) moreBtn.addEventListener("click", function () {
+    var open = !toolbar.classList.contains("open");
+    toolbar.classList.toggle("open", open);
+    moreBtn.setAttribute("aria-expanded", String(open));
+    moreBtn.textContent = open ? "Less" : "More";
+  });
 
   api.calm = calm;
   api.count = count;
