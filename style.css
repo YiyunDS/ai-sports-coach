@@ -5,6 +5,23 @@
 
    The names at the top (like --ref) are our colors. Change one here
    and it changes everywhere on the page.
+
+   THE LOOK, IN FOUR RULES (we checked the page against the "unslop"
+   list, see SOURCES.md):
+     1. The page around the pictures is QUIET: dark, flat, thin lines.
+        Light and color belong to the two pictures that matter: the 3D
+        skaters and the curve of the replay.
+     2. A color always MEANS something. Blue = the pro (and the button
+        to press next), orange = you, green / yellow / red = the grade.
+        Nothing glows.
+     3. Words are written the normal way ("Knee bend", not "KNEE
+        BEND"): that is easier to read. Only what belongs to the RINK
+        keeps the narrow scoreboard letters: the scoreboard, the signs
+        in the 3D picture, the words painted on the ice, and every
+        number we measured.
+     4. Sizes come from one ladder. Spaces are 4, 8, 12, 16, 20 or 24
+        (inside a small button a step of 2 is fine). Corners are 8
+        (buttons), 12 (cards) or 14 (panels).
    ===================================================================== */
 :root {
   color-scheme: dark;
@@ -13,7 +30,8 @@
   --panel-2: #19222e;   /* buttons and inputs */
   --line: #263344;      /* thin borders */
   --fg: #e8eef5;        /* main text */
-  --muted: #8d9db2;     /* quiet text */
+  --fg-2: #b7c2d0;      /* second text: titles of panels and cards */
+  --muted: #8d9db2;     /* quiet text: notes, targets, labels */
   --ref: #4da3ff;       /* the reference skater, and the main action color */
   --ref-ink: #06182b;   /* text on top of --ref */
   --you: #ff9f43;       /* the athlete */
@@ -23,6 +41,10 @@
   --ice: #e9f0f5;       /* the positioning board's ice */
   /* Softer borders for the panels: a thin line that is barely there. */
   --hair: rgba(148, 178, 214, 0.13);
+  /* The three corner sizes. */
+  --r-btn: 8px;
+  --r-card: 12px;
+  --r-panel: 14px;
   /* HOW THINGS MOVE. One curve for the whole page: start fast, stop
      gently. And three lengths: a press, a switch, a panel. Only the
      report appearing (--t-show) may take longer. */
@@ -33,7 +55,7 @@
   --t-show: 700ms;
   /* Dark "glass" for the buttons that float on the 3D picture. */
   --glass: rgba(11, 15, 20, 0.7);
-  --tabbar: 58px;       /* how tall the tabs are on a phone (they sit at the bottom there) */
+  --tabbar: 56px;       /* how tall the tabs are on a phone (they sit at the bottom there) */
   --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", Arial, sans-serif;
 }
@@ -43,8 +65,7 @@
 
 body {
   margin: 0;
-  /* A soft blue glow behind the top of the page, like light on the ice. */
-  background: radial-gradient(900px 420px at 50% -170px, rgba(77, 163, 255, 0.11), transparent 70%) no-repeat, var(--bg);
+  background: var(--bg);
   color: var(--fg);
   font-family: var(--font);
   font-size: 15px;
@@ -54,36 +75,33 @@ body {
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
 /* ---------- Top bar ---------- */
-.bar { border-bottom: 1px solid var(--hair); background: rgba(18, 25, 34, 0.66); }
+.bar { border-bottom: 1px solid var(--hair); background: #0e131a; }
 .bar-in {
   display: flex; align-items: center; flex-wrap: wrap; gap: 8px 24px;
   max-width: 1560px; margin: 0 auto;
-  padding-block: 10px;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 8px;
+  padding-left: max(24px, env(safe-area-inset-left, 0px));
+  padding-right: max(24px, env(safe-area-inset-right, 0px));
 }
-.brand { display: flex; align-items: baseline; gap: 10px; }
+.brand { display: flex; align-items: baseline; gap: 8px; }
 .mark {
   width: 10px; height: 18px; align-self: center;
   background: linear-gradient(var(--ref) 0 50%, var(--you) 50% 100%);
   transform: skewX(-12deg);
 }
+/* Our name is written like a name on a jersey. */
 .brand-name {
-  font-family: var(--display); font-weight: 700; font-size: 1.35rem;
-  letter-spacing: 0.04em; text-transform: uppercase;
+  font-family: var(--display); font-weight: 600; font-size: 1.375rem;
+  letter-spacing: 0.03em; text-transform: uppercase;
 }
-.brand-sub, .bar-meta {
-  font-family: var(--display); font-weight: 500; font-size: 0.95rem;
-  letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
-}
+.brand-sub, .bar-meta { font-size: 0.8125rem; color: var(--muted); }
 .bar-meta { margin-left: auto; }
 .tabs { display: flex; gap: 4px; position: relative; }
 .tabs button {
-  display: inline-flex; align-items: center; gap: 6px;
+  display: inline-flex; align-items: center; gap: 8px;
   border: 0; border-bottom: 2px solid transparent; border-radius: 0;
-  background: none; color: var(--muted); padding: 6px 10px;
-  font-family: var(--display); font-weight: 600; font-size: 1.05rem;
-  letter-spacing: 0.06em; text-transform: uppercase;
+  background: none; color: var(--muted); padding: 8px 12px;
+  font-size: 0.9375rem; font-weight: 500; line-height: 22px;
 }
 .tabs button:hover { color: var(--fg); background: none; }
 .tabs button[aria-pressed="true"] { color: var(--fg); border-bottom-color: var(--ref); }
@@ -109,43 +127,40 @@ main.layout { animation: fade-in var(--t-switch) ease-out; }
   gap: 16px;
   max-width: 1560px; margin: 0 auto;
   padding-block: 16px;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-left: max(24px, env(safe-area-inset-left, 0px));
+  padding-right: max(24px, env(safe-area-inset-right, 0px));
 }
 .stage-wrap, .board-wrap { grid-area: stage; min-width: 0; }
 .side { grid-area: side; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .report { grid-area: report; min-width: 0; }
 .pos-layout { grid-template-areas: "stage side"; }
 
+/* A panel is one flat step lighter than the page, with a thin line
+   around it. No shadow: on a dark page, depth comes from the steps. */
 .panel {
-  /* A little lighter at the top than at the bottom, a barely-there
-     border, and a faint line of light along the top edge. */
-  background: linear-gradient(180deg, #151d28, #111821);
+  background: var(--panel);
   border: 1px solid var(--hair);
-  border-radius: 10px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 10px 28px rgba(0, 0, 0, 0.22);
-  padding: 16px 18px;
+  border-radius: var(--r-panel);
+  padding: 16px;
 }
-.panel h2, .replay h3, .popover h2, .popover h3 {
+.panel h2, .replay h3, .popover h2, .popover h3, .game-story h2 {
   margin: 0 0 12px;
-  font-family: var(--display); font-weight: 600; font-size: 0.9rem;
-  letter-spacing: 0.13em; text-transform: uppercase; color: var(--muted);
+  font-size: 0.875rem; font-weight: 500; line-height: 20px; color: var(--fg-2);
   text-wrap: balance;
 }
 .panel h2 span { color: var(--fg); }
-.panel p { margin: 0 0 10px; }
+.panel p { margin: 0 0 12px; }
 .panel > :last-child { margin-bottom: 0; }
-.small { font-size: 0.86rem; color: var(--muted); }
-code { font-size: 0.9em; background: var(--panel-2); padding: 1px 5px; border-radius: 3px; }
+.small { font-size: 0.875rem; color: var(--muted); }
+code { font-size: 0.9em; background: var(--panel-2); padding: 0 4px; border-radius: 4px; }
 
 /* ---------- The 3D picture ---------- */
 .stage-wrap {
   position: relative;
   border: 1px solid var(--hair);
-  border-radius: 10px;
+  border-radius: var(--r-panel);
   overflow: hidden;
   background: var(--bg);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
 }
 #stage { width: 100%; height: min(66vh, 660px); min-height: 400px; }
 /* With a report on the page the picture is a little lower, so the
@@ -165,12 +180,12 @@ code { font-size: 0.9em; background: var(--panel-2); padding: 1px 5px; border-ra
 .stage-problem {
   position: absolute; inset: 0; z-index: 4;
   display: grid; place-items: center;
-  padding: 30px; text-align: center; font-weight: 600;
+  padding: 32px; text-align: center; font-weight: 500;
   background: var(--panel);
 }
 .stage-top, .stage-bottom {
   position: absolute; left: 12px; right: 12px; z-index: 2;
-  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
   pointer-events: none;
 }
 .stage-top { top: 12px; justify-content: space-between; }
@@ -178,7 +193,8 @@ code { font-size: 0.9em; background: var(--panel-2); padding: 1px 5px; border-ra
 .stage-bottom { bottom: 12px; }
 .stage-top > *, .stage-bottom > * { pointer-events: auto; }
 /* Everything that floats on the picture is dark glass: you still see a
-   blur of the ice through it. */
+   blur of the ice through it, and the words stay readable while the
+   skaters move behind them. */
 .stage-wrap .seg, .stage-wrap .ghost-btn, .toolbar, .start-card, .popover {
   background: var(--glass);
   -webkit-backdrop-filter: blur(12px) saturate(1.25); backdrop-filter: blur(12px) saturate(1.25);
@@ -186,22 +202,20 @@ code { font-size: 0.9em; background: var(--panel-2); padding: 1px 5px; border-ra
 /* ONE bar with the tools for comparing the two skaters. */
 .toolbar {
   display: flex; flex-wrap: wrap; align-items: center; gap: 2px 0;
-  max-width: 100%; padding: 3px;
-  border: 1px solid var(--hair); border-radius: 10px;
+  max-width: 100%; padding: 4px;
+  border: 1px solid var(--hair); border-radius: var(--r-card);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
   animation: fade-in var(--t-switch) ease-out;   /* the bar fades in when the second skater appears */
 }
-.tool { display: flex; align-items: center; gap: 8px; padding: 0 8px 0 10px; }
+.tool { display: flex; align-items: center; gap: 8px; padding: 0 8px 0 12px; }
 .tool + .tool { border-left: 1px solid var(--hair); }
 .toolbar .seg { border: 0; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
-.toolbar .seg button { padding-inline: 9px; }
-.toolbar input[type="range"] { width: 92px; }
-.tool-label, .field-label {
-  font-family: var(--display); font-weight: 500; font-size: 0.85rem;
-  letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
-}
-.tool output { min-width: 3.6em; font-size: 0.86rem; }
-input[type="range"] { width: 110px; accent-color: var(--ref); }
+.toolbar .seg button { padding-inline: 8px; }
+.toolbar input[type="range"] { width: 88px; }
+.tool-label, .field-label { font-size: 0.8125rem; font-weight: 500; color: var(--muted); }
+.tool output { min-width: 3.6em; font-size: 0.8125rem; }
+input[type="range"] { width: 112px; accent-color: var(--ref); }
+input[type="checkbox"] { width: 16px; height: 16px; margin: 0; accent-color: var(--ref); }
 /* A quiet button: no box until you point at it. */
 .flat-btn { background: none; border-color: transparent; color: var(--muted); }
 .flat-btn:hover { background: var(--panel-2); color: var(--fg); }
@@ -211,44 +225,46 @@ input[type="range"] { width: 110px; accent-color: var(--ref); }
 .start-card {
   position: absolute; left: 12px; right: 12px; bottom: 16px; z-index: 2;
   width: fit-content; max-width: calc(100% - 24px); margin: 0 auto;
-  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px 26px;
-  padding: 14px 18px; border: 1px solid var(--hair); border-radius: 12px;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px 24px;
+  padding: 16px 20px; border: 1px solid var(--hair); border-radius: var(--r-panel);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
-  animation: rise 420ms var(--ease) 250ms both;
+  animation: rise var(--t-panel) var(--ease) var(--t-switch) both;
 }
 .has-session .start-card { display: none; }
-.start-main { margin: 1px 0 2px !important; font-size: 1.2rem; font-weight: 600; letter-spacing: -0.01em; }
+.start-main { margin: 0 0 4px !important; font-size: 1.25rem; font-weight: 600; line-height: 1.3; }
 .start-text .small { margin: 0; }
 .start-go { display: flex; flex-wrap: wrap; gap: 8px; }
+.start-go button { min-height: 44px; padding-inline: 16px; }
 
 /* The help box: opens from the "?" button. */
 .popover {
-  position: absolute; top: 58px; right: 12px; z-index: 3;
-  width: min(330px, calc(100% - 24px)); max-height: calc(100% - 70px); overflow-y: auto;
-  padding: 14px 16px; border: 1px solid var(--hair); border-radius: 12px;
+  position: absolute; top: 56px; right: 12px; z-index: 3;
+  width: min(328px, calc(100% - 24px)); max-height: calc(100% - 68px); overflow-y: auto;
+  padding: 16px; border: 1px solid var(--hair); border-radius: var(--r-panel);
   background: rgba(13, 18, 25, 0.9);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
   animation: rise var(--t-panel) var(--ease);
 }
-.pop-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.pop-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
 .pop-head h2 { margin: 0; }
-.popover h3 { margin: 14px 0 6px; }
+.popover h3 { margin: 16px 0 8px; }
 .popover p { margin: 0; }
-.tick { display: flex; align-items: center; gap: 10px; min-height: 32px; cursor: pointer; font-size: 0.92rem; }
-.tick input { width: 18px; height: 18px; margin: 0; accent-color: var(--ref); }
+.tick { display: flex; align-items: center; gap: 8px; min-height: 32px; cursor: pointer; }
 
 /* ---------- Buttons and inputs ---------- */
+/* Every button, switch and chooser is 36 pixels tall on a computer
+   (44 on a phone, see the bottom of this file). */
 button, .file-btn, select {
-  font: inherit; font-weight: 500;
+  font: inherit; font-weight: 500; line-height: 22px;
   color: var(--fg);
   background: var(--panel-2);
   border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 7px 12px;
+  border-radius: var(--r-btn);
+  padding: 6px 12px;
   /* Colors change in a tenth of a second instead of snapping. */
   transition: background-color var(--t-press) ease-out, border-color var(--t-press) ease-out,
               color var(--t-press) ease-out, opacity var(--t-press) ease-out,
-              filter var(--t-press) ease-out, transform var(--t-press) var(--ease);
+              transform var(--t-press) var(--ease);
 }
 button, .file-btn { cursor: pointer; }
 button:hover, .file-btn:hover { background: #212c3a; }
@@ -258,36 +274,38 @@ button:focus-visible, select:focus-visible, input:focus-visible, .file-btn:focus
 canvas:focus-visible, .marker:focus-visible, summary:focus-visible, .check:focus-visible, .curve:focus-visible {
   outline: 2px solid var(--ref); outline-offset: 2px;
 }
+/* The ONE button to press next is plain blue. It gets a little
+   lighter when you point at it. */
 button.primary {
-  background: linear-gradient(180deg, #66b1ff, #3f97f5); border-color: #3f97f5; color: var(--ref-ink); font-weight: 600;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 4px 14px rgba(77, 163, 255, 0.22);
+  background: var(--ref); border-color: var(--ref); color: var(--ref-ink); font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
-button.primary:hover { background: linear-gradient(180deg, #66b1ff, #3f97f5); filter: brightness(1.1); }
-button.primary:disabled { box-shadow: none; filter: none; }
+button.primary:hover { background: #6fb6ff; border-color: #6fb6ff; }
+button.primary:disabled { box-shadow: none; }
 button:disabled { opacity: 0.45; cursor: not-allowed; }
 .ghost-btn { background: var(--glass); border-color: var(--hair); }
 .ghost-btn[aria-pressed="true"] { border-color: var(--ref); color: var(--ref); }
-.ghost-btn.round { width: 37px; height: 37px; padding: 0; border-radius: 50%; font-weight: 600; }
-select { padding: 6px 8px; }
+.ghost-btn.round { width: 36px; height: 36px; padding: 0; border-radius: 50%; font-weight: 600; }
+select { padding: 6px 8px; min-height: 36px; }
 select.wide { width: 100%; }
 
 /* A row of buttons where one is "on". */
 .seg {
   position: relative;
   display: inline-flex; flex-wrap: wrap;
-  background: rgba(11, 15, 20, 0.78); border: 1px solid var(--hair); border-radius: 7px;
+  background: rgba(11, 15, 20, 0.78); border: 1px solid var(--hair); border-radius: var(--r-btn);
   padding: 2px; gap: 2px;
 }
 .seg button, .seg.radio span {
   position: relative; z-index: 1;   /* the words stay on top of the sliding light */
-  border: 0; background: none; border-radius: 5px; padding: 5px 11px;
+  border: 0; background: none; border-radius: 6px; padding: 4px 12px; line-height: 22px;
   color: var(--muted); font-weight: 500;
 }
 /* The "pill": one lit box that slides behind the button that is on
    (ui.js moves it). Without it, the button lights up by itself. */
 .pill {
   position: absolute; left: 0; top: 0; z-index: 0; width: 0; height: 0;
-  border-radius: 5px; background: var(--line); pointer-events: none;
+  border-radius: 6px; background: var(--line); pointer-events: none;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   transition: transform var(--t-switch) var(--ease), width var(--t-switch) var(--ease), height var(--t-switch) var(--ease);
 }
@@ -303,7 +321,7 @@ select.wide { width: 100%; }
 .panel .seg { background: var(--bg); }
 
 .field { margin: 0 0 12px; }
-.field.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.field.row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .field.row > label { flex: 0 0 auto; }
 .field.row > select { min-width: 0; }
 .field-label { display: block; margin-bottom: 4px; }
@@ -313,12 +331,12 @@ select.wide { width: 100%; }
 /* The real file chooser is hidden inside a normal-looking button. */
 .file-btn { display: inline-block; position: relative; overflow: hidden; margin-bottom: 4px; }
 .file-btn input[type="file"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
-.small-btn { font-size: 0.86rem; padding: 5px 10px; }
+.small-btn { font-size: 0.875rem; padding: 4px 8px; }
 
 .go { display: flex; flex-wrap: wrap; gap: 8px; }
 /* While the coach reads the video, the Analyze button itself fills up
    like a bar (coach.js sets --p, from 0 to 1). */
-.work { position: relative; overflow: hidden; min-width: 12.5em; }
+.work { position: relative; overflow: hidden; min-width: 200px; }
 .work-fill {
   position: absolute; inset: 0; opacity: 0;
   background: rgba(6, 24, 43, 0.24);
@@ -328,63 +346,62 @@ select.wide { width: 100%; }
 .work.working .work-fill { opacity: 1; }
 .work-label { position: relative; }
 button.work.working:disabled { opacity: 1; cursor: progress; }
-.analyze-row { align-items: center; gap: 8px 14px; margin-top: 4px; }
+.analyze-row { align-items: center; gap: 8px 12px; margin-top: 4px; }
 .analyze-row .small { margin: 0; }
 
 /* The steps the coach goes through, and the shape of the report to come. */
-.steps { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 9px; }
-.steps li { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 0.92rem; transition: color var(--t-switch) ease-out; }
+.steps { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 8px; }
+.steps li { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.875rem; transition: color var(--t-switch) ease-out; }
 .step-mark { position: relative; flex: 0 0 auto; width: 16px; height: 16px; border: 1.5px solid var(--line); border-radius: 50%; }
 .steps li.now { color: var(--fg); }
 .steps li.now .step-mark { border-color: var(--ref); }
+/* The step the coach is ON blinks softly: that work is really going on.
+   (It is the only thing on the page that moves by itself.) */
 .steps li.now .step-mark::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--ref); animation: breathe 900ms ease-in-out infinite alternate; }
 .steps li.done .step-mark { border-color: var(--good); background: var(--good); }
 /* The check mark: two sides of a small box, turned. */
 .steps li.done .step-mark::after { content: ""; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid var(--bg); border-width: 0 2px 2px 0; transform: rotate(45deg); }
 @keyframes breathe { from { opacity: 0.35; } to { opacity: 1; } }
-.skeleton { display: grid; gap: 12px; animation: breathe 1100ms ease-in-out infinite alternate; }
-.sk-verdict { display: flex; align-items: center; gap: 20px; padding: 16px 18px; background: var(--bg); border: 1px solid var(--hair); border-radius: 8px; }
-.sk-ring { flex: 0 0 auto; width: 84px; height: 84px; border: 5px solid var(--line); border-radius: 50%; }
-.sk-lines { flex: 1; display: grid; gap: 10px; }
-.sk-lines i { height: 10px; border-radius: 5px; background: var(--line); }
+.skeleton { display: grid; gap: 12px; opacity: 0.7; }
+.sk-verdict { display: flex; align-items: center; gap: 20px; padding: 16px 20px; background: var(--bg); border: 1px solid var(--hair); border-radius: var(--r-card); }
+.sk-ring { flex: 0 0 auto; width: 96px; height: 96px; border: 6px solid var(--line); border-radius: 50%; }
+.sk-lines { flex: 1; display: grid; gap: 8px; }
+.sk-lines i { height: 8px; border-radius: 4px; background: var(--line); }
 .sk-lines i:nth-child(1) { width: 24%; }
 .sk-lines i:nth-child(2) { width: 62%; height: 16px; }
 .sk-lines i:nth-child(3) { width: 44%; }
 .sk-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-.sk-cards i { height: 132px; background: var(--bg); border: 1px solid var(--hair); border-top: 2px solid var(--line); border-radius: 8px; }
-.status { min-height: 1.5em; margin: 10px 0 0 !important; font-size: 0.9rem; }
-details summary { cursor: pointer; color: var(--muted); font-size: 0.9rem; }
+.sk-cards i { height: 136px; background: var(--bg); border: 1px solid var(--hair); border-radius: var(--r-card); }
+.status { min-height: 1.5em; margin: 8px 0 0 !important; font-size: 0.875rem; }
+details summary { cursor: pointer; color: var(--muted); font-size: 0.875rem; }
 details[open] summary { margin-bottom: 8px; }
 
-.legend { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; }
-.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }
+.legend { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 0.875rem; }
+/* A small colored dot says the grade: green, yellow or red. */
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; }
 .dot.good { background: var(--good); }
 .dot.close { background: var(--close); }
 .dot.far { background: var(--far); }
-.glossary { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; font-size: 0.86rem; }
-.glossary dt { font-family: var(--display); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.glossary { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; font-size: 0.875rem; }
+.glossary dt { font-weight: 500; }
 .glossary dd { margin: 0; color: var(--muted); }
 
 /* ---------- Session report ---------- */
 .results-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.results-body { display: flex; gap: 14px; align-items: flex-start; }
+.results-body { display: flex; gap: 12px; align-items: flex-start; }
 .cards {
   flex: 1; min-width: 0;
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(208px, 1fr)); gap: 12px;
 }
 
 /* Layer 1: the answer at a glance. A ring ("1 / 3 on target") and the
    ONE thing to work on next. */
 .verdict {
   display: flex; align-items: center; gap: 20px;
-  margin: 0 0 12px; padding: 16px 18px;
-  background: var(--bg); border: 1px solid var(--hair); border-radius: 8px;
+  margin: 0 0 12px; padding: 16px 20px;
+  background: var(--bg); border: 1px solid var(--hair); border-radius: var(--r-card);
 }
 .ring { position: relative; flex: 0 0 auto; width: 96px; height: 96px; }
-/* Everything on target: the ring gets ONE soft green glow as it fills. */
-.ring::after { content: ""; position: absolute; inset: 2px; border-radius: 50%; box-shadow: 0 0 26px 6px rgba(47, 191, 113, 0.55); opacity: 0; pointer-events: none; }
-.reveal .verdict.good .ring::after { animation: glow 1500ms ease-out 650ms; }
-@keyframes glow { 35% { opacity: 1; } }
 .ring svg { display: block; width: 100%; height: 100%; transform: rotate(-90deg); }   /* start filling at the top */
 .ring-track, .ring-fill { fill: none; stroke-width: 5; }
 .ring-track { stroke: var(--line); }
@@ -393,104 +410,104 @@ details[open] summary { margin-bottom: 8px; }
 .verdict.close .ring-fill { stroke: var(--close); }
 .verdict.far .ring-fill { stroke: var(--far); }
 .ring-text { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; font-family: var(--display); }
-.ring-num { font-size: 2.1rem; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
-.ring-of { font-size: 1.15rem; font-weight: 500; color: var(--muted); margin-left: 2px; }
-.ring-cap { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-top: 3px; }
+.ring-num { font-size: 2.25rem; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.ring-of { font-size: 1.125rem; font-weight: 500; color: var(--muted); margin-left: 2px; }
+.ring-cap { font-family: var(--font); font-size: 0.6875rem; font-weight: 500; line-height: 14px; color: var(--muted); margin-top: 2px; }
 .verdict-text { min-width: 0; }
-.eyebrow { font-family: var(--display); font-weight: 600; font-size: 0.86rem; letter-spacing: 0.13em; text-transform: uppercase; color: var(--muted); }
+/* The small line over a headline. Its color is the grade. */
+.eyebrow { font-size: 0.8125rem; font-weight: 500; color: var(--muted); }
 .eyebrow.good { color: var(--good); }
 .eyebrow.close { color: var(--close); }
 .eyebrow.far { color: var(--far); }
-.verdict-main { margin: 2px 0 8px !important; font-size: 1.4rem; font-weight: 600; line-height: 1.25; letter-spacing: -0.01em; text-wrap: balance; }
-.verdict-rest { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 0.88rem; color: var(--muted); }
-.verdict-rest .dot { margin-right: 7px; }
+.verdict-main { margin: 4px 0 8px !important; font-size: 1.375rem; font-weight: 600; line-height: 1.25; text-wrap: balance; }
+.verdict-rest { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 0.875rem; color: var(--muted); }
 .dot.none { background: var(--line); }
 
 /* Layer 3: the short line about the orange skater, and the rest folded away. */
-.kid-note { margin: 14px 0 6px !important; max-width: 85ch; }
+.kid-note { margin: 16px 0 8px !important; max-width: 85ch; }
 details.more p { max-width: 85ch; }
 
 /* The report's entrance (the one long moment on the page). Until the
    report is seen it waits, invisible. Then the top block rises, the
    cards rise one after another (--i is the card's number), and the
-   grade badge shows last. */
+   grade shows last. */
 .waiting .verdict, .waiting .check.enter { opacity: 0; }
-.reveal .verdict { animation: rise 420ms var(--ease) both; }
-.reveal .check.enter { animation: rise 420ms var(--ease) both; animation-delay: calc(140ms + var(--i, 0) * 70ms); }
-.reveal .check.enter .chip { animation: fade-in 300ms ease-out both; animation-delay: calc(560ms + var(--i, 0) * 70ms); }
+.reveal .verdict { animation: rise var(--t-panel) var(--ease) both; }
+.reveal .check.enter { animation: rise var(--t-panel) var(--ease) both; animation-delay: calc(120ms + var(--i, 0) * 60ms); }
+.reveal .check.enter .chip { animation: fade-in var(--t-switch) ease-out both; animation-delay: calc(440ms + var(--i, 0) * 60ms); }
 
 /* ---------- The video with tracking drawn on top ---------- */
 .report { display: flex; flex-direction: column; gap: 16px; }
-.video-box { position: relative; width: fit-content; max-width: 100%; margin: 0 auto 10px; line-height: 0; background: #000; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.video-box { position: relative; width: fit-content; max-width: 100%; margin: 0 auto 12px; line-height: 0; background: #000; border: 1px solid var(--line); border-radius: var(--r-btn); overflow: hidden; }
 .video-box video { display: block; max-width: 100%; max-height: 56vh; }
 .video-box canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; touch-action: manipulation; }
-.pick-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.pick-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .pick-row input[type="range"] { flex: 1; width: auto; min-width: 0; }
-.pick-row output { min-width: 3.4em; text-align: right; font-size: 0.86rem; }
-.note { margin: 0 0 12px !important; padding: 8px 12px; border-left: 3px solid var(--close); border-radius: 0 6px 6px 0; background: var(--bg); font-size: 0.88rem; }
+.pick-row output { min-width: 3.4em; text-align: right; font-size: 0.8125rem; }
+/* A warning (the numbers are rough): a yellow dot in front of the words. */
+.note { margin: 0 0 12px !important; padding: 8px 12px; border: 1px solid var(--hair); border-radius: var(--r-btn); background: var(--bg); font-size: 0.875rem; }
+.note::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--close); }
 
-.check { display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--hair); border-top: 2px solid var(--muted); border-radius: 8px; padding: 12px 14px 14px; }
-.check.good { border-top-color: var(--good); }
-.check.close { border-top-color: var(--close); }
-.check.far { border-top-color: var(--far); }
+/* One card for each number. The name and the grade on top, the big
+   number, the ruler, the tip. */
+.check { display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--hair); border-radius: var(--r-card); padding: 16px; }
 .check-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.check-name { font-family: var(--display); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-.chip {
-  font-family: var(--display); font-weight: 600; font-size: 0.85rem; letter-spacing: 0.06em; text-transform: uppercase;
-  padding: 1px 8px; border-radius: 4px; white-space: nowrap; border: 1px solid currentColor;
-  /* A light wash of the badge's own color behind the word. */
-  background: color-mix(in srgb, currentColor 13%, transparent);
-  border-color: color-mix(in srgb, currentColor 50%, transparent);
-}
+.check-name { font-size: 0.875rem; font-weight: 500; color: var(--fg-2); }
+/* The grade: a colored dot and one or two words. */
+.chip { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8125rem; font-weight: 500; white-space: nowrap; color: var(--muted); }
+.chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .good .chip { color: var(--good); }
 .close .chip { color: var(--close); }
 .far .chip { color: var(--far); }
-.check-nums { display: flex; align-items: baseline; gap: 10px; margin: 2px 0 0; }
-.big { font-family: var(--display); font-size: 2.4rem; font-weight: 600; line-height: 1.1; }
+.check-nums { display: flex; align-items: baseline; gap: 8px; margin: 4px 0 0; }
+/* The numbers we measured are written in scoreboard letters. */
+.big { font-family: var(--display); font-size: 2.5rem; font-weight: 600; line-height: 1.1; }
 .check .big { font-size: 3rem; line-height: 1; }
 .deg { font-size: 0.5em; color: var(--muted); vertical-align: 0.75em; margin-left: 2px; }
-.goal { color: var(--muted); font-size: 0.86rem; font-variant-numeric: tabular-nums; }
-.tip { margin: 8px 0 0 !important; font-size: 0.9rem; }
+.goal { color: var(--muted); font-size: 0.8125rem; font-variant-numeric: tabular-nums; }
+.tip { margin: 8px 0 0 !important; font-size: 0.875rem; }
 /* A card is also a button: tap it and the 3D picture goes to that joint.
    The card that is "on" gets a blue edge. */
 .check[role="button"] {
   cursor: pointer; -webkit-tap-highlight-color: transparent;
-  transition: box-shadow var(--t-press) ease-out, background-color var(--t-press) ease-out, transform var(--t-press) var(--ease);
+  transition: border-color var(--t-press) ease-out, box-shadow var(--t-press) ease-out, background-color var(--t-press) ease-out, transform var(--t-press) var(--ease);
 }
-.check[role="button"]:hover { box-shadow: 0 0 0 1px rgba(148, 178, 214, 0.26); }
+.check[role="button"]:hover { border-color: rgba(148, 178, 214, 0.3); }
 .check[role="button"]:active { transform: scale(0.985); }
-.check[aria-pressed="true"], .check[aria-pressed="true"]:hover { background: #0d1520; box-shadow: 0 0 0 1.5px var(--ref), 0 8px 26px rgba(77, 163, 255, 0.14); }
+.check[aria-pressed="true"], .check[aria-pressed="true"]:hover { background: #0d1520; border-color: var(--ref); box-shadow: 0 0 0 1px var(--ref); }
 .check-look {
-  display: inline-flex; align-items: center; gap: 7px; margin-top: auto; padding-top: 12px;
-  font-family: var(--display); font-weight: 600; font-size: 0.8rem; letter-spacing: 0.1em; text-transform: uppercase;
+  display: inline-flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 12px;
+  font-size: 0.8125rem; font-weight: 500;
   color: var(--muted); transition: color var(--t-press) ease-out;
 }
 /* The small "target" in front of the words. */
-.check-look::before { content: ""; width: 11px; height: 11px; border: 1.5px solid currentColor; border-radius: 50%; background: radial-gradient(currentColor 0 2px, transparent 2.6px); }
+.check-look::before { content: ""; width: 12px; height: 12px; border: 1.5px solid currentColor; border-radius: 50%; background: radial-gradient(currentColor 0 2px, transparent 2.6px); }
 .check[role="button"]:hover .check-look { color: var(--fg); }
 .check[aria-pressed="true"] .check-look, .check[aria-pressed="true"]:hover .check-look { color: var(--ref); }
 
 /* The ruler: green part = target range, mark = the skater.
-   The mark sits at the right end of an unseen box as wide as the
-   ruler; sliding that box slides the mark (and a slide is cheap for
-   the phone to draw). */
-.ruler { position: relative; height: 8px; background: var(--line); border-radius: 4px; margin: 14px 3px 8px; }
-.ruler-goal { position: absolute; top: 0; bottom: 0; background: linear-gradient(90deg, #26a560, #36d17d); border-radius: 4px; transition: left 500ms var(--ease), width 500ms var(--ease); }
-.ruler-you { position: absolute; top: 0; bottom: 0; left: -100%; width: 100%; pointer-events: none; transition: transform 500ms var(--ease); }
+   Both are moved by SLIDING and STRETCHING a box as wide as the ruler
+   (that is cheap for a phone to draw; changing a box's real width is
+   not). The green part lives in a rounded window, so its ends stay
+   round while it stretches. */
+.ruler { position: relative; height: 8px; margin: 16px 4px 8px; }
+.ruler-track { position: absolute; inset: 0; overflow: hidden; background: var(--line); border-radius: 4px; }
+.ruler-goal { position: absolute; inset: 0; background: var(--good); transform-origin: left; transition: transform var(--t-show) var(--ease); }
+.ruler-you { position: absolute; top: 0; bottom: 0; left: -100%; width: 100%; pointer-events: none; transition: transform var(--t-show) var(--ease); }
 .ruler-dot { position: absolute; right: -2px; top: -6px; width: 4px; height: 20px; background: var(--fg); border-radius: 2px; box-shadow: 0 0 0 2px var(--bg); }
 
 /* ---------- Replay ---------- */
-.replay { margin-top: 16px; border-top: 1px solid var(--hair); padding-top: 14px; }
+.replay { margin-top: 16px; border-top: 1px solid var(--hair); padding-top: 16px; }
 .replay h3 { margin: 0; }
-.replay-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 10px; }
-.inline { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 0.9rem; }
+.replay-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; }
+.inline { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.875rem; }
 /* The curve: the angle in every picture, over the green target band
    (chart.js draws it). */
-.curve-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 14px; margin-bottom: 8px; }
+.curve-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 8px; }
 .curve-key { display: inline-flex; align-items: center; gap: 8px; }
-.curve-key::before { content: ""; width: 18px; height: 10px; border-radius: 2px; background: rgba(47, 191, 113, 0.22); border: 1px dashed rgba(47, 191, 113, 0.7); border-width: 1px 0; }
+.curve-key::before { content: ""; width: 16px; height: 8px; border-radius: 2px; background: rgba(47, 191, 113, 0.22); border: 1px dashed rgba(47, 191, 113, 0.7); border-width: 1px 0; }
 .curve {
-  position: relative; height: 158px; margin-bottom: 8px; border-radius: 6px;
+  position: relative; height: 160px; margin-bottom: 8px; border-radius: var(--r-btn);
   cursor: ew-resize; touch-action: pan-y;   /* a finger going sideways scrubs; up and down still scrolls the page */
   -webkit-user-select: none; user-select: none;
 }
@@ -506,7 +523,6 @@ details.more p { max-width: 85ch; }
 .curve-band { fill: rgba(47, 191, 113, 0.15); }
 .curve-band-edge { stroke: rgba(47, 191, 113, 0.6); stroke-width: 1; stroke-dasharray: 3 4; }
 .curve-label { font-family: var(--font); font-size: 11px; font-weight: 500; fill: var(--muted); text-anchor: end; font-variant-numeric: tabular-nums; }
-.curve-label.quiet { font-family: var(--display); font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; }
 .curve-hole { stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 3; }
 .curve-line { fill: none; stroke-width: 2.6; stroke-linejoin: round; stroke-linecap: round; }
 .curve-line.plain { stroke: #8296b0; stroke-width: 2; }
@@ -523,176 +539,140 @@ details.more p { max-width: 85ch; }
 .curve-now { position: absolute; left: 0; top: 0; bottom: 0; width: 0; pointer-events: none; }
 .curve-now::before { content: ""; position: absolute; left: -0.5px; top: 12px; bottom: 20px; width: 1px; background: rgba(232, 238, 245, 0.7); }
 .curve-dot { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%; background: var(--fg); box-shadow: 0 0 0 2.5px var(--bg); }
-.curve-tag { position: absolute; left: 9px; top: 0; padding: 1px 6px; border-radius: 4px; background: var(--fg); color: var(--bg); font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
-.curve-tag.flip { left: -9px; }
+.curve-tag { position: absolute; left: 8px; top: 0; padding: 2px 6px; border-radius: 4px; background: var(--fg); color: var(--bg); font-size: 0.75rem; line-height: 16px; font-weight: 600; white-space: nowrap; }
+.curve-tag.flip { left: -8px; }
 
-/* ---------- Positioning board ---------- */
+/* ---------- The three rinks seen from above ---------- */
+/* (The positioning board, the game and the referee share their paint.) */
 .board-wrap {
-  border: 1px solid var(--hair); border-radius: 10px; background: linear-gradient(180deg, #151d28, #111821);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 10px 28px rgba(0, 0, 0, 0.22);
+  border: 1px solid var(--hair); border-radius: var(--r-panel); background: var(--panel);
   padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 12px;
 }
 #board { display: block; width: 100%; max-width: 620px; max-height: 76vh; touch-action: none; cursor: crosshair; }
-#board .ice { fill: var(--ice); stroke: #55667a; stroke-width: 0.6; }
-#board .line-red { stroke: #c8243a; fill: none; }
-#board .line-blue { stroke: #1f56b5; fill: none; }
-#board .wide { stroke-width: 1; }
-#board .thin { stroke-width: 0.35; }
-#board .dot-red { fill: #c8243a; }
-#board .crease { fill: #bcd9f2; stroke: #c8243a; stroke-width: 0.3; }
-#board .net { fill: none; stroke: #55667a; stroke-width: 0.4; }
-#board .rink-note { font-family: var(--display); font-size: 2.3px; font-weight: 600; letter-spacing: 0.25px; fill: #7b8a9c; text-anchor: middle; }
-#board .rink-note.end { text-anchor: end; }
-#board .puck { fill: #0b0f14; }
-#board .marker text { font-family: var(--display); font-size: 2.7px; font-weight: 700; text-anchor: middle; pointer-events: none; }
-#board .marker.mate circle { fill: #1c3f6e; stroke: #fff; stroke-width: 0.35; }
-#board .marker.mate text { fill: #fff; }
-#board .marker.opp circle { fill: #fff; stroke: #c8243a; stroke-width: 0.6; }
-#board .marker.opp text { fill: #c8243a; }
-#board .marker.you { cursor: grab; }
-#board .marker.you circle { fill: #ff9f43; stroke: #0b0f14; stroke-width: 0.6; r: 3.5px; }
-#board .marker.you text { fill: #0b0f14; }
-#board .zone-good { fill: rgba(47, 191, 113, 0.3); stroke: #1e9457; stroke-width: 0.35; }
-#board .zone-close { fill: rgba(230, 180, 34, 0.16); stroke: #b98d0a; stroke-width: 0.3; stroke-dasharray: 1.2 1; }
-#board .measure { stroke: #0b0f14; stroke-width: 0.3; stroke-dasharray: 0.8 0.8; }
-.board-key { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.86rem; color: var(--muted); }
-.key { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+#game-rink { display: block; width: 100%; touch-action: none; cursor: crosshair; }
+#ref-rink { display: block; width: 100%; max-height: 70vh; }
+:is(#board, #game-rink, #ref-rink) .ice { fill: var(--ice); stroke: #55667a; stroke-width: 0.6; }
+:is(#board, #game-rink, #ref-rink) .line-red { stroke: #c8243a; fill: none; }
+:is(#board, #game-rink, #ref-rink) .line-blue { stroke: #1f56b5; fill: none; }
+:is(#board, #game-rink, #ref-rink) .wide { stroke-width: 1; }
+:is(#board, #game-rink, #ref-rink) .thin { stroke-width: 0.35; }
+:is(#board, #game-rink, #ref-rink) .dot-red { fill: #c8243a; }
+:is(#board, #game-rink, #ref-rink) .crease { fill: #bcd9f2; stroke: #c8243a; stroke-width: 0.3; }
+:is(#board, #game-rink, #ref-rink) .net { fill: none; stroke: #55667a; stroke-width: 0.4; }
+/* The words painted on the ice, and the letters on the players. */
+:is(#board, #game-rink, #ref-rink) .rink-note { font-family: var(--display); font-size: 2.3px; font-weight: 600; letter-spacing: 0.25px; fill: #7b8a9c; text-anchor: middle; }
+:is(#board, #game-rink, #ref-rink) .rink-note.end { text-anchor: end; }
+:is(#board, #game-rink, #ref-rink) .puck { fill: #0b0f14; }
+:is(#board, #game-rink, #ref-rink) .marker text { font-family: var(--display); font-size: 2.7px; font-weight: 700; text-anchor: middle; pointer-events: none; }
+:is(#board, #game-rink, #ref-rink) .marker.mate circle { fill: #1c3f6e; stroke: #fff; stroke-width: 0.35; }
+:is(#board, #game-rink, #ref-rink) .marker.mate text { fill: #fff; }
+:is(#board, #game-rink, #ref-rink) .marker.opp circle { fill: #fff; stroke: #c8243a; stroke-width: 0.6; }
+:is(#board, #game-rink, #ref-rink) .marker.opp text { fill: #c8243a; }
+:is(#board, #game-rink) .marker.you { cursor: grab; }
+:is(#board, #game-rink) .marker.you circle { fill: #ff9f43; stroke: #0b0f14; stroke-width: 0.6; r: 3.5px; }
+:is(#board, #game-rink) .marker.you text { fill: #0b0f14; }
+:is(#board, #game-rink) .zone-good { fill: rgba(47, 191, 113, 0.3); stroke: #1e9457; stroke-width: 0.35; }
+:is(#board, #game-rink) .zone-close { fill: rgba(230, 180, 34, 0.16); stroke: #b98d0a; stroke-width: 0.3; stroke-dasharray: 1.2 1; }
+:is(#board, #game-rink) .measure { stroke: #0b0f14; stroke-width: 0.3; stroke-dasharray: 0.8 0.8; }
+:is(#game-rink, #ref-rink) .goalie { stroke: #0b0f14; stroke-width: 0.3; }
+:is(#game-rink, #ref-rink) .goalie.ours { fill: #1c3f6e; }
+:is(#game-rink, #ref-rink) .goalie.theirs { fill: #c8243a; }
+:is(#game-rink, #ref-rink) .fill-red { fill: #c8243a; }
+:is(#game-rink, #ref-rink) .fill-blue { fill: #1f56b5; }
+.board-key { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 0.875rem; color: var(--muted); }
+.key { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; vertical-align: -1px; }
 .key.you { background: var(--you); }
 .key.mate { background: #1c3f6e; border: 1px solid #fff; }
 .key.opp { background: #fff; border: 2px solid #c8243a; }
 .key.puck { background: #000; border: 1px solid var(--muted); width: 8px; height: 8px; }
 
-/* The answer box rises into place each time it appears. */
-.pos-result { margin: 12px 0 10px; background: var(--bg); border: 1px solid var(--hair); border-left: 3px solid var(--muted); border-radius: 6px; padding: 10px 12px; animation: rise var(--t-panel) var(--ease); }
-.pos-result.good { border-left-color: var(--good); }
-.pos-result.close { border-left-color: var(--close); }
-.pos-result.far { border-left-color: var(--far); }
-.pos-result-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; font-size: 0.9rem; }
-.pos-result p { margin: 0; font-size: 0.92rem; }
+/* The answer box rises into place each time it appears. A colored dot
+   and a word say how it went. */
+.pos-result { margin: 12px 0 8px; background: var(--bg); border: 1px solid var(--hair); border-radius: var(--r-card); padding: 12px; animation: rise var(--t-panel) var(--ease); }
+.pos-result-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 0.875rem; }
+.pos-result p { margin: 0; font-size: 0.875rem; }
 /* How a shift ended, and the referee's call: a small colored word,
    then the sentence, like the top of the skating report. */
-.call-result .eyebrow { margin-bottom: 2px; }
+.call-result .eyebrow { margin-bottom: 4px; }
 .call-result.good .eyebrow { color: var(--good); }
 .call-result.close .eyebrow { color: var(--close); }
 .call-result.far .eyebrow { color: var(--far); }
-.pos-result .result-main { font-size: 1.15rem; font-weight: 600; line-height: 1.3; }
-.call-result p + p { margin-top: 6px; }
+.pos-result .result-main { font-size: 1.125rem; font-weight: 600; line-height: 1.3; }
+.call-result p + p { margin-top: 8px; }
 
 .foot {
-  text-align: center; color: var(--muted); font-size: 0.82rem;
+  text-align: center; color: var(--muted); font-size: 0.8125rem;
   padding-block: 4px 24px;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-left: max(24px, env(safe-area-inset-left, 0px));
+  padding-right: max(24px, env(safe-area-inset-right, 0px));
 }
 
-/* ---------- Small screens: stack everything ---------- */
 /* ---------- Simulation game ---------- */
-#game-rink { display: block; width: 100%; touch-action: none; cursor: crosshair; }
-#game-rink .ice { fill: var(--ice); stroke: #55667a; stroke-width: 0.6; }
-#game-rink .line-red { stroke: #c8243a; fill: none; }
-#game-rink .line-blue { stroke: #1f56b5; fill: none; }
-#game-rink .wide { stroke-width: 1; }
-#game-rink .thin { stroke-width: 0.35; }
-#game-rink .dot-red { fill: #c8243a; }
-#game-rink .crease { fill: #bcd9f2; stroke: #c8243a; stroke-width: 0.3; }
-#game-rink .net { fill: none; stroke: #55667a; stroke-width: 0.4; }
-#game-rink .rink-note { font-family: var(--display); font-size: 2.3px; font-weight: 600; letter-spacing: 0.25px; fill: #7b8a9c; text-anchor: middle; }
-#game-rink .rink-note.end { text-anchor: end; }
-#game-rink .puck { fill: #0b0f14; }
-#game-rink .marker text { font-family: var(--display); font-size: 2.7px; font-weight: 700; text-anchor: middle; pointer-events: none; }
-#game-rink .marker.mate circle { fill: #1c3f6e; stroke: #fff; stroke-width: 0.35; }
-#game-rink .marker.mate text { fill: #fff; }
-#game-rink .marker.opp circle { fill: #fff; stroke: #c8243a; stroke-width: 0.6; }
-#game-rink .marker.opp text { fill: #c8243a; }
-#game-rink .marker.you { cursor: grab; }
-#game-rink .marker.you circle { fill: #ff9f43; stroke: #0b0f14; stroke-width: 0.6; r: 3.5px; }
-#game-rink .marker.you text { fill: #0b0f14; }
-#game-rink .zone-good { fill: rgba(47, 191, 113, 0.3); stroke: #1e9457; stroke-width: 0.35; }
-#game-rink .zone-close { fill: rgba(230, 180, 34, 0.16); stroke: #b98d0a; stroke-width: 0.3; stroke-dasharray: 1.2 1; }
-#game-rink .measure { stroke: #0b0f14; stroke-width: 0.3; stroke-dasharray: 0.8 0.8; }
-#game-rink .goalie { stroke: #0b0f14; stroke-width: 0.3; }
-#game-rink .goalie.ours { fill: #1c3f6e; }
-#game-rink .goalie.theirs { fill: #c8243a; }
 #game-rink .marker.has-puck circle { stroke: #0b0f14; stroke-width: 1.1; }
 #game-rink .reach { fill: none; stroke: #c9731a; stroke-width: 0.35; stroke-dasharray: 1.6 1.4; pointer-events: none; }
 #game-rink .preview { stroke: #0b0f14; stroke-width: 0.5; stroke-dasharray: 1.2 1.2; pointer-events: none; }
 .key.reach { background: none; border: 1px dashed var(--you); }
-/* The scoreboard: one dark bar like on TV. A colored edge for each
-   side, the numbers in their own boxes, the shift in the middle. */
+/* THE SCOREBOARD: one dark bar like on TV, in scoreboard letters. A
+   colored edge for each side, the numbers in their own boxes, the
+   shift in the middle. */
 .scorebar {
   align-self: stretch; display: grid; grid-template-columns: 1fr auto 1fr; align-items: stretch;
-  margin-bottom: 10px; background: var(--bg); border: 1px solid var(--hair); border-radius: 8px; overflow: hidden;
+  margin-bottom: 4px; background: var(--bg); border: 1px solid var(--hair); border-radius: var(--r-btn); overflow: hidden;
 }
 .score { display: flex; align-items: center; }
 .score.them, .score.plain { justify-content: flex-end; }
-.score.us { box-shadow: inset 3px 0 0 var(--ref); }
-.score.them { box-shadow: inset -3px 0 0 var(--far); }
-.score.plain { box-shadow: inset -3px 0 0 var(--line); }
+.score.us { box-shadow: inset 4px 0 0 var(--ref); }
+.score.them { box-shadow: inset -4px 0 0 var(--far); }
+.score.plain { box-shadow: inset -4px 0 0 var(--line); }
 /* A score gives a small pulse when it changes (ui.js adds "bump"). */
-.score .big { display: inline-block; min-width: 54px; padding: 5px 8px; text-align: center; font-size: 2.1rem; line-height: 1.05; background: #151d28; }
+.score .big { display: inline-block; min-width: 56px; padding: 4px 8px; text-align: center; font-size: 2.25rem; line-height: 1.1; background: var(--panel-2); }
 .bump { animation: bump 380ms var(--ease); }
-@keyframes bump { from { transform: scale(1.25); color: var(--ref); } }
-.score .team { padding: 0 13px; font-family: var(--display); font-weight: 600; letter-spacing: 0.1em; color: var(--muted); }
+@keyframes bump { from { transform: scale(1.12); color: var(--ref); } }
+.score .team { padding: 0 12px; font-family: var(--display); font-weight: 600; letter-spacing: 0.08em; color: var(--muted); }
 .score-mid {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px 10px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px 8px;
   text-align: center; color: var(--muted); text-wrap: balance;
   font-family: var(--display); letter-spacing: 0.06em; text-transform: uppercase;
 }
-.score-mid .small { font-size: 0.9rem; }
+.score-mid .small { font-size: 0.9375rem; }
 /* The puck's path: a thin line that grows behind the puck, then stays, fainter. */
 #game-rink .trail { fill: none; stroke: #0b0f14; stroke-width: 0.55; stroke-linejoin: round; stroke-linecap: round; opacity: 0.6; pointer-events: none; }
 #game-rink .trail.done { opacity: 0.26; stroke-dasharray: 1.4 1.2; }
 /* The referee's level switch, above the rink. */
-.level-row { align-self: stretch; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.level-row { align-self: stretch; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .level-note { flex: 1 1 220px; }
 .board-wrap .seg { background: var(--bg); }
-.choices { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
-.choice { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; text-align: left; border-left: 3px solid var(--muted); }
-.choice.good { border-left-color: var(--good); }
-.choice.close { border-left-color: var(--close); }
-.choice.far { border-left-color: var(--far); }
-.choice.shot { border-left-color: var(--ref); }
+/* The plays you can pick. The dot in front of each one says how good
+   its chance is: green, yellow or red (blue = a shot). The dots stand
+   in one column, the chances in another. */
+.choices { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.choice { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; }
+.choice::before { content: ""; flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.choice.good::before { background: var(--good); }
+.choice.close::before { background: var(--close); }
+.choice.far::before { background: var(--far); }
+.choice.shot::before { background: var(--ref); }
+.choice span:first-child { flex: 1; min-width: 0; }
 .choice .odds { color: var(--muted); white-space: nowrap; }
-.game-story { align-self: stretch; width: 100%; margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
-.game-story h2 { margin: 0 0 6px; font-family: var(--display); font-size: 0.86rem; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
-.game-log { list-style: none; margin: 0; padding: 0; max-height: 230px; overflow-y: auto; font-size: 0.92rem; }
-.game-log li { padding: 5px 0; border-bottom: 1px solid var(--line); }
+.game-story { align-self: stretch; width: 100%; margin-top: 4px; border-top: 1px solid var(--hair); padding-top: 12px; }
+.game-story h2 { margin: 0 0 4px; }
+.game-log { list-style: none; margin: 0; padding: 0; max-height: 232px; overflow-y: auto; font-size: 0.875rem; }
+.game-log li { padding: 6px 0; border-bottom: 1px solid var(--hair); }
 .game-log li:last-child { border-bottom: 0; }
-.game-log li.shift { color: var(--muted); font-family: var(--display); letter-spacing: 0.04em; text-transform: uppercase; font-size: 0.82rem; }
+.game-log li.shift { color: var(--muted); font-size: 0.8125rem; }
 .game-log li.goal-us { color: var(--good); font-weight: 600; }
 .game-log li.goal-them { color: var(--far); font-weight: 600; }
 .game-log li.whistle, .game-log li.change, .game-log li.offside { color: var(--close); }
+
 /* ---------- You make the call (referee) ---------- */
-#ref-rink { display: block; width: 100%; max-height: 70vh; }
-#ref-rink .ice { fill: var(--ice); stroke: #55667a; stroke-width: 0.6; }
-#ref-rink .line-red { stroke: #c8243a; fill: none; }
-#ref-rink .line-blue { stroke: #1f56b5; fill: none; }
-#ref-rink .wide { stroke-width: 1; }
-#ref-rink .thin { stroke-width: 0.35; }
-#ref-rink .dot-red { fill: #c8243a; }
-#ref-rink .crease { fill: #bcd9f2; stroke: #c8243a; stroke-width: 0.3; }
-#ref-rink .net { fill: none; stroke: #55667a; stroke-width: 0.4; }
-#ref-rink .rink-note { font-family: var(--display); font-size: 2.3px; font-weight: 600; letter-spacing: 0.25px; fill: #7b8a9c; text-anchor: middle; }
-#ref-rink .rink-note.end { text-anchor: end; }
-#ref-rink .puck { fill: #0b0f14; }
-#ref-rink .marker text { font-family: var(--display); font-size: 2.7px; font-weight: 700; text-anchor: middle; pointer-events: none; }
-#ref-rink .marker.mate circle { fill: #1c3f6e; stroke: #fff; stroke-width: 0.35; }
-#ref-rink .marker.mate text { fill: #fff; }
-#ref-rink .marker.opp circle { fill: #fff; stroke: #c8243a; stroke-width: 0.6; }
-#ref-rink .marker.opp text { fill: #c8243a; }
-#game-rink .fill-red, #ref-rink .fill-red { fill: #c8243a; }
-#game-rink .fill-blue, #ref-rink .fill-blue { fill: #1f56b5; }
-#ref-rink .goalie { stroke: #0b0f14; stroke-width: 0.3; }
-#ref-rink .goalie.ours { fill: #1c3f6e; }
-#ref-rink .goalie.theirs { fill: #c8243a; }
 #ref-rink .marker.faded circle { fill-opacity: 0.35; }
 #ref-rink .skate { fill: #0b0f14; }
 #ref-rink .hl-line { stroke: #ffd21f; stroke-width: 0.5; }
 #ref-rink .hl-path { stroke: #0b0f14; stroke-width: 0.4; stroke-dasharray: 1.6 1.2; }
 #ref-rink .hl-ring { fill: none; stroke: #ffd21f; stroke-width: 0.6; }
-.ref-banner { align-self: stretch; margin: 0; padding: 7px 12px; border: 1px solid var(--close); border-radius: 4px; color: var(--close); font-size: 0.9rem; text-align: center; }
-.calls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
-.call { min-height: 52px; font-family: var(--display); font-size: 1.1rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding: 6px 4px; }
+.ref-banner { align-self: stretch; margin: 0; padding: 8px 12px; border: 1px solid var(--hair); border-radius: var(--r-btn); color: var(--close); font-size: 0.875rem; text-align: center; }
+.calls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.call { min-height: 48px; font-size: 1rem; font-weight: 600; padding: 4px; }
 .call.right { border-color: var(--good); color: var(--good); opacity: 1; }
 .call.wrong { border-color: var(--far); color: var(--far); opacity: 1; }
 
@@ -701,15 +681,13 @@ details.more p { max-width: 85ch; }
    44 pixels tall. */
 @media (pointer: coarse), (max-width: 700px) {
   button, select, .file-btn { min-height: 44px; }
-  .seg button, .seg.radio span { min-height: 44px; padding: 10px 13px; }
+  .seg button, .seg.radio span { min-height: 44px; padding: 10px 12px; }
   .tabs button { min-height: 44px; }
-  summary { padding: 11px 0; }
-  input[type="range"] { height: 32px; }
+  summary { padding: 12px 0; }
+  input[type="range"] { height: 44px; }
   button, select, summary, .file-btn { touch-action: manipulation; }  /* no surprise zoom on a double tap */
-}
-@media (pointer: coarse), (max-width: 700px) {
   .ghost-btn.round { width: 44px; height: 44px; }
-  .tick { min-height: 44px; }
+  .tick, label.inline { min-height: 44px; }
 }
 @media (max-width: 900px) {
   .layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "stage" "side" "report"; }
@@ -720,10 +698,18 @@ details.more p { max-width: 85ch; }
   #stage { height: 58vh; }
   .bar-meta { display: none; }
   .results-body { flex-direction: column; align-items: stretch; }
-  /* Less room for the tool bar: the two switches explain themselves. */
+}
+/* Less room for the tool bar: the two switches explain themselves. */
+@media (max-width: 1340px) {
   .toolbar .tool > span.tool-label { display: none; }
+  .toolbar .tool { padding-left: 8px; }
 }
 @media (max-width: 700px) {
+  /* The page's edges are 16 wide on a phone (24 on a computer). */
+  .bar-in, .layout, .foot {
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
   /* THE TABS SIT AT THE BOTTOM, like in a phone app: your thumb reaches
      them, and all four fit. Each has a little picture over its name. */
   body { padding-bottom: calc(var(--tabbar) + env(safe-area-inset-bottom, 0px)); }
@@ -734,11 +720,10 @@ details.more p { max-width: 85ch; }
     background: rgba(13, 18, 25, 0.9); border-top: 1px solid var(--hair);
     -webkit-backdrop-filter: blur(14px) saturate(1.3); backdrop-filter: blur(14px) saturate(1.3);
   }
-  .tabs button { flex-direction: column; justify-content: center; gap: 3px; min-height: var(--tabbar); padding: 6px 2px; border-bottom: 0; font-size: 0.8rem; letter-spacing: 0.07em; }
+  .tabs button { flex-direction: column; justify-content: center; gap: 2px; min-height: var(--tabbar); padding: 6px 2px; border-bottom: 0; font-size: 0.6875rem; line-height: 14px; }
   .tabs button[aria-pressed="true"] { color: var(--ref); }
   .tab-icon { display: block; }
   .tab-long { display: none; }
-  .bar-in { padding-block: 8px; }
   .foot { padding-bottom: 16px; }
 
   /* THE 3D PICTURE. With a report, it gets smaller and STAYS at the top
@@ -749,7 +734,7 @@ details.more p { max-width: 85ch; }
      width in every browser.) */
   .stage-wrap { margin-inline: -16px; border-inline: 0; border-radius: 0; overflow: visible; }
   .has-report .stage-wrap { position: sticky; top: 0; z-index: 15; }
-  .has-report #stage { height: 40vh; min-height: 250px; }
+  .has-report #stage { height: 40vh; min-height: 248px; }
   .stage-top, .stage-bottom { left: 8px; right: 8px; gap: 6px; }
   .stage-top { top: 8px; flex-wrap: nowrap; }
   .stage-bottom { bottom: 8px; }
@@ -760,10 +745,11 @@ details.more p { max-width: 85ch; }
   /* The help box is a sheet that comes up from the bottom, above the tabs. */
   .popover {
     position: fixed; left: 0; right: 0; top: auto; bottom: calc(var(--tabbar) + env(safe-area-inset-bottom, 0px)); z-index: 35;
-    width: auto; max-height: 64vh; border-radius: 14px 14px 0 0; border-bottom: 0;
+    width: auto; max-height: 64vh; border-radius: var(--r-panel) var(--r-panel) 0 0; border-bottom: 0;
     background: rgba(13, 18, 25, 0.96);
   }
-  .start-card { bottom: 12px; padding: 12px 14px; }
+  .start-card { bottom: 12px; padding: 12px 16px; }
+  .start-main { font-size: 1.125rem; }
   .start-go { width: 100%; }
   .start-go button { flex: 1; }
   /* The tool bar shows only "Compare" and a "More" button that opens the rest. */
@@ -772,7 +758,7 @@ details.more p { max-width: 85ch; }
   .toolbar .tool.extra { display: none; }
   .toolbar:not(.open) .tool-label { display: none; }
   .more-btn { display: inline-block; margin-left: auto; }
-  .toolbar.open .tool { display: flex; flex: 1 0 100%; border-left: 0; padding: 0 6px; }
+  .toolbar.open .tool { display: flex; flex: 1 0 100%; border-left: 0; padding: 0 8px; }
   .toolbar.open .tool > span.tool-label { display: inline; }
   .toolbar.open .tool-label { min-width: 4.8em; }
   .toolbar.open .tool:nth-last-child(2) { flex: 1 1 auto; }   /* "Reset" shares its row with "Less" */
@@ -782,39 +768,45 @@ details.more p { max-width: 85ch; }
      just above the tabs, so the rink and the buttons are seen together
      without scrolling. */
   #game-rink, #ref-rink { width: auto; max-width: 100%; height: 42vh; max-height: none; margin: 0 auto; }
+  /* The rink is small here, so the words and letters on it are bigger. */
+  #board .rink-note { font-size: 3.2px; }
+  #board .marker text { font-size: 3.1px; }
+  #game-rink .rink-note { font-size: 4px; }
+  #game-rink .marker text { font-size: 3.4px; }
   .game-layout { padding-bottom: calc(42vh + var(--tabbar)); }
   .game-layout .board-key { display: none; }
-  .game-layout .board-wrap { padding: 10px; gap: 8px; }
+  .game-layout .board-wrap { padding: 8px; gap: 8px; }
   .game-layout .panel.move {
     position: fixed; left: 0; right: 0; bottom: calc(var(--tabbar) + env(safe-area-inset-bottom, 0px)); z-index: 20; margin: 0;
     max-height: 40vh; overflow-y: auto;
-    border-radius: 12px 12px 0 0; border: 1px solid var(--line); border-bottom: 0;
+    border-radius: var(--r-panel) var(--r-panel) 0 0; border: 1px solid var(--line); border-bottom: 0;
     box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.45);
-    padding: 10px 12px;
+    padding: 12px;
   }
   .game-layout .panel.move h2 { display: none; }
   .game-layout .panel.move p.small { margin-bottom: 8px; }
-  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-  .choice { padding: 6px 8px; font-size: 0.86rem; gap: 6px; }
-  .game-log { max-height: 84px; }
+  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .choice { padding: 6px 8px; font-size: 0.875rem; line-height: 20px; gap: 6px; }
+  .game-log { max-height: 88px; }
   .scorebar { margin-bottom: 0; }
-  .score .big { min-width: 46px; font-size: 1.8rem; }
-  .score .team { padding: 0 9px; }
-  .score-mid { padding: 4px 6px; letter-spacing: 0.04em; }
-  .score-mid .small { font-size: 0.78rem; }
+  .score .big { min-width: 48px; font-size: 1.75rem; }
+  .score .team { padding: 0 8px; }
+  .score-mid { padding: 4px 8px; letter-spacing: 0.04em; }
+  .score-mid .small { font-size: 0.75rem; }
   .level-row .tool-label, .level-note { display: none; }
   .level-row { justify-content: center; }
   .big { font-size: 2rem; }
-  .check .big { font-size: 2.7rem; }
-  .panel { padding: 14px 14px; }
-  .verdict { gap: 14px; padding: 14px 12px; }
+  .check .big { font-size: 2.75rem; }
+  .panel { padding: 12px; }
+  .verdict { gap: 12px; padding: 12px; }
   .ring { width: 80px; height: 80px; }
-  .ring-num { font-size: 1.8rem; }
-  .ring-cap { font-size: 0.6rem; letter-spacing: 0.08em; }
-  .verdict-main { font-size: 1.2rem; }
+  .ring-num { font-size: 1.75rem; }
+  .verdict-main { font-size: 1.25rem; }
+  .pos-result .result-main { font-size: 1rem; }
   .curve { height: 140px; }
   .sk-cards { grid-template-columns: 1fr; }
   .sk-cards i { height: 64px; }
+  .sk-ring { width: 80px; height: 80px; }
   .work { width: 100%; }
 }
 
@@ -826,5 +818,5 @@ details.more p { max-width: 85ch; }
   .pill, .ruler-you, .ruler-goal, .ring-fill, .curve-wipe, .curve-wipe-in, .work-fill { transition: none; }
   button:active:not(:disabled), .file-btn:active, .check[role="button"]:active { transform: none; }
   .reveal .verdict, .reveal .check.enter, .pos-result, .start-card, .popover { animation-name: fade-in; }
-  .bump, .skeleton, .steps li.now .step-mark::after, .reveal .verdict.good .ring::after { animation: none; }
+  .bump, .steps li.now .step-mark::after { animation: none; }
 }

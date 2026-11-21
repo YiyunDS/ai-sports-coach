@@ -562,13 +562,17 @@
       // A ruler: the green part is the goal, the mark is you.
       var ruler = make("div", "ruler");
       var span = check.high - check.low;
-      var zone = make("div", "ruler-goal");
+      var track = make("div", "ruler-track"), zone = make("div", "ruler-goal");
       var zoneLeft = (range.min - check.low) / span * 100, zoneWide = (range.max - range.min) / span * 100;
       var spot = M.clamp((s.value - check.low) / span, 0, 1) * 100;
       var you = make("div", "ruler-you");
       you.appendChild(make("div", "ruler-dot"));
-      ruler.appendChild(zone); ruler.appendChild(you);
+      track.appendChild(zone);
+      ruler.appendChild(track); ruler.appendChild(you);
       card.appendChild(ruler);
+      // The green part is a box as wide as the ruler. We slide it to
+      // where the goal starts and squeeze it to the goal's width.
+      function placeZone(left, wide) { zone.style.transform = "translateX(" + left + "%) scaleX(" + wide / 100 + ")"; }
 
       card.appendChild(make("p", "tip", check.tip(Math.round(s.off))));
       card.appendChild(make("span", "check-look"));
@@ -582,11 +586,9 @@
       you.style.transform = "translateX(" + fromSpot + "%)";
       number.textContent = String(fromValue);
       // The green goal also glides when the age or level changes it.
-      zone.style.left = (was && !fresh ? was.zoneLeft : zoneLeft) + "%";
-      zone.style.width = (was && !fresh ? was.zoneWide : zoneWide) + "%";
+      placeZone(was && !fresh ? was.zoneLeft : zoneLeft, was && !fresh ? was.zoneWide : zoneWide);
       movers.push(function () {
-        zone.style.left = zoneLeft + "%";
-        zone.style.width = zoneWide + "%";
+        placeZone(zoneLeft, zoneWide);
         you.style.transform = "translateX(" + spot + "%)";
         if (UI) UI.count(number, fromValue, value, fresh ? 700 : 300);
         else number.textContent = String(value);

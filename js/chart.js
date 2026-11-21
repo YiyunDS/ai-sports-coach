@@ -221,8 +221,8 @@
       if (data.peaksOnLine) shape("circle", { cx: x, cy: points[p.i].y, r: 4.5, class: "curve-peak on-line " + p.grade }, this.front);
     }, this);
     if (data.peaks && data.peaks.length) {
-      var word = shape("text", { x: left - 7, y: bottom + 13, class: "curve-label quiet" }, this.back);
-      word.textContent = "PUSH";
+      var word = shape("text", { x: left - 7, y: bottom + 13, class: "curve-label" }, this.back);
+      word.textContent = "Push";
     }
   };
 
