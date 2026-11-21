@@ -57,4 +57,39 @@ test("the ring shows the right share", function () {
   assert.ok(Math.abs(UI.ringDash(-1, r).hidden - around) < 1e-9);
 });
 
+test("the camera backs up just far enough to see a box", function () {
+  var fov = 35, half = Math.tan(fov / 2 * Math.PI / 180);
+  // A tall, narrow box in a wide picture: the height decides.
+  var d = UI.cameraDistance(1, 2, fov, 1.6);
+  assert.ok(Math.abs(2 * d * half - 2) < 1e-9, "at that distance the picture is exactly 2 m tall");
+  // A wide box in a narrow picture (a phone): the width decides.
+  var e = UI.cameraDistance(4, 1, fov, 0.6);
+  assert.ok(Math.abs(2 * e * half * 0.6 - 4) < 1e-9, "at that distance the picture is exactly 4 m wide");
+  // The box always fits: the picture is at least as tall and as wide as the box.
+  [[3, 1.9, 1.6], [3, 1.9, 0.6], [1.7, 1.25, 1.2], [5, 0.5, 2.4]].forEach(function (c) {
+    var dist = UI.cameraDistance(c[0], c[1], fov, c[2]);
+    assert.ok(2 * dist * half >= c[1] - 1e-9, "tall enough: " + c);
+    assert.ok(2 * dist * half * c[2] >= c[0] - 1e-9, "wide enough: " + c);
+  });
+  // A bigger box needs more distance; a wider eye needs less.
+  assert.ok(UI.cameraDistance(4, 2, fov, 1.6) > UI.cameraDistance(2, 1, fov, 1.6));
+  assert.ok(UI.cameraDistance(2, 2, 60, 1.6) < UI.cameraDistance(2, 2, 35, 1.6));
+});
+
+test("signs grow when the camera is far away, within limits", function () {
+  var fov = 35, half = Math.tan(fov / 2 * Math.PI / 180), base = 0.158;
+  // Find the distance where the sign already looks 28 pixels tall in a
+  // 500 pixel picture: there it needs no change.
+  var justRight = base * 500 / (2 * half * 28);
+  assert.ok(Math.abs(UI.signScale(justRight, fov, 500, 28, base) - 1) < 1e-9);
+  // One and a half times as far away: one and a half times as big.
+  assert.ok(Math.abs(UI.signScale(justRight * 1.5, fov, 500, 28, base) - 1.5) < 1e-9);
+  // A smaller picture (a phone) at the same distance: bigger signs.
+  assert.ok(UI.signScale(justRight, fov, 300, 28, base) > 1.5);
+  // Never tiny, never huge.
+  assert.strictEqual(UI.signScale(0.01, fov, 500, 28, base), 0.8);
+  assert.strictEqual(UI.signScale(500, fov, 500, 28, base), 2.2);
+  assert.strictEqual(UI.signScale(5, fov, 0, 28, base), 2.2);   // a picture with no height yet does not break it
+});
+
 console.log("All page-movement tests passed!");
