@@ -732,6 +732,131 @@ test browser; pictures in `docs/screenshots/phase16/`)
 - At phone width the buttons on top of the 3D picture still take two
   rows (as before).
 
+### Phase 17: A curve, cards that steer the 3D view, and a phone layout like an app (done, first version)
+
+After Phase 16 the team leader asked which looks and which kinds of
+movement fit the app, and then: build all eight suggested improvements.
+
+**1. The replay is a curve.** The rows of red blocks were the loudest
+thing on the page, louder than the answer. Now there is ONE line: the
+angle in every picture, over a green band (the target for this age).
+The line paints itself by its height: green inside the band, yellow a
+little outside, red far outside. A switch picks Knee, Lean or Push.
+Small marks along the bottom show the top of each push. For the push
+leg the line is plain and only the tops are colored dots, because only
+the top of a push is graded. Parts not seen from the side are faded, a
+dotted line marks a jump. The line draws itself from left to right when
+you first see it. Dragging along it scrubs, with no animation.
+
+**2. The report steers the 3D skater.** Tap a card: the camera glides
+close to that joint, its sign stays strong and the other signs fade,
+and the curve shows that same number. Tap again (or Side, Front, Top,
+or Reset) to see everything again. The signs now stand BESIDE their
+joint as the camera sees it, joined by a thin line, and they are drawn
+bigger when the camera is far away (on a phone they were too small to
+read). Only three signs by default; the elbow signs are a choice in
+the help box.
+
+**3. Phone: the answer on the first screen.** The four tabs sit at the
+bottom of the screen, each with a small picture we drew ourselves.
+Once there is a report, the 3D picture gets smaller, goes from edge to
+edge and STAYS at the top while you read. The report comes right under
+it, before the settings. The tool bar shows only Side by side /
+Overlay; "More" opens the rest. The help box is a sheet from the
+bottom.
+
+**4. A clear start.** A card on the 3D picture: "Use your video" and
+"Try the sample". It goes away once you pick one. The "No session yet"
+box is gone.
+
+**5. A darker stage, one tool bar.** The arena is dark around the
+edges, so the bright ice does not glare. Compare, You, Spacing and
+Reset are ONE bar of dark glass, and it only appears when there are
+two skaters. The camera leaves room for the bar and for the buttons
+on top, so nothing covers the skaters.
+
+**6. Loading that explains itself.** While the coach reads a video,
+the page shows the four steps (getting the pose finder ready, finding
+the skater, following the skater with a percent, measuring) and the
+grey shape of the report to come. The Analyze button moved under the
+video, where you just clicked the skater, and fills up like a bar.
+When the report is ready it goes ABOVE the video.
+
+**7. Game and Referee.** A scoreboard bar like on TV. In the Game the
+puck leaves a thin line behind it, and the line stays (fainter) so you
+can see what just happened. How a shift ended, and the referee's call,
+are said like the top of the skating report: a small colored word,
+then the sentence. In the Referee tab the Level switch moved above the
+rink, so the answer sheet no longer covers it.
+
+**8. A tidier side column.** "Reading the view" is now the "?" button
+on the 3D picture.
+
+Also from the list of movements: one soft green glow around the ring
+when everything is on target (no confetti).
+
+**New math, with tests**
+- `js/chart.js` + `tests/chart.test.js` (7 tests): the chart's lowest
+  and highest angle, how high an angle sits, which picture is under a
+  finger, where the line is cut at a hole, and the paint of the line.
+  The paint test checks every half degree against the report's own
+  grades, and the pretend kid's 60 pictures one by one.
+- `js/ui.js` + `tests/ui.test.js` (2 new tests): how far back the
+  camera must sit to see a box, and how much bigger to draw a sign so
+  it can be read.
+
+**Checked** (in a test browser; before and after pictures in
+`docs/screenshots/phase17/`)
+- Sample session, desktop 1280 x 800 and phone 375 x 812: the ring and
+  the headline are on the first screen without scrolling. Before, the
+  phone showed the 3D picture and four rows of buttons, and the report
+  started two screens down.
+- Phone, all four tabs: no sideways scrolling, and nothing you tap is
+  under 44 px (also the bottom tabs, the open tool bar and the help
+  sheet). A tablet standing up (820 px): one tool bar row, three cards.
+- The curve: 64 pictures, 5 push marks. Push view: a plain line with 5
+  colored dots. A press at three quarters of its width goes to picture
+  48 of 64, a drag back to one quarter to picture 14, the arrow keys
+  step one picture, and after letting go it stops following the mouse.
+  It waits closed until you scroll to it, then opens.
+- Tap a card (or press Enter on it): the camera goes from about 6 m
+  away to about 3 m, the card lights up, the curve switches to that number. A
+  change of age keeps the card lit. Side, Front, Top or Reset end it.
+- No push seen: the third card says "Not seen" and cannot be tapped,
+  and the curve has no push marks. All on target: the green glow plays.
+- "Reduce motion": the camera jumps, the curve is simply there, the
+  start card and the help box only fade, the loading shape does not
+  pulse, and the Game shows the puck's path without moving it.
+- Game: the path grows behind the puck and stays after the beat; a
+  shift that ended says "Whistle" and "The goalie froze the puck."
+  Referee: the Level switch is above the rink; "Correct" and "The
+  call: Good play".
+- The real test clip (`local-videos/test.mp4`, skater in black at
+  1.0 s), run on its own: the start card goes, the video comes under
+  the 3D picture, the four steps light up one after another, the button
+  fills, and the report lands above the video with the page back at
+  the top. The numbers are the same as in Phase 16 (16 good pictures of
+  99; 129, 30 and 179 degrees; 3 of 3 on target), so the measuring did
+  not change. The curve shows one faded part, one jump and one push
+  mark. (A first run next to four other test browsers gave 13 pictures:
+  a busy computer makes the video skip, as it always could.)
+- All 13 test files pass.
+
+**Limits, said plainly**
+- Checked in a test browser at phone size, not on a real phone. The
+  sticky 3D picture, the bottom tabs and the bottom sheets are the
+  parts most worth trying on a real one.
+- How the movement FEELS at full speed has to be judged by eye.
+- The curve shows one number at a time.
+- The close look always goes to the side view, and on a narrow phone
+  picture it shows the orange skater alone.
+- With two skaters on a narrow phone picture the signs can still touch
+  each other.
+- The Positioning tab only got the bottom tabs. The line that draws
+  itself to your best spot was not built.
+- The glass blur needs a newer browser; an older one shows plain dark
+  boxes instead.
+
 ### Phase 5: Check the pro against a real skater (needs a video)
 
 - Run a good side-view video of a strong skater through the Phase 1
