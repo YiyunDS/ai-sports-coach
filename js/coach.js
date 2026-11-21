@@ -1067,11 +1067,23 @@
   }
 
   // Jump the video to a time and wait until that picture is ready.
+  // Gives back true when the picture is there, false when it did not
+  // come in time.
+  //   A fast computer needs a few hundredths of a second for a jump. A
+  //   slow phone can need seconds, so we wait up to SEEK_WAIT. And we
+  //   ask the video itself whether it is still jumping ("seeking"): a
+  //   late "I am there" from an EARLIER jump must not fool us into
+  //   looking at the wrong picture.
+  var SEEK_WAIT = 6000;       // the longest we wait for one picture (milliseconds)
+  var LATE_IN_A_ROW = 5;      // this many pictures in a row too late: we stop and say so
   async function seek(video, t) {
-    if (Math.abs(video.currentTime - t) < 0.001 && !video.seeking) return;
-    var ready = waitFor(video, "seeked", 2000);
+    if (Math.abs(video.currentTime - t) < 0.001 && !video.seeking) return true;
+    var began = Date.now();
     video.currentTime = t;
-    await ready;
+    while (video.seeking && Date.now() - began < SEEK_WAIT) {
+      await waitFor(video, "seeked", SEEK_WAIT - (Date.now() - began));
+    }
+    return !video.seeking;
   }
 
   function setBusy(on) {
@@ -1156,7 +1168,9 @@
   // Find the skater you clicked. We try a small window first (good for
   // a far-away skater) and then bigger and bigger ones.
   async function findClickedSkater(finder, video, seed, W, H) {
-    await seek(video, seed.t);
+    if (!(await seek(video, seed.t))) {
+      throw new Error("The video is too slow to jump to the moment you clicked. Try again, or use a shorter clip.");
+    }
     var x = seed.x * W, y = seed.y * H, parts = [0.22, 0.36, 0.6, 1];
     for (var i = 0; i < parts.length; i++) {
       var win = T.cropWindow(x, y, parts[i] * H, W, H);
@@ -1173,12 +1187,26 @@
   //   startPicture = the tiny gray picture at the moment you clicked.
   // Stops early if the camera cuts or swings away, and returns the time
   // where it stopped (or null if it went all the way).
-  async function follow(finder, video, times, order, start, W, H, found, onStep, startPicture, gap) {
+  //   late = { count, row }: how many pictures did not come in time, in
+  //          all and in a row. Those pictures are NOT looked at (the
+  //          screen would still show an older picture, and we would
+  //          measure the wrong moment).
+  async function follow(finder, video, times, order, start, W, H, found, onStep, startPicture, gap, late) {
     var cur = start.box, prev = null, misses = 0;
     var lastPicture = startPicture, changes = [];
     for (var k = 0; k < order.length; k++) {
       var i = order[k];
-      await seek(video, times[i]);
+      if (!(await seek(video, times[i]))) {
+        late.count++; late.row++;
+        if (late.row >= LATE_IN_A_ROW) {
+          throw new Error("This video is too slow to read on this device: " + late.row +
+            " pictures in a row did not load in time. Try a shorter clip, or a smaller video file.");
+        }
+        prev = null; misses++;   // for the tracker it is a moment where we did not see the skater
+        onStep();
+        continue;
+      }
+      late.row = 0;
       var picture = tinyPicture(video);
       changes.push(T.pictureChange(lastPicture, picture));
       lastPicture = picture;
@@ -1260,8 +1288,10 @@
       var forward = [], backward = [];
       for (var f = plan.seedIndex + 1; f < n; f++) forward.push(f);
       for (var b = plan.seedIndex - 1; b >= 0; b--) backward.push(b);
-      var stopLater = await follow(finder, video, times, forward, start, W, H, found, onStep, startPicture, gap);
-      var stopEarlier = await follow(finder, video, times, backward, start, W, H, found, onStep, startPicture, gap);
+      var late = { count: 0, row: 0 };   // pictures that did not load in time (a slow device)
+      var stopLater = await follow(finder, video, times, forward, start, W, H, found, onStep, startPicture, gap, late);
+      late.row = 0;
+      var stopEarlier = await follow(finder, video, times, backward, start, W, H, found, onStep, startPicture, gap, late);
 
       setStep("measure");
       setProgress(1, "Measuring...");
@@ -1341,6 +1371,10 @@
       }
       if (cutOff > 0) {
         notes.push(cutOff + " frames were skipped because part of the skater was outside the picture.");
+      }
+      if (late.count > 0) {
+        notes.push(late.count + (late.count === 1 ? " frame was" : " frames were") +
+          " skipped because the video did not load " + (late.count === 1 ? "it" : "them") + " in time on this device.");
       }
       if (state.analysis && state.analysis.sideOn) {
         notes.push("Knee bend and lean come from the " + state.analysis.sideOn + " of " + shown +

@@ -1010,10 +1010,9 @@ and the 3D picture. The signs we did find:
 **Limits, said plainly**
 
 - Still not tried on a real phone.
-- The real clip's numbers in the test browser depend on how busy the
-  page is (see above). The slowest jump of the video took 1.8 of the
-  2 seconds the coach waits, so a slow phone could run out of time on
-  some pictures. Worth a longer wait, in a later phase.
+- The real clip's numbers in the test browser depended on how busy
+  the page is (see above). The slowest jump of the video took 1.8 of
+  the 2 seconds the coach waited. Fixed in version 18.1, see below.
 - The dots for the grades are small. They always come with a word, so
   nobody has to tell the colors apart.
 - Under 1340 pixels wide the tool bar has no "Compare" and "You"
@@ -1022,6 +1021,41 @@ and the 3D picture. The signs we did find:
   slides. It is a tiny box that pushes nothing else around, so we left
   it.
 - The letters on the players in the Game are 9.7 pixels on a phone.
+
+**Version 18.1: more time for a slow device**
+
+The team leader said yes to giving the coach more time for each
+picture of the video. What changed in `js/coach.js`:
+
+- The coach waits up to 6 seconds for a picture (it was 2).
+- It asks the video itself "are you still jumping?" before it looks.
+  Before, a late "I am there" from an earlier jump could make the
+  coach look at the wrong picture.
+- A picture that still does not come is SKIPPED, not measured. The
+  report says how many ("3 frames were skipped because the video did
+  not load them in time on this device"), under "How much of the video
+  was used".
+- Five pictures in a row too late: the coach stops and says the video
+  is too slow to read on this device, instead of going on for many
+  minutes.
+
+Checked with the real test clip, each run on its own:
+
+- As it is: the same as before the change (20 good pictures; 131, 27
+  and 180 degrees; 3 of 3 on target; no errors).
+- Pretending every 12th picture never comes: the coach skipped 16
+  pictures, still made a report (15 useful pictures, 3 of 3 on
+  target), and the note says "16 frames were skipped because the video
+  did not load them in time on this device."
+- Pretending nothing comes any more after the 30th jump: after 5
+  pictures in a row the coach stopped and said "This video is too slow
+  to read on this device ... Try a shorter clip, or a smaller video
+  file." The button went back to "Analyze video".
+- All 13 test files pass. (No new math: this is waiting, not
+  measuring.)
+
+Not checked: a real slow phone. The pretending was done in the test
+browser on this computer.
 
 ### Phase 5: Check the pro against a real skater (needs a video)
 
