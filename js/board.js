@@ -118,7 +118,7 @@
   function drawMarker(layer, at, label, className) {
     var g = shape("g", { class: "marker " + className, transform: "translate(" + at.x + "," + at.y + ")" }, layer);
     shape("circle", { r: 3.1 }, g);
-    words(label, { y: 0.95 }, g);
+    words(label, { y: "0.35em" }, g);
     return g;
   }
 

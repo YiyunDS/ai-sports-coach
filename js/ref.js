@@ -72,8 +72,10 @@
     now.skaters.forEach(function (s) {
       var about = frozen && s.id === truth.who;
       var g = shape("g", { class: "marker " + (s.team === "att" ? "mate" : "opp") + (frozen && play.rule === "offside" ? " faded" : "") }, live);
-      shape("circle", { cx: s.d, cy: s.a, r: 2.4 }, g);
-      if (!(frozen && play.rule === "offside") && s.label) words(s.label, { transform: rink.place(s), y: 0.9 }, g);
+      // On a phone the rink is small: the players are plain dots, a
+      // little bigger, with no letters (they would be too small to read).
+      shape("circle", { cx: s.d, cy: s.a, r: rink.upright ? 2.8 : 2.4 }, g);
+      if (!rink.upright && !(frozen && play.rule === "offside") && s.label) words(s.label, { transform: rink.place(s), y: "0.35em" }, g);
       // The two skates (you can see them when the picture is zoomed in).
       s.skates.forEach(function (k) {
         shape("rect", { x: k.heel, y: k.a - 0.24, width: k.toe - k.heel, height: 0.48, rx: 0.2, class: "skate" }, live);
@@ -89,8 +91,9 @@
     if (!play) { rink = R.build(svg, { upright: tall.matches, ours: "", theirs: "" }); live = shape("g", {}, rink.root); return; }
     var from = play.rule === "offside" ? 70 : 28;
     rink = R.build(svg, { upright: tall.matches, from: from, to: 200, ours: "", theirs: "" });
-    // An arrow of words: which way blue is going.
-    words("BLUE ATTACKS THIS WAY", { transform: rink.place(tall.matches ? { a: 42.5, d: from + 5 } : { a: 80.5, d: from + 34 }), class: "rink-note" }, rink.root);
+    // Words on the ice: which way blue is going. (On a phone they would
+    // be too small to read, so the line above the buttons says it instead.)
+    if (!tall.matches) words("BLUE ATTACKS THIS WAY", { transform: rink.place({ a: 80.5, d: from + 34 }), class: "rink-note" }, rink.root);
     live = shape("g", {}, rink.root);
   }
 
@@ -180,9 +183,11 @@
       el.answer.textContent = "The call: " + F.CALL_WORDS[truth.call];
       el.why.textContent = F.explain(play, truth);
     }
+    // (On a phone the rink stands up: blue attacks toward the top.)
+    var way = tall.matches ? " Blue attacks toward the top." : "";
     el.prompt.textContent = !play ? "Press Start. Watch the play, then make the call."
-      : phase === "playing" ? "Watch the play..."
-      : phase === "ask" ? "What is the call?"
+      : phase === "playing" ? "Watch the play." + way
+      : phase === "ask" ? "What is the call?" + way
       : "This is the moment that decided it.";
   }
 
@@ -202,6 +207,7 @@
     if (phase === "playing") return;
     build();
     if (play) { if (phase === "answered") freeze(); else draw(play.duration, false); }
+    refresh();   // the words about "the top" follow the rink when it stands up or lies down
   }
   if (tall.addEventListener) tall.addEventListener("change", rebuild); else if (tall.addListener) tall.addListener(rebuild);
 

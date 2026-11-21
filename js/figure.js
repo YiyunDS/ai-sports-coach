@@ -639,6 +639,13 @@
     if (this.wedges[id]) this.wedges[id].visible = false;
   };
 
+  // Hide only the sign and its thin line; the colored slice stays.
+  Figure.prototype.hideLabel = function (id) {
+    if (!this.labels[id]) return;
+    this.labels[id].sprite.visible = false;
+    if (this.labels[id].lead) this.labels[id].lead.visible = false;
+  };
+
   // Make a sign and its slice stronger or fainter.
   //   k = 1 is normal, a small number is faint. (When you tap a card in
   //   the report, the sign it is about stays strong and the others fade.)

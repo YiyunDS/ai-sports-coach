@@ -85,7 +85,7 @@
   function marker(at, label, className) {
     var g = shape("g", { class: "marker " + className, transform: place(at) }, live);
     shape("circle", { r: 3.1 }, g);
-    words(label, { y: 0.95 }, g);
+    words(label, { y: "0.35em" }, g);
     return g;
   }
   var parts = null;   // the shapes on screen right now, so we can slide them
@@ -200,7 +200,11 @@
       el.result.className = "pos-result call-result " + (kind === "goal-us" ? "good" : kind === "goal-them" ? "far" : "close");
       el.resultKind.textContent = kind === "goal-us" ? "Goal" : kind === "goal-them" ? "Goal against" : kind === "offside" ? "Offside"
         : kind === "change" ? "Line change" : "Whistle";
-      el.resultText.textContent = game.over.text;
+      // The small word already says "Offside", so the sentence under it
+      // does not start with the same word again.
+      var word = el.resultKind.textContent, text = game.over.text;
+      if (text.indexOf(word + ": ") === 0) text = text.charAt(word.length + 2).toUpperCase() + text.slice(word.length + 3);
+      el.resultText.textContent = text;
     }
     var mine = has && !game.over && G.youHavePuck(game);
     el.go.hidden = !has || game.over || mine;
@@ -209,7 +213,9 @@
     if (!has) el.prompt.textContent = "Choose how the shift starts and your position. Then the play begins.";
     else if (game.over) el.prompt.textContent = "The shift is over. Press Next shift to play again, or pick another start.";
     else if (busy) el.prompt.textContent = "Watch the play...";
-    else if (mine) el.prompt.textContent = "You have the puck. Pick a play: the number is its chance to work. You can also tap a teammate to pass.";
+    // (Shorter on a phone, where the rink needs the room.)
+    else if (mine) el.prompt.textContent = "You have the puck. Pick a play: the number is its chance to work." +
+      (tall.matches ? "" : " You can also tap a teammate to pass.");
     else if (game.owner === "us") el.prompt.textContent = "Our " + P.ROLE_NAMES[game.carrier].toLowerCase() + " has the puck. Drag your marker to where you should be. Then press Play on, or call for a pass if you are open.";
     else el.prompt.textContent = "They have the puck. Drag your marker to where you should defend, then press Play on.";
     drawChoices();

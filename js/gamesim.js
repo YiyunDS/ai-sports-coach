@@ -494,8 +494,8 @@
     } else {                                     // a shot
       if (dice() < choice.chance) {
         s.score[attTeam]++;
-        say(does(who, "shoot", "shoots") + "... GOAL!", GOAL);
-        end(attTeam === "us" ? "goal-us" : "goal-them", attTeam === "us" ? "We score!" : "They score.", GOAL);
+        say(does(who, "shoot and score", "shoots and scores") + ".", GOAL);
+        end(attTeam === "us" ? "goal-us" : "goal-them", attTeam === "us" ? "We score." : "They score.", GOAL);
       } else if (dice() < 0.25) {
         // Missed the net: the puck goes around the boards to the far corner.
         say(does(who, "shoot", "shoots") + " and misses the net.", pt(GOAL.a + (from.a < W / 2 ? 7 : -7), 196));
@@ -504,7 +504,7 @@
         say(does(who, "shoot", "shoots") + ". Save, and the goalie covers the puck. Whistle.", GOAL);
         end("whistle", "The goalie froze the puck.", GOAL);
       } else {
-        say(does(who, "shoot", "shoots") + ". Save! There is a rebound.", GOAL);
+        say(does(who, "shoot", "shoots") + ". Save. There is a rebound.", GOAL);
         // Defenders stand between the rebound and their net, so they get a small edge.
         loose(pt(GOAL.a + (dice() - 0.5) * 22, GOAL.d - 9 - dice() * 12), "The rebound pops out.", -0.05);
       }

@@ -427,6 +427,14 @@
     refFigure.update(pose, null, { edges: edges });
     var showPush = shown ? !!skating.pushSide : false;
     decorate(refFigure, pose, { knee: BLUE, lean: BLUE, push: BLUE, elbow: BLUE }, showPush, shown);
+    // On a narrow picture (a phone) two skaters with three signs each
+    // do not fit: the signs would cover each other. So next to YOU the
+    // pro keeps its colored slices, but shows only the sign of the
+    // check you tapped. (Your own signs always stay.)
+    if (hasKid && narrowPicture()) {
+      var lit = focusSign();
+      ["knee", "lean", "push"].forEach(function (id) { if (id !== lit) refFigure.hideLabel(id); });
+    }
   }
 
   // ---------- 5. Camera views ----------------------------------------
@@ -531,7 +539,8 @@
   var replanning = false;   // frameView is having its second go (see the end of frameView)
   // How tall a sign should look on the screen, in pixels. A little
   // smaller on a narrow phone picture, where two skaters share the room.
-  function signPixels() { return (stage.clientWidth || 800) < 500 ? 21 : 25; }
+  function narrowPicture() { return (stage.clientWidth || 800) < 500; }
+  function signPixels() { return narrowPicture() ? 21 : 25; }
 
   // How many pixels at the bottom of the picture are covered by the
   // tool bar or by the start card?
