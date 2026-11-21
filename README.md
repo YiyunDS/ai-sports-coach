@@ -138,7 +138,7 @@ The rules are the USA Hockey rules for players 12 and under: the whistle blows r
 
 ### On a phone
 
-Every tab works on a phone: nothing scrolls sideways, and everything you tap is at least 44 pixels tall. The four tabs sit at the bottom of the screen, where your thumb is. In Form analysis the 3D picture gets smaller once there is a report and stays at the top of the screen while you read, so the answer is on the first screen and you still see the skaters when you tap a card. The tool bar shows only **Side by side / Overlay**; **More** opens the rest. In the Game and the Referee tab the rink stands up, and your buttons sit in a sheet just above the tabs so you see the rink and the buttons together. In the Game the picture follows the puck, so the markers stay big enough for a finger.
+Every tab works on a phone: nothing scrolls sideways, and everything you tap is at least 44 pixels tall. The four tabs sit at the bottom of the screen, where your thumb is. In Form analysis the 3D picture gets smaller once there is a report and stays at the top of the screen while you read, so the answer is on the first screen and you still see the skaters when you tap a card. The tool bar shows only **Side by side / Overlay**; **More** opens the rest. In the Game and the Referee tab the rink stands up, and your buttons sit in a sheet just above the tabs so you see the rink and the buttons together. In the Game the picture follows the puck, so the markers stay big enough for a finger. On a narrow screen the pictures are made simpler instead of smaller: next to your skater the pro shows only its name (tap a card to see the pro's number for that joint), and in the Referee tab the players are plain dots.
 
 ### Changing the goal angles
 
@@ -150,7 +150,7 @@ The goal angles live in [`targets.json`](targets.json). There is one set for eac
 
 | File | What it does |
 |---|---|
-| `index.html`, `style.css` | The page and its colors |
+| `index.html`, `style.css` | The page and its colors. The four rules of the look are written at the top of `style.css` |
 | `targets.json` | The goal angles (kids can edit) |
 | `js/angles.js` | The math: measures angles and scores them |
 | `js/rigged-figure.js` | Draws the realistic 3D hockey player: a model with a skeleton inside, made in Blender |

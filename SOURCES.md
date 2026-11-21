@@ -70,6 +70,7 @@ or text from them.
 | A report in three layers (one answer, then details, then the raw data), and color only where it means something | 925Studios, "WHOOP Design Breakdown", https://www.925studios.co/blog/whoop-design-breakdown |
 | A dark page looks calm with soft borders and small steps of brightness instead of heavy shadows | Linear, "Behind the latest design refresh", https://linear.app/blog/behind-the-latest-design-refresh |
 | Movement must have a purpose, be short, and never be the only way to learn something | Apple Human Interface Guidelines, "Motion", https://developer.apple.com/design/human-interface-guidelines/motion |
+| A list of the signs that make a page look machine-made (glows, washes of color, LABELS IN CAPITALS, uneven spaces, badges everywhere), and the order to fix them in: spaces, color, icons, words, letters, layout, details, pictures, movement | "unslop" by Damir Sokolovsky (@heydamir), https://github.com/heydamir/unslop , license CC BY 4.0 (read on 2026-11-21). We checked our page against its lists in Phase 18 and wrote our own four rules from them at the top of `style.css`. We copied none of its code or pictures. |
 
 ## Hockey rules used in the Referee game
 

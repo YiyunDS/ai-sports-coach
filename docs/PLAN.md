@@ -857,6 +857,172 @@ when everything is on target (no confetti).
 - The glass blur needs a newer browser; an older one shows plain dark
   boxes instead.
 
+### Phase 18: The page checked against the "unslop" list (done)
+
+The team leader asked to improve the design with
+https://github.com/heydamir/unslop (a list of the signs that make a
+page look machine-made, and the order to fix them in), to use only the
+parts that fit our project, and to make sure the phone is good too.
+Its license is CC BY 4.0; it is credited in `SOURCES.md`.
+
+**What the check found**
+
+Unslop says to look first and decide how much to change. Our page was
+mostly designed already (one accent color, no emojis, short movements,
+a 3D picture that is clearly the main thing). So this is a POLISH: we
+fixed what the list found and kept the colors, the letters, the layout
+and the 3D picture. The signs we did find:
+
+- Labels in CAPITALS with wide gaps between the letters, almost
+  everywhere: 21 of them on the report alone.
+- A wash of blue light behind the top of the page, shadows under every
+  panel, a glow under the blue button, a glow around the card you
+  tapped, and a green glow on the ring.
+- The grade of a card was said three times: a colored top edge, a
+  boxed badge and a dot. Result boxes and the Game's choices had a
+  colored left edge.
+- Spaces of 3, 5, 7, 9, 11, 13, 14, 18 and 26 pixels, and corners of
+  3, 4, 5, 6, 7, 8, 10, 12 and 14, with no pattern.
+- Twenty different sizes for words, many of them almost the same
+  (13.1, 13.6, 13.8, 14.1, 14.4 and 14.7 pixels).
+- Movement: the ruler's green part changed its real width (slow for a
+  phone to draw), and two things pulsed while the coach worked.
+- Words: "... GOAL!" and "We score!", and a result that said "Offside"
+  twice.
+- On the phone: letters smaller than 11 pixels (the ring's "on target"
+  at 9.6, the words on the rinks at 4.6 to 8.4, the letters on the
+  players at 5.4 to 9.8), and signs that covered each other when both
+  skaters stood in the narrow 3D picture.
+
+**The direction** (unslop asks for five lines before any change)
+
+- Product: it measures a young hockey player's skating from a phone
+  video and shows it in 3D next to a pro, with the one thing to
+  practice next. For kids of 8 to 12 and the grown-up next to them.
+- Character: exact, calm, rink-side.
+- World: a rink at night with the lights on. White ice, dark stands,
+  red and blue painted lines, the scoreboard over center ice.
+- Moments (where the color and the light go): the 3D picture of the
+  two skaters, and the curve of the replay over its green band.
+- Signature: scoreboard letters. The narrow scoreboard type is used
+  for what belongs to the rink (the scoreboard, the signs in the 3D
+  picture, the words painted on the ice, our name) and for every
+  number we measured. Everything else is written the normal way.
+
+**What changed, in unslop's order**
+
+1. Spaces. One ladder: 4, 8, 12, 16, 20, 24 (a step of 2 inside small
+   buttons). Buttons, switches and choosers are all 36 pixels tall on a
+   computer and 44 on a phone. The page's edges are 24 wide on a
+   computer, 16 on a phone.
+2. Color. The page is flat: no wash of light, no shadows under panels
+   (a panel is one step lighter than the page, with a thin line). The
+   blue button is plain blue. Nothing glows. A third text color was
+   added for titles, so there are three: main, title, quiet.
+3. Icons. Nothing to fix (one set of line pictures on the tabs).
+4. Words. Goals are said plainly ("shoots and scores.", "We score.").
+   The Game's result no longer repeats the small word above it. On a
+   phone the Game's hint is one sentence shorter.
+5. Letters. Normal case everywhere except on the rink (see the
+   signature). Nine sizes for words instead of twenty: 11 or 12 for
+   small marks, 13 for labels, 14 for notes, 15 for reading, 16 to 22
+   for headlines. (The big scoreboard numbers keep their own sizes.)
+   No tight letter spacing on small text.
+6. Layout. Not changed.
+7. Details. Three corner sizes: 8 for buttons, 12 for cards, 14 for
+   panels (and 4 or 6 for the small parts inside a button). A grade is
+   said ONCE, by a colored dot and a word ("Close",
+   "On target"). The cards lost their colored top edge, the result
+   boxes and the Game's choices their colored left edge. In the Game
+   the dots stand in one column and the chances in another. The card
+   you tapped has a plain blue edge.
+8. Pictures. Not changed: the 3D picture is the product itself.
+9. Movement. The ruler's green part now slides and stretches (the
+   same cheap kind of movement as everything else). The grey shape of
+   the report stands still while the coach works; only the dot of the
+   step it is ON blinks, because that work is really going on. The
+   green glow on the ring is gone. A score's pulse is smaller.
+
+**What we did NOT take from unslop, and why**
+
+- A generated picture for the top of the page, and the "story video"
+  of the page fixing itself: those are for selling pages. Ours is a
+  tool, and its picture is the 3D skater.
+- An off-white main button: our blue already means "the pro" and "the
+  next step", and one blue is easier for kids to follow.
+- Removing the dark glass behind the buttons on the 3D picture: there
+  the blur does a job. The skaters move behind the words, and the
+  words must stay readable.
+- No periods after short lines: our notes are whole sentences that
+  kids read, so they keep their periods. Buttons and labels never had
+  any.
+- Normal case on the rink: a scoreboard is written in capitals, and
+  in the small 3D signs capitals are easier to read.
+
+**On the phone**
+
+- No letters under 11 pixels, except the one or two letters on a
+  player's marker in the Game (9.7). The ring's "on target" is 11, the
+  tab names are 11, the words on the positioning rink are 11.7.
+- A small picture is made SIMPLER, not just smaller. Next to your
+  skater the pro shows only its name; its colored slices stay, and
+  when you tap a card the pro's number for that joint appears beside
+  yours. In the Referee tab the players are plain dots, a little
+  bigger, with no letters, and "Blue attacks toward the top." is said
+  in the line above the buttons instead of in tiny letters on the ice.
+- The spacing slider and the line "Show my best spot" are now 44 tall
+  like everything else you tap.
+- The start card's headline is on one line again, so the card no
+  longer covers the pro's skates.
+
+**Checked**
+
+- At 1280 by 800, 1440 by 900, 820 by 1180 and 375 by 812 in a test
+  browser: no sideways scrolling on any tab, nothing you tap under 44
+  pixels on the touch sizes, no page errors.
+- The answer is still on the first screen: the bottom of the top block
+  is at 702 of 800 on the computer and at 607 of 812 on the phone.
+- The tool bar is one row at every size. Under 1340 wide it hides the
+  words "Compare" and "You" to fit.
+- In the Game on a phone the sheet with your choices is 309 tall and
+  does not scroll while you play. At the end of a shift it can still
+  need a small scroll to read the tip about your spot.
+- "Reduce motion": the ruler's green part and mark are simply in
+  place (no slide), the cards only fade in, and nothing blinks.
+- The real test clip (`local-videos/test.mp4`, skater in black at
+  1.0 s), run on its own three times: the video panel, the four steps,
+  the button that fills up and the report all work with the new look,
+  with no errors, and the answer is the same (3 of 3 on target). But
+  the numbers moved a little: 20 good pictures instead of 16, and 131,
+  27 and 180 degrees instead of 129, 30 and 179. Last phase's page,
+  run the same way on the same day, still gives 16 pictures and 129,
+  30, 179. None of the measuring files changed (`angles.js`,
+  `tracker.js`, `measure.js`, `rebuild.js`, `stride.js`,
+  `retarget.js`), so the measuring itself is the same. What changed is
+  the page around it: it draws less while the coach reads the video.
+  We counted the video's jumps on the new page: 202 jumps, every one
+  finished, the slowest in 1.8 seconds (the coach waits at most 2).
+  Our best explanation, not proven: on the old, busier page a few
+  jumps ran out of time in the slow test browser, and the coach read
+  the wrong picture there.
+- All 13 test files pass. No new math was needed.
+
+**Limits, said plainly**
+
+- Still not tried on a real phone.
+- The real clip's numbers in the test browser depend on how busy the
+  page is (see above). The slowest jump of the video took 1.8 of the
+  2 seconds the coach waits, so a slow phone could run out of time on
+  some pictures. Worth a longer wait, in a later phase.
+- The dots for the grades are small. They always come with a word, so
+  nobody has to tell the colors apart.
+- Under 1340 pixels wide the tool bar has no "Compare" and "You"
+  labels.
+- The sliding light behind a switch still changes its width while it
+  slides. It is a tiny box that pushes nothing else around, so we left
+  it.
+- The letters on the players in the Game are 9.7 pixels on a phone.
+
 ### Phase 5: Check the pro against a real skater (needs a video)
 
 - Run a good side-view video of a strong skater through the Phase 1

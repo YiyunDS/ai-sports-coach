@@ -8,6 +8,11 @@ team leader) for the Presidential SI Challenge. All work happens on the
 
 - Runs with no server-side code. Video never leaves the computer.
 - Keep the dark, professional analysis-tool look. No emojis, no toy look.
+  The look follows the four rules at the top of `style.css`: a quiet
+  page around the two pictures, a color always means something and
+  nothing glows, words in normal case (scoreboard letters only on the
+  rink and for measured numbers), and sizes from one ladder (spaces 4,
+  8, 12, 16, 20, 24; corners 8, 12, 14). No text under 11 px.
 - Movement on the page follows the rules at the top of `js/ui.js`, with
   the times and the curve from the top of `style.css` (`--t-press`,
   `--t-switch`, `--t-panel`, `--ease`). Short, no bounce, only
