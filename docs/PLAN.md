@@ -1057,6 +1057,134 @@ Checked with the real test clip, each run on its own:
 Not checked: a real slow phone. The pretending was done in the test
 browser on this computer.
 
+### Phase 19: A second look you can switch to, "Sunset" (done)
+
+The team leader asked for one more choice of look, inspired by the
+"Vice City" style of the GTA games, and said the 3D skaters must change
+with it, not only the page.
+
+**Decided before building**
+
+- The 3D rink becomes an outdoor rink at sunset (sky, low sun, palms).
+- Neon only inside the 3D picture. The page around it stays flat.
+- The switch says "Sunset", our own name. `SOURCES.md` says where the
+  idea came from. Nothing from the games is used: no logo, font, name,
+  character or picture. Sky, sun and palms are our own drawing in code.
+- The question about the skaters came back with no answer, so we took
+  the middle choice: new kit and gear on the same body model.
+
+**What Sunset looks like**
+
+- The page: deep purple instead of the dark arena. TEAL means the pro
+  (and the button to press next), HOT PINK means you. Green, yellow and
+  red still grade, and each grade still has its word beside it.
+- The 3D rink: a sky from orange at the horizon through pink to deep
+  purple, a low sun over the far boards, 30 palm outlines far away, a
+  warm haze, warm light from the front, pink light from the sun side
+  and a little teal from the other side. White boards, a hot-pink kick
+  plate, and a teal neon tube as the top rail: the one thing that
+  glows. The ice mirrors the sky a little (warm far away, cool close).
+- The skaters: the pro in teal, you in hot pink, both with a dark
+  purple shoulder panel and pants, white helmets and gloves, dark
+  sticks with pink (pro) or teal (you) tape and laces. The pro wears a
+  mirrored visor instead of the cage, as many pros do. The kid KEEPS
+  the cage, because kids must wear one.
+- The words follow: "the pink skater", "Teal skater shows", "Drag the
+  pink marker".
+
+**What stays the same in both looks**
+
+- Rink is the look a new visitor gets, and it did not change.
+- The bodies, the poses and every measured number.
+- The blue and red lines of every rink, and the blue team and the red
+  team on the rinks seen from above. The lessons say "the blue line"
+  and "the blue winger", so those colors are facts.
+- Sizes, letters and movement. A look is only paint.
+
+**How it is built**
+
+- `js/theme.js` (new): the one list of colors JavaScript needs for
+  each look (3D rink, outfits, signs, the lines on the video, the two
+  color words), the switch, and remembering the choice on this device.
+  If the browser will not let us save (a private window), the switch
+  still works; the page just starts in Rink next time.
+- `style.css`: 20 colors that were typed in the middle of the file got
+  names at the top. Then one block, `:root[data-theme="sunset"]`, gives
+  those names other colors. Nothing else in the file knows about looks.
+- `index.html`: a tiny script in the head puts the saved look on
+  before anything is drawn, so the page never flashes the wrong one.
+  The switch sits at the right end of the top bar.
+- `js/scene.js`: `applyLook()` changes lights, haze, boards and the
+  ice picture, and shows or hides the sunset. The sky is the inside of
+  a big ball, the sun two flat pictures, each palm one flat picture;
+  all painted on a canvas by a few lines of code. No bloom effect, so
+  a phone has no extra work for the glow.
+- `js/figure.js`, `js/rigged-figure.js`, `js/skate.js`: `setOutfit()`
+  changes the COLOR of each paint and never swaps a paint, so the
+  see-through Overlay keeps working. The visor is a curved band fitted
+  to the cage and fastened to the head bone, the way the skates are
+  fastened to the foot bones.
+- `js/coach.js`: sign colors, the lines on the video and the notes
+  take the look's colors and words. No measuring code was touched.
+- `tests/theme.test.js` (new, the 14th test file): a saved look is
+  used and anything else gives Rink; both looks list the same things;
+  the contrast and color-wheel math; in both looks the words can be
+  read (main text at least 7 to 1, quiet text and colored words at
+  least 4.5 to 1); pro, you and the three grades can be told apart;
+  and `style.css` and `js/theme.js` say the same colors.
+
+**Checked**
+
+- Rink did not change: for every element on the page (and its
+  ::before and ::after) we wrote down the colors the browser worked
+  out, before the work and after it, in 12 states (start, report with
+  a card on, help box, Positioning, Game, Referee; on a computer and
+  on a phone). They are the same. (The only differences were a box
+  caught in the middle of fading in, and the Referee's answer, which is
+  right or wrong by chance.) The 3D picture was compared by eye.
+  We first tried comparing pictures dot by dot; that does not work
+  here, because the sample replay keeps moving.
+- Sunset at 1280x800, 1440x900, 820x1180 and 375x812: no sideways
+  scrolling, nothing you tap under 44 px on the touch sizes, no page
+  errors, and the answer is still on the first screen (bottom of the
+  top block at 702 of 800 on a computer, 616 of 812 on a phone).
+- Flipping the switch with the sample session open, both ways: on
+  every tab, in Overlay, in "As filmed", in the close look of a card.
+  Report, signs, rings and curve keep working, the words change, and a
+  reload keeps the choice. The same with saving blocked, and with
+  "reduce motion" on. No errors.
+- A "needs work" grade (red) on the pink skater, to see that the two
+  can be told apart.
+- The real test clip (`local-videos/test.mp4`, skater in black at
+  1.0 s), run alone and analyzed in the Sunset look: the same as in
+  18.1 (20 good pictures; 131, 27 and 180 degrees; 3 of 3 on target;
+  no errors). The box and dots on the video are pink. Flipped to Rink
+  afterward: the same numbers, and the notes say "orange" again. Those
+  pictures show the real video, so they stay in
+  `local-videos/screenshots/phase19/`.
+- All 14 test files pass.
+
+**Limits, said plainly**
+
+- Not tried on a real phone. The sunset adds one ball, two flat
+  pictures for the sun and 30 for the palms, which should be little
+  work, but that is a guess until it is measured on a phone.
+- In Sunset a red "needs work" ring on the hot-pink jersey is easier
+  to miss than on the orange one. The sign beside it and the word in
+  the report still say it.
+- The simpler backup skater (used only if the model fails to load)
+  gets the Sunset colors but no visor.
+- Small text on the Game rink (position letters, about 10 px on a
+  phone and a tablet) and the 16 px check box in the Game tab are the
+  same in both looks. This phase did not change their sizes.
+- The top bar is 6 to 10 px taller on touch screens, because the
+  switch is 44 px tall there. "Skating lab" beside our name is hidden
+  under 900 px wide to make room for it.
+- In "As filmed" with the replay paused, a sign next to your skater
+  can keep its old size after the camera moves in for a close look,
+  until the next picture is drawn. Seen while checking this phase; not
+  looked into yet.
+
 ### Phase 5: Check the pro against a real skater (needs a video)
 
 - Run a good side-view video of a strong skater through the Phase 1

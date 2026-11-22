@@ -140,6 +140,14 @@ The rules are the USA Hockey rules for players 12 and under: the whistle blows r
 
 Every tab works on a phone: nothing scrolls sideways, and everything you tap is at least 44 pixels tall. The four tabs sit at the bottom of the screen, where your thumb is. In Form analysis the 3D picture gets smaller once there is a report and stays at the top of the screen while you read, so the answer is on the first screen and you still see the skaters when you tap a card. The tool bar shows only **Side by side / Overlay**; **More** opens the rest. In the Game and the Referee tab the rink stands up, and your buttons sit in a sheet just above the tabs so you see the rink and the buttons together. In the Game the picture follows the puck, so the markers stay big enough for a finger. On a narrow screen the pictures are made simpler instead of smaller: next to your skater the pro shows only its name (tap a card to see the pro's number for that joint), and in the Referee tab the players are plain dots.
 
+### Two looks: Rink and Sunset
+
+The switch at the right end of the top bar changes the look of the whole page. **Rink** is the dark arena the page always had: the pro in blue, you in orange. **Sunset** is an outdoor rink at sunset: a pink and orange sky, a low sun, palm trees, a neon rail on the boards, the pro in **teal** and you in **hot pink**. The skaters change clothes too: white helmets and gloves, and the pro wears a mirrored visor instead of a cage (the kid keeps the cage, as kids must). The page remembers your choice on this device.
+
+Only the paint changes. The skaters' bodies, their poses and every measured number are the same in both looks, green, yellow and red still mean the grade, and the lines of the rinks stay blue and red (the lessons talk about "the blue line"). In Sunset, light glows only inside the 3D picture; the page around it stays flat and calm. The sky, the sun and the palms are drawn by our own code, so nothing extra is downloaded. Where the idea came from is in [`SOURCES.md`](SOURCES.md).
+
+The rest of this page describes the Rink look. In Sunset, read "teal" where it says blue skater and "pink" where it says orange skater or orange marker; the page itself changes those words when you flip the switch.
+
 ### Changing the goal angles
 
 The goal angles live in [`targets.json`](targets.json). There is one set for each age band (6-8, 9-10, 11-12) and each level, plus one for the pro. To try your own numbers, edit the file and use **Edit target angles > Load targets.json** on the page. To make them the new normal, also copy the file into `js/default-targets.js`.
@@ -150,7 +158,8 @@ The goal angles live in [`targets.json`](targets.json). There is one set for eac
 
 | File | What it does |
 |---|---|
-| `index.html`, `style.css` | The page and its colors. The four rules of the look are written at the top of `style.css` |
+| `index.html`, `style.css` | The page and its colors. The four rules of the look are written at the top of `style.css`, with one block of colors for each look |
+| `js/theme.js` | The two looks of the page, Rink and Sunset: the colors of the 3D rink, of the skaters' outfits, of their signs and of the lines on the video; the switch in the top bar; and the math that checks words can be read. Run `node tests/theme.test.js` |
 | `targets.json` | The goal angles (kids can edit) |
 | `js/angles.js` | The math: measures angles and scores them |
 | `js/rigged-figure.js` | Draws the realistic 3D hockey player: a model with a skeleton inside, made in Blender |
@@ -172,6 +181,7 @@ The goal angles live in [`targets.json`](targets.json). There is one set for eac
 | `js/positions.js` | The playbook: where each position should stand in each situation |
 | `js/board.js` | The positioning board you drag your marker on |
 | `tests/angles.test.js` | Checks the math. Run `node tests/angles.test.js` |
+| `tests/theme.test.js` | Checks the two looks: words can be read in both, the colors that mean something can be told apart, and `style.css` and `js/theme.js` say the same colors. Run `node tests/theme.test.js` |
 | `js/stride.js` | How the pro skates: the stride keyframes (kids can edit them) and the math that turns them into a pose |
 | `tests/stride.test.js` | Checks the pro's stride (bones keep their length, skates stay on the ice and do not skid). Run `node tests/stride.test.js` |
 | `js/rink.js` | Draws the whole rink from above for the Game and the Referee tabs |

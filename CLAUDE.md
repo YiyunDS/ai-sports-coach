@@ -13,6 +13,17 @@ team leader) for the Presidential SI Challenge. All work happens on the
   nothing glows, words in normal case (scoreboard letters only on the
   rink and for measured numbers), and sizes from one ladder (spaces 4,
   8, 12, 16, 20, 24; corners 8, 12, 14). No text under 11 px.
+- The page has TWO looks, chosen with the switch in the top bar: "Rink"
+  (the dark arena, the default) and "Sunset" (an outdoor rink at
+  sunset: purple, teal for the pro, hot pink for you). The same four
+  rules hold in both. In Sunset, light may glow inside the 3D picture
+  only. A look changes colors, never sizes, letters or movement. The
+  page's colors are in `style.css` (one block per look), the 3D colors
+  in `js/theme.js`. Rink must look the same after any work on Sunset,
+  and every change to the page is looked at in both looks. The lines
+  and the two teams on the rinks seen from above stay blue and red in
+  both looks. Nothing from a game or a brand is used: no logo, font,
+  name, character or picture.
 - Movement on the page follows the rules at the top of `js/ui.js`, with
   the times and the curve from the top of `style.css` (`--t-press`,
   `--t-switch`, `--t-panel`, `--ease`). Short, no bounce, only
@@ -30,7 +41,8 @@ team leader) for the Presidential SI Challenge. All work happens on the
   `node tests/refplays.test.js` (added in Phase 14),
   `node tests/rebuild.test.js` (added in Phase 15),
   `node tests/ui.test.js` (added in Phase 16),
-  `node tests/chart.test.js` (added in Phase 17).
+  `node tests/chart.test.js` (added in Phase 17),
+  `node tests/theme.test.js` (added in Phase 19).
   Add tests for new math.
 - Do not break the Positioning tab. The Game tab is a separate game
   (`js/gamesim.js` = rules and chances, `js/game.js` = the page); it
