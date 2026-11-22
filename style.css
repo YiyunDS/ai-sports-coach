@@ -22,6 +22,11 @@
      4. Sizes come from one ladder. Spaces are 4, 8, 12, 16, 20 or 24
         (inside a small button a step of 2 is fine). Corners are 8
         (buttons), 12 (cards) or 14 (panels).
+
+   TWO COATS OF PAINT, THE SAME FOUR RULES. The page has a second look,
+   "Sunset" (the switch is in the top bar). It changes only the colors
+   named below. In Sunset, light may glow inside the 3D picture (the
+   sky, the sun, the neon rail of the boards) and nowhere else.
    ===================================================================== */
 :root {
   color-scheme: dark;
@@ -55,9 +60,75 @@
   --t-show: 700ms;
   /* Dark "glass" for the buttons that float on the 3D picture. */
   --glass: rgba(11, 15, 20, 0.7);
+  /* Shades of the colors above, each for one job. */
+  --bar: #0e131a;                           /* the top bar */
+  --hover: #212c3a;                         /* a button you point at */
+  --ref-hover: #6fb6ff;                     /* the main button you point at */
+  --pressed: #0d1520;                       /* the report card that is "on" */
+  --hair-2: rgba(148, 178, 214, 0.3);       /* the edge of a card you point at */
+  --pop: rgba(13, 18, 25, 0.9);             /* the help box, and the tabs on a phone */
+  --pop-solid: rgba(13, 18, 25, 0.96);
+  --seg-bg: rgba(11, 15, 20, 0.78);         /* behind a row of switch buttons */
+  --work: rgba(6, 24, 43, 0.24);            /* the bar that fills the Analyze button */
+  --shade-edge: rgba(7, 10, 15, 0.52);      /* the dark edges of the 3D picture */
+  --shade-top: rgba(7, 10, 15, 0.42);
+  --band: rgba(47, 191, 113, 0.15);         /* the green target band of the replay curve */
+  --band-edge: rgba(47, 191, 113, 0.6);
+  --band-key: rgba(47, 191, 113, 0.22);
+  --band-key-edge: rgba(47, 191, 113, 0.7);
+  --curve-plain: #8296b0;                   /* a curve we do not grade */
+  --now-line: rgba(232, 238, 245, 0.7);     /* the line at the moment the replay shows */
+  --mate: #1c3f6e;                          /* your teammates on the rinks seen from above */
+  --you-ink: #c9731a;                       /* a darker "you", for thin lines on white ice */
   --tabbar: 56px;       /* how tall the tabs are on a phone (they sit at the bottom there) */
   --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", Arial, sans-serif;
+}
+
+/* ---------- THE SECOND LOOK: "Sunset" ----------
+   The same page with another coat of paint: an outdoor rink at sunset.
+   Purple instead of the dark arena, TEAL for the pro (and the button
+   to press next), HOT PINK for you. Green, yellow and red still grade.
+   Only colors change here: no size, no letter and no movement.
+   The lines of the rinks stay blue and red in both looks, because
+   "the blue line" is a rule of hockey, not a decoration.
+   (js/theme.js holds the same colors for the 3D picture, and
+   tests/theme.test.js checks that the two lists agree.) */
+:root[data-theme="sunset"] {
+  --bg: #120a1f;
+  --panel: #1a1030;
+  --panel-2: #24173f;
+  --line: #3b2a5e;
+  --fg: #f4ecfa;
+  --fg-2: #cfc2e2;
+  --muted: #a898c4;
+  --ref: #2fd6d9;
+  --ref-ink: #04262b;
+  --you: #ff5fa8;
+  --good: #3ddc8f;
+  --close: #ffd24a;
+  --far: #ff5a3d;
+  --hair: rgba(196, 160, 255, 0.14);
+  --glass: rgba(18, 10, 31, 0.7);
+  --bar: #160c27;
+  --hover: #2f1f52;
+  --ref-hover: #6fe6e8;
+  --pressed: #1d1036;
+  --hair-2: rgba(196, 160, 255, 0.32);
+  --pop: rgba(23, 13, 40, 0.9);
+  --pop-solid: rgba(23, 13, 40, 0.96);
+  --seg-bg: rgba(18, 10, 31, 0.78);
+  --work: rgba(4, 38, 43, 0.24);
+  --shade-edge: rgba(20, 8, 34, 0.4);
+  --shade-top: rgba(20, 8, 34, 0.3);
+  --band: rgba(61, 220, 143, 0.15);
+  --band-edge: rgba(61, 220, 143, 0.6);
+  --band-key: rgba(61, 220, 143, 0.22);
+  --band-key-edge: rgba(61, 220, 143, 0.7);
+  --curve-plain: #a596c0;
+  --now-line: rgba(244, 236, 250, 0.7);
+  --mate: #0d5a6b;
+  --you-ink: #c21f6e;
 }
 
 * { box-sizing: border-box; }
@@ -75,7 +146,7 @@ body {
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
 /* ---------- Top bar ---------- */
-.bar { border-bottom: 1px solid var(--hair); background: #0e131a; }
+.bar { border-bottom: 1px solid var(--hair); background: var(--bar); }
 .bar-in {
   display: flex; align-items: center; flex-wrap: wrap; gap: 8px 24px;
   max-width: 1560px; margin: 0 auto;
@@ -95,7 +166,13 @@ body {
   letter-spacing: 0.03em; text-transform: uppercase;
 }
 .brand-sub, .bar-meta { font-size: 0.8125rem; color: var(--muted); }
-.bar-meta { margin-left: auto; }
+/* The right end of the bar: the team's name and the switch for the look. */
+.bar-end { margin-left: auto; display: flex; align-items: center; gap: 16px; }
+.look button { display: inline-flex; align-items: center; gap: 6px; }
+/* A small two-color dot shows each look's own colors (pro and you). */
+.swatch { flex: 0 0 auto; width: 12px; height: 12px; border-radius: 50%; }
+.swatch.rink { background: linear-gradient(90deg, #4da3ff 0 50%, #ff9f43 50% 100%); }
+.swatch.sunset { background: linear-gradient(90deg, #2fd6d9 0 50%, #ff5fa8 50% 100%); }
 .tabs { display: flex; gap: 4px; position: relative; }
 .tabs button {
   display: inline-flex; align-items: center; gap: 8px;
@@ -174,8 +251,8 @@ code { font-size: 0.9em; background: var(--panel-2); padding: 0 4px; border-radi
 .stage-wrap::after {
   content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
   background:
-    radial-gradient(115% 95% at 50% 58%, transparent 50%, rgba(7, 10, 15, 0.52) 100%),
-    linear-gradient(180deg, rgba(7, 10, 15, 0.42), transparent 24%);
+    radial-gradient(115% 95% at 50% 58%, transparent 50%, var(--shade-edge) 100%),
+    linear-gradient(180deg, var(--shade-top), transparent 24%);
 }
 .stage-problem {
   position: absolute; inset: 0; z-index: 4;
@@ -241,7 +318,7 @@ input[type="checkbox"] { width: 16px; height: 16px; margin: 0; accent-color: var
   position: absolute; top: 56px; right: 12px; z-index: 3;
   width: min(328px, calc(100% - 24px)); max-height: calc(100% - 68px); overflow-y: auto;
   padding: 16px; border: 1px solid var(--hair); border-radius: var(--r-panel);
-  background: rgba(13, 18, 25, 0.9);
+  background: var(--pop);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
   animation: rise var(--t-panel) var(--ease);
 }
@@ -267,7 +344,7 @@ button, .file-btn, select {
               transform var(--t-press) var(--ease);
 }
 button, .file-btn { cursor: pointer; }
-button:hover, .file-btn:hover { background: #212c3a; }
+button:hover, .file-btn:hover { background: var(--hover); }
 /* A button gives a little when you press it. */
 button:active:not(:disabled), .file-btn:active { transform: scale(0.97); }
 button:focus-visible, select:focus-visible, input:focus-visible, .file-btn:focus-within,
@@ -280,7 +357,7 @@ button.primary {
   background: var(--ref); border-color: var(--ref); color: var(--ref-ink); font-weight: 600;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
-button.primary:hover { background: #6fb6ff; border-color: #6fb6ff; }
+button.primary:hover { background: var(--ref-hover); border-color: var(--ref-hover); }
 button.primary:disabled { box-shadow: none; }
 button:disabled { opacity: 0.45; cursor: not-allowed; }
 .ghost-btn { background: var(--glass); border-color: var(--hair); }
@@ -293,7 +370,7 @@ select.wide { width: 100%; }
 .seg {
   position: relative;
   display: inline-flex; flex-wrap: wrap;
-  background: rgba(11, 15, 20, 0.78); border: 1px solid var(--hair); border-radius: var(--r-btn);
+  background: var(--seg-bg); border: 1px solid var(--hair); border-radius: var(--r-btn);
   padding: 2px; gap: 2px;
 }
 .seg button, .seg.radio span {
@@ -339,7 +416,7 @@ select.wide { width: 100%; }
 .work { position: relative; overflow: hidden; min-width: 200px; }
 .work-fill {
   position: absolute; inset: 0; opacity: 0;
-  background: rgba(6, 24, 43, 0.24);
+  background: var(--work);
   transform: scaleX(var(--p, 0)); transform-origin: left;
   transition: transform var(--t-switch) linear;
 }
@@ -472,9 +549,9 @@ details.more p { max-width: 85ch; }
   cursor: pointer; -webkit-tap-highlight-color: transparent;
   transition: border-color var(--t-press) ease-out, box-shadow var(--t-press) ease-out, background-color var(--t-press) ease-out, transform var(--t-press) var(--ease);
 }
-.check[role="button"]:hover { border-color: rgba(148, 178, 214, 0.3); }
+.check[role="button"]:hover { border-color: var(--hair-2); }
 .check[role="button"]:active { transform: scale(0.985); }
-.check[aria-pressed="true"], .check[aria-pressed="true"]:hover { background: #0d1520; border-color: var(--ref); box-shadow: 0 0 0 1px var(--ref); }
+.check[aria-pressed="true"], .check[aria-pressed="true"]:hover { background: var(--pressed); border-color: var(--ref); box-shadow: 0 0 0 1px var(--ref); }
 .check-look {
   display: inline-flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 12px;
   font-size: 0.8125rem; font-weight: 500;
@@ -505,7 +582,7 @@ details.more p { max-width: 85ch; }
    (chart.js draws it). */
 .curve-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 8px; }
 .curve-key { display: inline-flex; align-items: center; gap: 8px; }
-.curve-key::before { content: ""; width: 16px; height: 8px; border-radius: 2px; background: rgba(47, 191, 113, 0.22); border: 1px dashed rgba(47, 191, 113, 0.7); border-width: 1px 0; }
+.curve-key::before { content: ""; width: 16px; height: 8px; border-radius: 2px; background: var(--band-key); border: 1px dashed var(--band-key-edge); border-width: 1px 0; }
 .curve {
   position: relative; height: 160px; margin-bottom: 8px; border-radius: var(--r-btn);
   cursor: ew-resize; touch-action: pan-y;   /* a finger going sideways scrubs; up and down still scrolls the page */
@@ -520,12 +597,12 @@ details.more p { max-width: 85ch; }
 .curve.shut .curve-wipe { transform: translateX(-100%); transition: none; }
 .curve.shut .curve-wipe-in { transform: translateX(100%); transition: none; }
 .curve-plot { fill: var(--bg); }
-.curve-band { fill: rgba(47, 191, 113, 0.15); }
-.curve-band-edge { stroke: rgba(47, 191, 113, 0.6); stroke-width: 1; stroke-dasharray: 3 4; }
+.curve-band { fill: var(--band); }
+.curve-band-edge { stroke: var(--band-edge); stroke-width: 1; stroke-dasharray: 3 4; }
 .curve-label { font-family: var(--font); font-size: 11px; font-weight: 500; fill: var(--muted); text-anchor: end; font-variant-numeric: tabular-nums; }
 .curve-hole { stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 3; }
 .curve-line { fill: none; stroke-width: 2.6; stroke-linejoin: round; stroke-linecap: round; }
-.curve-line.plain { stroke: #8296b0; stroke-width: 2; }
+.curve-line.plain { stroke: var(--curve-plain); stroke-width: 2; }
 .stop-good { stop-color: var(--good); }
 .stop-close { stop-color: var(--close); }
 .stop-far { stop-color: var(--far); }
@@ -537,7 +614,7 @@ details.more p { max-width: 85ch; }
 .curve-peak.on-line { stroke: var(--bg); stroke-width: 2; }
 /* The marker for the moment the replay is showing. */
 .curve-now { position: absolute; left: 0; top: 0; bottom: 0; width: 0; pointer-events: none; }
-.curve-now::before { content: ""; position: absolute; left: -0.5px; top: 12px; bottom: 20px; width: 1px; background: rgba(232, 238, 245, 0.7); }
+.curve-now::before { content: ""; position: absolute; left: -0.5px; top: 12px; bottom: 20px; width: 1px; background: var(--now-line); }
 .curve-dot { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%; background: var(--fg); box-shadow: 0 0 0 2.5px var(--bg); }
 .curve-tag { position: absolute; left: 8px; top: 0; padding: 2px 6px; border-radius: 4px; background: var(--fg); color: var(--bg); font-size: 0.75rem; line-height: 16px; font-weight: 600; white-space: nowrap; }
 .curve-tag.flip { left: -8px; }
@@ -564,25 +641,25 @@ details.more p { max-width: 85ch; }
 :is(#board, #game-rink, #ref-rink) .rink-note.end { text-anchor: end; }
 :is(#board, #game-rink, #ref-rink) .puck { fill: #0b0f14; }
 :is(#board, #game-rink, #ref-rink) .marker text { font-family: var(--display); font-size: 2.7px; font-weight: 700; text-anchor: middle; pointer-events: none; }
-:is(#board, #game-rink, #ref-rink) .marker.mate circle { fill: #1c3f6e; stroke: #fff; stroke-width: 0.35; }
+:is(#board, #game-rink, #ref-rink) .marker.mate circle { fill: var(--mate); stroke: #fff; stroke-width: 0.35; }
 :is(#board, #game-rink, #ref-rink) .marker.mate text { fill: #fff; }
 :is(#board, #game-rink, #ref-rink) .marker.opp circle { fill: #fff; stroke: #c8243a; stroke-width: 0.6; }
 :is(#board, #game-rink, #ref-rink) .marker.opp text { fill: #c8243a; }
 :is(#board, #game-rink) .marker.you { cursor: grab; }
-:is(#board, #game-rink) .marker.you circle { fill: #ff9f43; stroke: #0b0f14; stroke-width: 0.6; r: 3.5px; }
+:is(#board, #game-rink) .marker.you circle { fill: var(--you); stroke: #0b0f14; stroke-width: 0.6; r: 3.5px; }
 :is(#board, #game-rink) .marker.you text { fill: #0b0f14; }
 :is(#board, #game-rink) .zone-good { fill: rgba(47, 191, 113, 0.3); stroke: #1e9457; stroke-width: 0.35; }
 :is(#board, #game-rink) .zone-close { fill: rgba(230, 180, 34, 0.16); stroke: #b98d0a; stroke-width: 0.3; stroke-dasharray: 1.2 1; }
 :is(#board, #game-rink) .measure { stroke: #0b0f14; stroke-width: 0.3; stroke-dasharray: 0.8 0.8; }
 :is(#game-rink, #ref-rink) .goalie { stroke: #0b0f14; stroke-width: 0.3; }
-:is(#game-rink, #ref-rink) .goalie.ours { fill: #1c3f6e; }
+:is(#game-rink, #ref-rink) .goalie.ours { fill: var(--mate); }
 :is(#game-rink, #ref-rink) .goalie.theirs { fill: #c8243a; }
 :is(#game-rink, #ref-rink) .fill-red { fill: #c8243a; }
 :is(#game-rink, #ref-rink) .fill-blue { fill: #1f56b5; }
 .board-key { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 0.875rem; color: var(--muted); }
 .key { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; vertical-align: -1px; }
 .key.you { background: var(--you); }
-.key.mate { background: #1c3f6e; border: 1px solid #fff; }
+.key.mate { background: var(--mate); border: 1px solid #fff; }
 .key.opp { background: #fff; border: 2px solid #c8243a; }
 .key.puck { background: #000; border: 1px solid var(--muted); width: 8px; height: 8px; }
 
@@ -609,7 +686,7 @@ details.more p { max-width: 85ch; }
 
 /* ---------- Simulation game ---------- */
 #game-rink .marker.has-puck circle { stroke: #0b0f14; stroke-width: 1.1; }
-#game-rink .reach { fill: none; stroke: #c9731a; stroke-width: 0.35; stroke-dasharray: 1.6 1.4; pointer-events: none; }
+#game-rink .reach { fill: none; stroke: var(--you-ink); stroke-width: 0.35; stroke-dasharray: 1.6 1.4; pointer-events: none; }
 #game-rink .preview { stroke: #0b0f14; stroke-width: 0.5; stroke-dasharray: 1.2 1.2; pointer-events: none; }
 .key.reach { background: none; border: 1px dashed var(--you); }
 /* THE SCOREBOARD: one dark bar like on TV, in scoreboard letters. A
@@ -696,7 +773,7 @@ details.more p { max-width: 85ch; }
   .layout.has-session { grid-template-areas: "stage" "report" "side"; }
   .pos-layout { grid-template-areas: "stage" "side"; }
   #stage { height: 58vh; }
-  .bar-meta { display: none; }
+  .bar-meta, .brand-sub { display: none; }
   .results-body { flex-direction: column; align-items: stretch; }
 }
 /* Less room for the tool bar: the two switches explain themselves. */
@@ -717,11 +794,14 @@ details.more p { max-width: 85ch; }
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
     display: grid; grid-template-columns: repeat(4, 1fr); gap: 0;
     padding-bottom: env(safe-area-inset-bottom, 0px);
-    background: rgba(13, 18, 25, 0.9); border-top: 1px solid var(--hair);
+    background: var(--pop); border-top: 1px solid var(--hair);
     -webkit-backdrop-filter: blur(14px) saturate(1.3); backdrop-filter: blur(14px) saturate(1.3);
   }
   .tabs button { flex-direction: column; justify-content: center; gap: 2px; min-height: var(--tabbar); padding: 6px 2px; border-bottom: 0; font-size: 0.6875rem; line-height: 14px; }
   .tabs button[aria-pressed="true"] { color: var(--ref); }
+  /* The switch for the look sits beside our name; a little less air so both fit. */
+  .bar-in { padding-block: 4px; }
+  .bar .look button { padding-inline: 8px; }
   .tab-icon { display: block; }
   .tab-long { display: none; }
   .foot { padding-bottom: 16px; }
@@ -746,7 +826,7 @@ details.more p { max-width: 85ch; }
   .popover {
     position: fixed; left: 0; right: 0; top: auto; bottom: calc(var(--tabbar) + env(safe-area-inset-bottom, 0px)); z-index: 35;
     width: auto; max-height: 64vh; border-radius: var(--r-panel) var(--r-panel) 0 0; border-bottom: 0;
-    background: rgba(13, 18, 25, 0.96);
+    background: var(--pop-solid);
   }
   .start-card { bottom: 12px; padding: 12px 16px; }
   .start-main { font-size: 1.125rem; }

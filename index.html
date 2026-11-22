@@ -7,13 +7,25 @@
   <meta name="theme-color" content="#0b0f14">
   <title>AI Sports Coach - 3D Visual Coach</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
-  <link rel="stylesheet" href="style.css?v=18.1">
+  <script>
+    // The page has two looks (see js/theme.js). If "Sunset" was chosen on
+    // this device before, put it on right away, before anything is
+    // drawn, so the page never flashes the other look first.
+    try {
+      if (localStorage.getItem("coach-theme") === "sunset") {
+        document.documentElement.setAttribute("data-theme", "sunset");
+        document.querySelector('meta[name="theme-color"]').setAttribute("content", "#120a1f");
+      }
+    } catch (e) { /* the browser will not let us read it: the first look it is */ }
+  </script>
+  <link rel="stylesheet" href="style.css?v=19.0">
 </head>
 <body>
   <!--
     HOW THIS PAGE IS PUT TOGETHER
     index.html             the boxes and buttons you see (this file)
     style.css              the colors and sizes
+    js/theme.js            the two looks of the page (Rink and Sunset): the colors of the 3D picture
     targets.json           the "good skater" angles - kids can edit these!
     js/angles.js           the math: measures angles from joint positions
     js/stride.js           how the pro skates: the stride keyframes (and the sample skater)
@@ -64,7 +76,14 @@
           <span>Referee</span>
         </button>
       </nav>
-      <div class="bar-meta">Team PHL</div>
+      <div class="bar-end">
+        <div class="bar-meta">Team PHL</div>
+        <!-- The look of the page: the dark arena, or an outdoor rink at sunset. -->
+        <div class="seg look" role="group" aria-label="The look of the page">
+          <button type="button" data-look="rink" aria-pressed="true"><i class="swatch rink" aria-hidden="true"></i>Rink</button>
+          <button type="button" data-look="sunset" aria-pressed="false"><i class="swatch sunset" aria-hidden="true"></i>Sunset</button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -531,14 +550,14 @@
   </script>
   <script type="module">
     // Our own code, in the order it needs to load.
-    var OURS = ["js/angles.js", "js/stride.js", "js/measure.js", "js/rebuild.js", "js/retarget.js", "js/tracker.js", "js/default-targets.js",
+    var OURS = ["js/theme.js", "js/angles.js", "js/stride.js", "js/measure.js", "js/rebuild.js", "js/retarget.js", "js/tracker.js", "js/default-targets.js",
                 "js/skate.js", "js/figure.js", "js/rigged-figure.js", "js/ui.js", "js/scene.js", "js/chart.js", "js/coach.js", "js/positions.js", "js/board.js", "js/rink.js", "js/gamesim.js", "js/game.js",
                 "js/refplays.js", "js/ref.js"];
     // Our files belong together: a new coach.js with an old scene.js (kept
     // by the browser from an earlier visit) does not work. This number
     // goes on the end of every file's address, so after an update the
     // browser fetches all of them fresh. RAISE IT whenever a .js file changes.
-    var VERSION = "18.1";
+    var VERSION = "19.0";
     // Load one of our .js files and wait until it has run.
     function load(src) {
       return new Promise(function (done, fail) {
