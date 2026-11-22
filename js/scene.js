@@ -47,9 +47,16 @@
   renderer.toneMappingExposure = 1.0;
   stage.appendChild(renderer.domElement);
 
+  // The LOOK of the picture (see theme.js): "rink" is a dark arena,
+  // "sunset" an outdoor rink at sunset. Every color below comes from
+  // that list, so the picture can change its paint while it runs
+  // (applyLook, further down).
+  var Theme = window.CoachTheme;
+  var look = Theme.now();
+
   var scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0a0e13);     // a dark arena, like on TV
-  scene.fog = new THREE.Fog(0x0a0e13, 18, 46);      // far things fade into the dark
+  scene.background = new THREE.Color(look.scene.background);   // a dark arena, like on TV
+  scene.fog = new THREE.Fog(look.scene.haze[0], look.scene.haze[1], look.scene.haze[2]);  // far things fade away
 
   var camera = new THREE.PerspectiveCamera(35, 1, 0.1, 120);
   camera.layers.enableAll(); // see the skaters (layer 0) and the signs (layer 1)
@@ -71,7 +78,8 @@
   var pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new THREE.RoomEnvironment(), 0.04).texture;
   scene.environmentIntensity = 0.55;
-  scene.add(new THREE.HemisphereLight(0xdfe9f5, 0x28323d, 0.5)); // a little light from the sky and the floor
+  var skyLight = new THREE.HemisphereLight(0xdfe9f5, 0x28323d, 0.5); // a little light from the sky and the floor
+  scene.add(skyLight);
   // The main arena light, high above and in front. It casts the shadows.
   var sun = new THREE.DirectionalLight(0xffffff, 2.2);
   sun.position.set(3, 10, 5);
@@ -87,6 +95,10 @@
   var rimLight = new THREE.DirectionalLight(0xbcd4ff, 1.1);
   rimLight.position.set(-5, 5, -7);
   scene.add(rimLight);
+  // One more light from the side, only used by the Sunset look.
+  var sideLight = new THREE.DirectionalLight(0xffffff, 0);
+  sideLight.visible = false;
+  scene.add(sideLight);
 
   // ---------- 3. The rink --------------------------------------------
   // The middle part of a real rink (center ice), at real size:
@@ -96,19 +108,31 @@
 
   // We paint the ice (lines, circle, skate marks) on a flat picture,
   // then stick that picture onto the floor. Every size here is in meters.
-  function paintIce() {
-    var c = document.createElement("canvas");
-    c.width = 2048; c.height = 1024;
-    var g = c.getContext("2d");
+  //   paint = the colors of the ice (look.scene in theme.js)
+  var iceCanvas = document.createElement("canvas");
+  iceCanvas.width = 2048; iceCanvas.height = 1024;
+  function paintIce(paint) {
+    var g = iceCanvas.getContext("2d");
     function X(m) { return 1024 + m * PX; }   // meters from center ice -> dots
     function Y(m) { return 512 + m * PX; }
     // The ice, a touch darker in places, like real ice.
-    g.fillStyle = "#e5ecf1"; g.fillRect(0, 0, 2048, 1024);
+    g.fillStyle = paint.ice; g.fillRect(0, 0, 2048, 1024);
     for (var k = 0; k < 18; k++) {
       var gx = (k * 397) % 2048, gy = (k * 263) % 1024, r = 120 + (k * 53) % 220;
       var shade = g.createRadialGradient(gx, gy, 0, gx, gy, r);
-      shade.addColorStop(0, "rgba(160,180,200,0.10)"); shade.addColorStop(1, "rgba(160,180,200,0)");
+      shade.addColorStop(0, "rgba(" + paint.iceShade + ",0.10)"); shade.addColorStop(1, "rgba(" + paint.iceShade + ",0)");
       g.fillStyle = shade; g.fillRect(gx - r, gy - r, 2 * r, 2 * r);
+    }
+    // At sunset the ice mirrors the sky: warm on the far side (the top
+    // of this picture), where the sun goes down, cooler on the near side.
+    // The colors run across the rink only, so the ice can still slide
+    // along under the skaters without the colors moving.
+    if (paint.iceWarm) {
+      var sky = g.createLinearGradient(0, 0, 0, 1024);
+      sky.addColorStop(0, "rgba(" + paint.iceWarm[0] + ",0.5)");
+      sky.addColorStop(0.5, "rgba(" + paint.iceWarm[0] + ",0.14)");
+      sky.addColorStop(1, "rgba(" + paint.iceWarm[1] + ",0.3)");
+      g.fillStyle = sky; g.fillRect(0, 0, 2048, 1024);
     }
     // The lines are painted UNDER the ice, so their edges are a little soft.
     g.filter = "blur(1.2px)";
@@ -129,13 +153,9 @@
     g.lineWidth = 1;
     for (var i = 0; i < 260; i++) {
       var sx = (i * 173) % 2048, sy = (i * 97) % 1024;
-      g.strokeStyle = "rgba(120,145,170," + (0.05 + (i % 5) * 0.015) + ")";
+      g.strokeStyle = "rgba(" + paint.iceMarks + "," + (0.05 + (i % 5) * 0.015) + ")";
       g.beginPath(); g.arc(sx, sy, 60 + (i * 31) % 260, i, i + 0.5 + (i % 3) * 0.3); g.stroke();
     }
-    var t = new THREE.CanvasTexture(c);
-    t.colorSpace = THREE.SRGBColorSpace;
-    t.anisotropy = renderer.capabilities.getMaxAnisotropy(); // stays sharp when seen at a low angle
-    return t;
   }
 
   // A rectangle with round corners, like a real rink.
@@ -160,7 +180,10 @@
     return wall;
   }
 
-  var iceTexture = paintIce();
+  paintIce(look.scene);
+  var iceTexture = new THREE.CanvasTexture(iceCanvas);
+  iceTexture.colorSpace = THREE.SRGBColorSpace;
+  iceTexture.anisotropy = renderer.capabilities.getMaxAnisotropy(); // stays sharp when seen at a low angle
   iceTexture.wrapS = THREE.RepeatWrapping; // so the ice can slide along and wrap around
   // These two lines stretch the picture to fit the whole rink.
   iceTexture.repeat.set(1 / RINK_W, 1 / RINK_D);
@@ -175,16 +198,25 @@
 
   // The boards: white, with a yellow kick plate at the bottom and a dark
   // rail on top. Then the glass above them.
-  var boards = rinkWall(0, 0.16, 0, 1.0, new THREE.MeshStandardMaterial({ color: 0xf1f3f5, roughness: 0.5 }));
+  // (We keep the paints in one list, so the look can change them later.)
+  var wallPaint = {
+    boards: new THREE.MeshStandardMaterial({ color: 0xf1f3f5, roughness: 0.5 }),
+    kick: new THREE.MeshStandardMaterial({ color: 0xc99a2e, roughness: 0.55 }),
+    rail: new THREE.MeshStandardMaterial({ color: 0x15233a, roughness: 0.4 }),
+    glass: new THREE.MeshStandardMaterial({
+      color: 0xd6e6f2, roughness: 0.05, transparent: true, opacity: 0.07, depthWrite: false, side: THREE.DoubleSide
+    }),
+    posts: new THREE.MeshStandardMaterial({ color: 0x8b96a3, roughness: 0.4, metalness: 0.5 }),
+    floor: new THREE.MeshStandardMaterial({ color: 0x0c1117, roughness: 1 })
+  };
+  var boards = rinkWall(0, 0.16, 0, 1.0, wallPaint.boards);
   boards.receiveShadow = true;
-  rinkWall(-0.004, 0.17, 0, 0.24, new THREE.MeshStandardMaterial({ color: 0xc99a2e, roughness: 0.55 }));
-  rinkWall(-0.01, 0.19, 1.0, 1.05, new THREE.MeshStandardMaterial({ color: 0x15233a, roughness: 0.4 }));
-  rinkWall(0.07, 0.02, 1.05, 2.6, new THREE.MeshStandardMaterial({
-    color: 0xd6e6f2, roughness: 0.05, transparent: true, opacity: 0.07, depthWrite: false, side: THREE.DoubleSide
-  }));
+  rinkWall(-0.004, 0.17, 0, 0.24, wallPaint.kick);
+  rinkWall(-0.01, 0.19, 1.0, 1.05, wallPaint.rail);
+  rinkWall(0.07, 0.02, 1.05, 2.6, wallPaint.glass);
   // Thin posts that hold the glass panels, every 2 meters along the long sides.
   var postGeo = new THREE.BoxGeometry(0.035, 1.55, 0.035);
-  var postPaint = new THREE.MeshStandardMaterial({ color: 0x8b96a3, roughness: 0.4, metalness: 0.5 });
+  var postPaint = wallPaint.posts;
   for (var px = -RINK_W / 2 + CORNER; px <= RINK_W / 2 - CORNER + 0.01; px += 2) {
     [-1, 1].forEach(function (side) {
       var post = new THREE.Mesh(postGeo, postPaint);
@@ -194,10 +226,129 @@
   }
   var floor = new THREE.Mesh(
     new THREE.PlaneGeometry(160, 160),
-    new THREE.MeshStandardMaterial({ color: 0x0c1117, roughness: 1 })
+    wallPaint.floor
   );
   floor.rotation.x = -Math.PI / 2; floor.position.y = -0.02;
   scene.add(floor);
+
+  // ---------- 3b. The sunset around the rink (only in the Sunset look) ----
+  // Everything here is our own drawing, made with a few lines of code:
+  // a sky painted on the inside of a huge ball, a low sun, and the dark
+  // outlines of palm trees far away. It is built the first time the
+  // Sunset look is chosen, and simply hidden in the Rink look.
+  var outdoor = null;
+  function picture(canvas) {
+    var t = new THREE.CanvasTexture(canvas);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }
+  // The sky: bands of color from the horizon (bottom) up to straight above.
+  function paintSky(paint) {
+    var c = document.createElement("canvas");
+    c.width = 4; c.height = 512;
+    var g = c.getContext("2d");
+    // The lower half of the ball is under the ground. It gets the color
+    // of the horizon, so no edge shows where the ground ends.
+    g.fillStyle = paint.sky[0][1]; g.fillRect(0, 0, 4, 512);
+    var bands = g.createLinearGradient(0, 256, 0, 0);   // from the horizon up
+    paint.sky.forEach(function (stop) { bands.addColorStop(stop[0], stop[1]); });
+    g.fillStyle = bands; g.fillRect(0, 0, 4, 256);
+    return picture(c);
+  }
+  // The sun: a bright disc, and (bigger, fainter) its glow in the sky.
+  function paintSun(paint, glow) {
+    var c = document.createElement("canvas");
+    c.width = c.height = 256;
+    var g = c.getContext("2d"), light = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+    if (glow) {
+      light.addColorStop(0, "rgba(" + paint.sun.glow + ",0.7)");
+      light.addColorStop(0.35, "rgba(" + paint.sun.glow + ",0.22)");
+      light.addColorStop(1, "rgba(" + paint.sun.glow + ",0)");
+    } else {
+      light.addColorStop(0, paint.sun.core); light.addColorStop(0.6, paint.sun.core);
+      light.addColorStop(0.93, paint.sun.edge); light.addColorStop(1, "rgba(" + paint.sun.glow + ",0)");
+    }
+    g.fillStyle = light; g.fillRect(0, 0, 256, 256);
+    return picture(c);
+  }
+  // One palm tree, as a dark outline: a bent trunk and nine drooping
+  // leaves. "bend" leans the trunk a little to one side.
+  function paintPalm(color, bend) {
+    var c = document.createElement("canvas");
+    c.width = 256; c.height = 384;
+    var g = c.getContext("2d");
+    g.strokeStyle = color; g.fillStyle = color; g.lineCap = "round";
+    var topX = 128, topY = 104, footX = 128 + bend * 46;
+    // The trunk: thick at the foot, thin at the top.
+    for (var i = 0; i < 24; i++) {
+      var t0 = i / 24, t1 = (i + 1) / 24;
+      var at = function (t) {
+        var u = 1 - t;   // a curve from the foot to the top
+        return [u * u * footX + 2 * u * t * (footX - bend * 8) + t * t * topX, u * u * 384 + 2 * u * t * 250 + t * t * topY];
+      };
+      var a = at(t0), b = at(t1);
+      g.lineWidth = 11 - 6 * t0;
+      g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
+    }
+    // The leaves: each is a curve going out and hanging down, with many
+    // short leaflets along it.
+    for (var k = 0; k < 9; k++) {
+      var angle = -Math.PI * (0.06 + 0.11 * k), long = 92 + (k * 37) % 26;   // from the right side, over the top, to the left
+      var endX = topX + Math.cos(angle) * long, endY = topY + Math.sin(angle) * long * 0.55 + 34 + (k * 13) % 22;
+      var midX = topX + Math.cos(angle) * long * 0.55, midY = topY + Math.sin(angle) * long * 0.8 - 14;
+      var px = topX, py = topY;
+      for (var j = 1; j <= 16; j++) {
+        var t = j / 16, u = 1 - t;
+        var x = u * u * topX + 2 * u * t * midX + t * t * endX, y = u * u * topY + 2 * u * t * midY + t * t * endY;
+        g.lineWidth = 4.2 - 2.6 * t;
+        g.beginPath(); g.moveTo(px, py); g.lineTo(x, y); g.stroke();
+        // Leaflets hang from the rib, longest in the middle of the leaf.
+        var hang = 7 + 17 * Math.sin(Math.PI * t), away = (x - px) > 0 ? 1 : -1;
+        g.lineWidth = 2.2;
+        g.beginPath(); g.moveTo(x, y); g.lineTo(x + away * hang * 0.35, y + hang); g.stroke();
+        g.beginPath(); g.moveTo((x + px) / 2, (y + py) / 2); g.lineTo((x + px) / 2 - away * hang * 0.1, (y + py) / 2 + hang * 0.85); g.stroke();
+        px = x; py = y;
+      }
+    }
+    g.beginPath(); g.arc(topX, topY + 2, 8, 0, Math.PI * 2); g.fill();   // the knot where the leaves meet
+    return picture(c);
+  }
+  function buildOutdoor(paint) {
+    var group = new THREE.Group();
+    // The sky ball. It is drawn first and never hides anything.
+    var sky = new THREE.Mesh(
+      new THREE.SphereGeometry(90, 32, 24),
+      new THREE.MeshBasicMaterial({ map: paintSky(paint), side: THREE.BackSide, fog: false, depthWrite: false })
+    );
+    sky.renderOrder = -3;
+    group.add(sky);
+    // The sun sits low over the far side of the rink.
+    var where = new THREE.Vector3().fromArray(paint.sun.at).normalize().multiplyScalar(84);
+    var glow = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshBasicMaterial({
+      map: paintSun(paint, true), transparent: true, blending: THREE.AdditiveBlending, fog: false, depthWrite: false, toneMapped: false
+    }));
+    var disc = new THREE.Mesh(new THREE.PlaneGeometry(9.5, 9.5), new THREE.MeshBasicMaterial({
+      map: paintSun(paint, false), transparent: true, fog: false, depthWrite: false, toneMapped: false
+    }));
+    [glow, disc].forEach(function (m, i) { m.position.copy(where); m.lookAt(0, where.y, 0); m.renderOrder = -2 + i; group.add(m); });
+    // Palm trees, far enough away that the camera never gets among them.
+    var palmPaints = [-1, 1, 0.3].map(function (bend) {
+      // (fog: false = the far haze does not wash them out: they stay dark
+      //  against the bright sky, the way trees look at sunset.)
+      return new THREE.MeshBasicMaterial({ map: paintPalm(paint.palms, bend), transparent: true, alphaTest: 0.35, side: THREE.DoubleSide, toneMapped: false, fog: false });
+    });
+    for (var i = 0; i < 30; i++) {
+      // Spread around the rink, in no neat order (but the same every time).
+      var turn = (i * 137.5 + (i % 3) * 9) * Math.PI / 180;
+      var far = 44 + (i * 53) % 29, tall = 6.2 + ((i * 29) % 8) * 0.4;
+      var palm = new THREE.Mesh(new THREE.PlaneGeometry(tall * 256 / 384, tall), palmPaints[i % 3]);
+      palm.position.set(Math.sin(turn) * far, tall / 2 - 0.05, Math.cos(turn) * far);
+      palm.rotation.y = turn;   // it faces the rink
+      group.add(palm);
+    }
+    scene.add(group);
+    return group;
+  }
 
   // ---------- 4. The skaters -----------------------------------------
   // The blue one is the PRO (or the goal for your age).
@@ -208,16 +359,16 @@
     }
     return new window.SkaterFigure(opts);
   }
-  var refFigure = makeSkater({
-    name: "PRO", nameColor: "#4da3ff", number: "14",
-    jersey: 0x2f6fc0, trim: 0x0e2240, socks: 0x2f6fc0, pants: 0x14213a, helmet: 0x0e2240, glove: 0x14213a
-  });
+  // Their outfits come from the look (theme.js): in Rink the pro wears
+  // blue and you wear orange; in Sunset it is teal and hot pink.
+  function dressed(name, number, outfit) {
+    return { name: name, number: number, nameColor: outfit.nameColor, jersey: outfit.jersey, trim: outfit.trim,
+             socks: outfit.jersey, pants: outfit.pants, helmet: outfit.helmet, glove: outfit.glove };
+  }
+  var refFigure = makeSkater(dressed("PRO", "14", look.pro));
   scene.add(refFigure.group);
   // The orange one is YOU. It stays hidden until there is a pose to show.
-  var kidFigure = makeSkater({
-    name: "YOU", nameColor: "#ff9f43", number: "7",
-    jersey: 0xe57f22, trim: 0x2a1606, socks: 0xe57f22, pants: 0x1b1d22, helmet: 0x1b1d22, glove: 0x1b1d22
-  });
+  var kidFigure = makeSkater(dressed("YOU", "7", look.you));
   kidFigure.group.visible = false;
   scene.add(kidFigure.group);
 
@@ -225,7 +376,47 @@
   var reference = { kneeBend: 110, forwardLean: 45, strideExtension: 171 };
   var strideOn = false;   // is the blue skater doing a stride right now?
   var hasKid = false;
-  var BLUE = "#4da3ff";
+  var BLUE = look.signs.pro;       // the color of the pro's signs (teal in the Sunset look)
+  var ELBOW = look.signs.elbow;    // the color of an elbow sign that is not graded
+
+  // ---------- 4b. Put a look on the picture --------------------------
+  // Called once now, and again each time you flip the switch in the top
+  // bar. Nothing is built again: we only change colors and lights (and
+  // show or hide the sunset around the rink).
+  function setLight(light, list) {
+    light.color.setHex(list[0]);
+    light.intensity = list[1];
+    light.position.fromArray(list[2]);
+  }
+  function applyLook(next) {
+    look = next;
+    var paint = look.scene;
+    scene.background.setHex(paint.background);
+    scene.fog.color.setHex(paint.haze[0]); scene.fog.near = paint.haze[1]; scene.fog.far = paint.haze[2];
+    skyLight.color.setHex(paint.skyLight[0]); skyLight.groundColor.setHex(paint.skyLight[1]); skyLight.intensity = paint.skyLight[2];
+    setLight(sun, paint.mainLight);
+    setLight(rimLight, paint.backLight);
+    sideLight.visible = !!paint.sideLight;
+    if (paint.sideLight) setLight(sideLight, paint.sideLight);
+    scene.environmentIntensity = paint.room;
+    ["boards", "kick", "rail", "glass", "posts", "floor"].forEach(function (part) { wallPaint[part].color.setHex(paint[part]); });
+    // The rail on top of the boards is a neon tube in the Sunset look:
+    // it gives off its own light. (The one thing that glows.)
+    wallPaint.rail.emissive.setHex(paint.railGlow ? paint.railGlow[0] : 0x000000);
+    wallPaint.rail.emissiveIntensity = paint.railGlow ? paint.railGlow[1] : 1;
+    paintIce(paint);
+    iceTexture.needsUpdate = true;
+    if (paint.outdoor && !outdoor) outdoor = buildOutdoor(paint);
+    if (outdoor) outdoor.visible = !!paint.outdoor;
+    // The skaters change clothes, and their signs change color.
+    window.SkaterFigure.setLook(look);
+    refFigure.setOutfit(look.pro);
+    kidFigure.setOutfit(look.you);
+    BLUE = look.signs.pro;
+    ELBOW = look.signs.elbow;
+  }
+  applyLook(look);
+  Theme.onChange(applyLook);
 
   // Where the skaters stand, and how we compare them.
   var compareMode = "side";  // "side" = next to each other, "overlay" = on top of each other
@@ -308,7 +499,7 @@
     ["l", "r"].forEach(function (s) {
       var sh = pose[s + "Shoulder"], el = pose[s + "Elbow"], wr = pose[s + "Wrist"], id = s + "Elbow";
       if (!showElbows || !sh || !el || !wr || colors.elbow === false) { fig.hide(id); return; }
-      var deg = M.angleAt(sh, el, wr), color = colors.elbow || "#cbd5e1";
+      var deg = M.angleAt(sh, el, wr), color = colors.elbow || ELBOW;
       fig.setWedge(id, el, M.sub(sh, el), M.sub(wr, el), 0.11, color);
       fig.setLabel(id, beside(el, s === "l" ? 0.4 : -0.4, s === "l" ? 0.2 : 0.12),
         (s === "l" ? "L" : "R") + " elbow " + Math.round(deg) + "°", color, el);

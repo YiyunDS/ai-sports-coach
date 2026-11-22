@@ -22,6 +22,8 @@
     // ---------------- RINK: the look the page always had ----------------
     rink: {
       label: "Rink",
+      // The words the page uses for the two skaters' colors.
+      words: { you: "orange", pro: "blue" },
       // The same colors as at the top of style.css.
       css: { bg: "#0b0f14", panel: "#121922", fg: "#e8eef5", muted: "#8d9db2",
              ref: "#4da3ff", refInk: "#06182b", you: "#ff9f43",
@@ -59,6 +61,7 @@
     // games. Nothing from the games is used: see SOURCES.md.
     sunset: {
       label: "Sunset",
+      words: { you: "pink", pro: "teal" },
       css: { bg: "#120a1f", panel: "#1a1030", fg: "#f4ecfa", muted: "#a898c4",
              ref: "#2fd6d9", refInk: "#04262b", you: "#ff5fa8",
              good: "#3ddc8f", close: "#ffd24a", far: "#ff5a3d" },
@@ -69,25 +72,25 @@
       overlay: { box: "#ff5fa8", dot: "#ff5fa8", bone: "#ffffff", search: "rgba(255,255,255,0.7)" },
       scene: {
         outdoor: true,
-        background: 0xe8607f,
-        haze: [0xe8607f, 24, 78],
-        skyLight: [0xffb7d2, 0x2a1a4a, 0.75],
-        mainLight: [0xffd9b8, 2.0, [5, 9, 6]],     // warm light, like the last sun on your face
-        backLight: [0xff6f9c, 1.5, [3, 3.5, -9]],  // pink light from where the sun sets
-        sideLight: [0x45e0e3, 0.55, [-7, 4, 5]],   // a little teal from the other side
+        background: 0xff9e6d,
+        haze: [0xff9e6d, 26, 80],
+        skyLight: [0xffb7d2, 0x2a1a4a, 0.5],
+        mainLight: [0xffd9b8, 1.75, [5, 9, 6]],    // warm light, like the last sun on your face
+        backLight: [0xff6f9c, 0.55, [2.5, 4, -9]],  // pink light from where the sun sets
+        sideLight: [0x45e0e3, 0.5, [-7, 4, 5]],    // a little teal from the other side
         room: 0.5,
         boards: 0xf7f1f7, kick: 0xff3d8f, rail: 0x0b3b40, railGlow: [0x2ff3f0, 1.6],
         glass: 0xffd6ec, posts: 0xd9c7e6, floor: 0x1f1233,
-        ice: "#f3e9f1", iceShade: "196,160,200", iceMarks: "168,132,176", iceWarm: ["255,170,120", "150,120,230"],
+        ice: "#e6d9ec", iceShade: "190,150,200", iceMarks: "160,122,172", iceWarm: ["255,146,112", "150,112,232"],
         // The sky, from the horizon up to straight above: [how high (0 to 1), color].
-        sky: [[0, "#e8607f"], [0.05, "#ef6f86"], [0.12, "#d9488a"], [0.24, "#93308f"], [0.42, "#4a1f7a"], [0.7, "#231552"], [1, "#140c33"]],
-        sun: { at: [0.42, 0.105, -0.9], core: "#fff3c4", edge: "#ffb45e", glow: "255,140,90" },
+        sky: [[0, "#ff9e6d"], [0.022, "#ff8077"], [0.05, "#f2578e"], [0.09, "#bb3c97"], [0.16, "#742c8c"], [0.34, "#33196a"], [1, "#140c33"]],
+        sun: { at: [0.22, 0.038, -0.97], core: "#fff3c4", edge: "#ffb45e", glow: "255,140,90" },
         palms: "#1d0c30"
       },
       pro: { nameColor: "#2fd6d9", jersey: 0x10aebb, trim: 0x2a1250, stripe: 0xffb7dc, pants: 0x24133f,
-             helmet: 0xf4f0f7, glove: 0xf4f0f7, cage: null, stick: 0xf2edf6, tape: 0xff3d8f, laces: 0xff5fa8, visor: true },
+             helmet: 0xf4f0f7, glove: 0xf4f0f7, cage: null, stick: 0x2c1650, tape: 0xff3d8f, laces: 0xff5fa8, visor: true },
       you: { nameColor: "#ff5fa8", jersey: 0xf2408f, trim: 0x2a1250, stripe: 0xb5f4f5, pants: 0x24133f,
-             helmet: 0xf4f0f7, glove: 0xf4f0f7, cage: 0xe9e4ee, stick: 0xf2edf6, tape: 0x16b9c4, laces: 0x2fd6d9, visor: false }
+             helmet: 0xf4f0f7, glove: 0xf4f0f7, cage: 0xe9e4ee, stick: 0x2c1650, tape: 0x16b9c4, laces: 0x2fd6d9, visor: false }
     }
   };
   var FIRST = "rink";            // the look a new visitor gets
@@ -154,11 +157,21 @@
     // The color of the browser's own bar on a phone.
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute("content", THEMES[name].css.bg);
+    // The page talks about "the orange skater". In Sunset that skater
+    // is pink, so every such word (marked data-word in index.html) is
+    // written again. data-word="You" (a capital) starts a sentence.
+    var marked = document.querySelectorAll("[data-word]");
+    for (var i = 0; i < marked.length; i++) {
+      var who = marked[i].getAttribute("data-word"), w = THEMES[name].words[who.toLowerCase()];
+      if (w) marked[i].textContent = who === who.toLowerCase() ? w : w.charAt(0).toUpperCase() + w.slice(1);
+    }
   }
   show();
 
   api.name = function () { return name; };
   api.now = function () { return THEMES[name]; };
+  // The color word for a skater right now: word("you") is "orange" or "pink".
+  api.word = function (who) { return THEMES[name].words[who]; };
   // Other files ask to be told when the look changes.
   api.onChange = function (fn) { listeners.push(fn); };
   api.set = function (next) {

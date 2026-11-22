@@ -228,7 +228,7 @@
     for (var i = 0; i < 9; i++) {
       var y = 0.064 + i * 0.0108;
       var x = smooth(FRONT, y), hw = smooth(WIDE, y) * smooth(ALONG, x);
-      var lace = add(laceGeo, P.lace);
+      var lace = add(laceGeo, opts.lacePaint || P.lace);   // (a skater may bring laces in its own color)
       lace.scale.set(1, hw * 1.15, 1);
       // lie across the boot, tipped to follow the slope of the front
       lace.rotation.set(Math.PI / 2, 0, 0);

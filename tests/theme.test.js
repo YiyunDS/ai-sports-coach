@@ -43,6 +43,15 @@ test("both looks list the same things", function () {
   assert.strictEqual(T.THEMES.sunset.scene.outdoor, true);
 });
 
+test("each look has its own words for the two skaters' colors", function () {
+  names.forEach(function (n) {
+    var w = T.THEMES[n].words;
+    assert.ok(w.you && w.pro && w.you !== w.pro, n);
+  });
+  assert.notStrictEqual(T.THEMES.rink.words.you, T.THEMES.sunset.words.you);
+  assert.notStrictEqual(T.THEMES.rink.words.pro, T.THEMES.sunset.words.pro);
+});
+
 // ---- The color math ----
 function near(a, b, tol, msg) { assert.ok(Math.abs(a - b) <= tol, (msg || "") + " got " + a + ", wanted " + b); }
 test("contrast: black on white is 21, a color on itself is 1", function () {

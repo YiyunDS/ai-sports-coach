@@ -71,7 +71,13 @@
     object.quaternion.setFromRotationMatrix(m);
   }
 
+  // The paint of the signs and of the see-through skater. The page has
+  // two looks (see theme.js); setLook, at the bottom of this file,
+  // changes these when you switch.
+  var SIGN = { plate: "rgba(10,14,20,0.9)", text: "#f2f6fa", ghost: 0x5aa9ff };
+
   // When the nice web font finishes loading, repaint every sign once.
+  // (The same counter makes every sign repaint when the look changes.)
   var fontEpoch = 0;
   if (root.document && document.fonts && document.fonts.ready) {
     document.fonts.ready.then(function () { fontEpoch++; });
@@ -87,9 +93,9 @@
     c.lineTo(r + 6, h - 6); c.quadraticCurveTo(6, h - 6, 6, h - r - 6);
     c.lineTo(6, r + 6); c.quadraticCurveTo(6, 6, r + 6, 6);
     c.closePath();
-    c.fillStyle = "rgba(10,14,20,0.9)"; c.fill();      // dark plate
+    c.fillStyle = SIGN.plate; c.fill();                 // dark plate
     c.lineWidth = 5; c.strokeStyle = color; c.stroke();  // thin colored edge
-    c.fillStyle = "#f2f6fa";
+    c.fillStyle = SIGN.text;
     c.font = "600 50px 'Barlow Condensed', 'Arial Narrow', Arial, sans-serif";
     c.textAlign = "center"; c.textBaseline = "middle";
     c.fillText(text.toUpperCase(), w / 2, h / 2 + 3);
@@ -220,6 +226,7 @@
     this.labels = {};
     this.wedges = {};
     this.name = opts.name;
+    this.number = opts.number;
     this.labelsOn = true;  // set to false to hide this skater's signs and slices
     this.nameColor = opts.nameColor || "#1d4ed8";
     this.parts = [];       // every piece, so we can move them each frame
@@ -667,10 +674,11 @@
   Figure.prototype.setGhost = function (on) {
     if (!this.ghostPaint) {
       this.ghostPaint = new THREE.MeshBasicMaterial({
-        color: 0x5aa9ff, transparent: true, opacity: 0.32, depthWrite: false, depthTest: false, toneMapped: false
+        color: SIGN.ghost, transparent: true, opacity: 0.32, depthWrite: false, depthTest: false, toneMapped: false
       });
-      this.ghostLine = new THREE.LineBasicMaterial({ color: 0x5aa9ff, transparent: true, opacity: 0.5, depthTest: false, toneMapped: false });
+      this.ghostLine = new THREE.LineBasicMaterial({ color: SIGN.ghost, transparent: true, opacity: 0.5, depthTest: false, toneMapped: false });
     }
+    this.freshGhost();   // (the look may have changed since last time)
     var self = this;
     this.group.traverse(function (m) {
       if (!m.userData.body) return;
@@ -699,6 +707,40 @@
     var self = this;
     Object.keys(this.labels).forEach(function (id) { self.hide(id); });
     Object.keys(this.wedges).forEach(function (id) { self.hide(id); });
+  };
+
+  // ---- Changing clothes (the page has two looks, see theme.js) ----
+  // outfit = { nameColor, jersey, trim, pants, helmet, glove, stick, tape }
+  // We change the COLOR of each paint and never swap a paint for a new
+  // one. That way the see-through Overlay, which remembers every
+  // piece's real paint, keeps working.
+  Figure.prototype.setOutfit = function (outfit) {
+    var P = this.paints;
+    this.nameColor = outfit.nameColor;
+    // A new jersey picture (color, stripes and number) on the same paint.
+    var old = P.jersey.map, trim = "#" + new THREE.Color(outfit.trim).getHexString();
+    P.jersey.map = jerseyTexture("#" + new THREE.Color(outfit.jersey).getHexString(), trim, this.number);
+    P.jersey.needsUpdate = true;
+    if (old) old.dispose();
+    P.sleeve.color.setHex(outfit.jersey); P.socks.color.setHex(outfit.jersey);
+    P.trim.color.setHex(outfit.trim); P.pants.color.setHex(outfit.pants);
+    P.helmet.color.setHex(outfit.helmet); P.glove.color.setHex(outfit.glove);
+    P.stick.color.setHex(outfit.stick); P.tape.color.setHex(outfit.tape);
+    this.freshGhost();
+  };
+  // The see-through skater of Overlay mode takes the look's color too.
+  Figure.prototype.freshGhost = function () {
+    if (!this.ghostPaint) return;
+    this.ghostPaint.color.setHex(SIGN.ghost);
+    this.ghostLine.color.setHex(SIGN.ghost);
+  };
+  // The paint all skaters share: the plate and letters of the signs,
+  // the colors of the rings around graded joints, the see-through color.
+  //   look = one entry of the list in theme.js
+  Figure.setLook = function (look) {
+    SIGN.plate = look.signs.plate; SIGN.text = look.signs.text; SIGN.ghost = look.ghost;
+    Object.keys(look.rings).forEach(function (grade) { GRADE_COLORS[grade] = look.rings[grade]; });
+    fontEpoch++;   // every sign paints itself again, with the new plate
   };
 
   root.SkaterFigure = Figure;

@@ -151,7 +151,7 @@
           </div>
           <div class="tool extra" id="kid-tool" hidden>
             <span class="tool-label">You</span>
-            <div class="seg" role="group" aria-label="How the orange skater moves">
+            <div class="seg" role="group" aria-label="How your skater moves">
               <button type="button" data-kid="smooth" aria-pressed="true" title="Your stride, rebuilt smoothly from all the good pictures">Smooth stride</button>
               <button type="button" data-kid="filmed" aria-pressed="false" title="The poses the AI saw, picture by picture">As filmed</button>
             </div>
@@ -204,7 +204,7 @@
       <section class="panel">
         <h2>Reference skater</h2>
         <div class="field row">
-          <label for="ref-mode">Blue skater shows</label>
+          <label for="ref-mode"><span data-word="Pro">Blue</span> skater shows</label>
           <select id="ref-mode">
             <option value="pro">Pro reference</option>
             <option value="goal">Target for this age</option>
@@ -295,7 +295,7 @@
         <!-- Layer 3: how it was measured (folded away until you ask). -->
         <p id="kid-note" class="small kid-note" hidden></p>
         <details id="kid-more" class="more" hidden>
-          <summary>How the orange skater was made</summary>
+          <summary>How the <span data-word="you">orange</span> skater was made</summary>
           <p id="kid-long" class="small"></p>
         </details>
         <details id="quality-more" class="more" hidden>
@@ -373,7 +373,7 @@
 
       <section class="panel">
         <h2>Your spot: <span id="pos-role-name"></span></h2>
-        <p class="small">Drag the orange marker to where you should stand, then check it.</p>
+        <p class="small">Drag the <span data-word="you">orange</span> marker to where you should stand, then check it.</p>
         <div class="go">
           <button type="button" id="pos-check" class="primary">Check my spot</button>
           <button type="button" id="pos-answer">Show answer</button>

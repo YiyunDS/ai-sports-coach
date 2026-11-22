@@ -91,7 +91,8 @@
    to press next), HOT PINK for you. Green, yellow and red still grade.
    Only colors change here: no size, no letter and no movement.
    The lines of the rinks stay blue and red in both looks, because
-   "the blue line" is a rule of hockey, not a decoration.
+   "the blue line" is a rule of hockey, not a decoration. So do the
+   blue team and the red team on the rinks seen from above.
    (js/theme.js holds the same colors for the 3D picture, and
    tests/theme.test.js checks that the two lists agree.) */
 :root[data-theme="sunset"] {
@@ -127,7 +128,6 @@
   --band-key-edge: rgba(61, 220, 143, 0.7);
   --curve-plain: #a596c0;
   --now-line: rgba(244, 236, 250, 0.7);
-  --mate: #0d5a6b;
   --you-ink: #c21f6e;
 }
 

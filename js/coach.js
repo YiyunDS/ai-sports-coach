@@ -55,7 +55,12 @@
   var CROP = 512;           // the zoomed-in picture we hand to the AI is 512 x 512 dots
   var SMALL_SKATER = 0.18;  // skater shorter than this part of the picture = "far away"
 
-  var COLORS = { good: "#2fbf71", close: "#e6b422", far: "#ef5350", none: "#263344" };
+  // The colors of the signs next to the orange skater (one per grade)
+  // and of what we draw on the video. They come from the look of the
+  // page (theme.js) and change when you flip the switch in the top bar.
+  var Theme = window.CoachTheme;
+  var COLORS = Theme.now().signs;
+  var INK = Theme.now().overlay;
 
   // The three checks, with the words we show for each one.
   //   tip   = the advice on the card
@@ -400,12 +405,12 @@
     // "more" is the longer explanation, folded away until you ask.
     var text, more = "";
     if (!can) {
-      text = "The orange skater shows the poses as the AI saw them. " + (r ? r.why : "");
+      text = "The " + Theme.word("you") + " skater shows the poses as the AI saw them. " + (r ? r.why : "");
     } else if (smoothOn()) {
       var o = r.overall, a = r.angles;
       // (A real video: say how many pictures the coach could read in all.)
       var outOf = state.useful && state.useful.total > r.pictures ? " (of " + state.useful.total + " the coach could read)" : "";
-      text = "The orange skater is your stride, rebuilt from " + r.pictures + " good pictures" + outOf + ". " +
+      text = "The " + Theme.word("you") + " skater is your stride, rebuilt from " + r.pictures + " good pictures" + outOf + ". " +
         "The legs and the lean are yours. The arms, the stick and how the skates tip are drawn the standard way. " +
         (r.pushSeen ? "" : "The coach saw no full push in this clip, so the push is NOT yours: it is drawn at a standard " +
           Math.round(o.strideExtension) + "°. ") +
@@ -419,7 +424,7 @@
         "A one-time stumble does not show here; pick \"As filmed\" to see every picture as the AI saw it. " +
         "When the replay ends, both skaters keep striding so you can keep comparing.";
     } else {
-      text = "The orange skater shows the poses as the AI saw them, picture by picture.";
+      text = "The " + Theme.word("you") + " skater shows the poses as the AI saw them, picture by picture.";
       more = "That is wobbly, because every picture is read on its own. " +
         "Pick \"Smooth stride\" to see your stride rebuilt from all the good pictures together.";
     }
@@ -438,6 +443,26 @@
         if (smoothOn()) startLoop(); else showFrame(state.index);
       }
     });
+  });
+
+  // The look of the page changed (the switch in the top bar): take the
+  // new colors and draw the picture we are showing once more.
+  // The long note about how much of the video was used. It may name
+  // your skater's color ("{you}"), which depends on the look.
+  function showQuality() {
+    el.qualityLong.textContent = (state.qualityNotes || "").replace("{you}", Theme.word("you"));
+  }
+  Theme.onChange(function (look) {
+    COLORS = look.signs;
+    INK = look.overlay;
+    showKidMode();     // its note says "the orange skater" (or "the pink skater")
+    showQuality();
+    if (state.frames && state.frames.length) {
+      // (A playing replay and the striding loop redraw by themselves.)
+      if (!state.playing && !(state.looping && smoothOn())) showFrame(state.index);
+    } else if (state.seed) {
+      drawSeed();
+    }
   });
 
   // ---------- The report cards ----------------------------------------
@@ -952,22 +977,22 @@
     var thin = Math.max(2, W / 500);
     if (win) { // the square where the tracker is looking
       g.setLineDash([thin * 4, thin * 3]);
-      g.strokeStyle = "rgba(255,255,255,0.7)"; g.lineWidth = thin;
+      g.strokeStyle = INK.search; g.lineWidth = thin;
       g.strokeRect(win.x, win.y, win.size, win.size);
       g.setLineDash([]);
     }
     if (!det) return;
     var b = det.box;
-    g.strokeStyle = "#ff9f43"; g.lineWidth = thin;
+    g.strokeStyle = INK.box; g.lineWidth = thin;
     g.strokeRect(b.cx - b.w / 2 - 6, b.cy - b.h / 2 - 6, b.w + 12, b.h + 12);
-    g.strokeStyle = "#ffffff"; g.lineWidth = thin * 0.9; g.lineCap = "round";
+    g.strokeStyle = INK.bone; g.lineWidth = thin * 0.9; g.lineCap = "round";
     g.beginPath();
     BONES_2D.forEach(function (pair) {
       var p = det.pts[pair[0]], q = det.pts[pair[1]];
       g.moveTo(p.x, p.y); g.lineTo(q.x, q.y);
     });
     g.stroke();
-    g.fillStyle = "#ff9f43";
+    g.fillStyle = INK.dot;
     [11, 12, 23, 24, 25, 26, 27, 28].forEach(function (i) {
       g.beginPath(); g.arc(det.pts[i].x, det.pts[i].y, thin * 1.5, 0, Math.PI * 2); g.fill();
     });
@@ -978,7 +1003,7 @@
     var g = clearOverlay(), W = el.overlay.width, H = el.overlay.height;
     if (!state.seed) return;
     var r = Math.max(14, W / 45);
-    g.strokeStyle = "#ff9f43"; g.lineWidth = Math.max(3, W / 320);
+    g.strokeStyle = INK.box; g.lineWidth = Math.max(3, W / 320);
     g.beginPath(); g.arc(state.seed.x * W, state.seed.y * H, r, 0, Math.PI * 2); g.stroke();
   }
 
@@ -1348,7 +1373,7 @@
       //   notes    = how much of the video was used: folded away under the cards
       var notes = [], warnings = [];
       if (shown < clearCount) {
-        notes.push("The orange skater shows only the " + shown + " useful moments (" +
+        notes.push("The {you} skater shows only the " + shown + " useful moments (" +
           (state.useful.sideOnly ? "seen from the side, " : "") + "several pictures in a row, a pose that makes sense" +
           (state.useful.pushesOnly ? ", a real push in it" : "") + ")" +
           (state.useful.runs > 1 ? ", in " + state.useful.runs + " pieces" : "") + ". The other " + (clearCount - shown) +
@@ -1387,7 +1412,8 @@
       notes.push("Angles are most accurate when the skater is filmed from the side.");
       el.qualityNote.textContent = warnings.join(" ");
       el.qualityNote.hidden = !warnings.length;
-      el.qualityLong.textContent = notes.join(" ");
+      state.qualityNotes = notes.join(" ");   // ("{you}" stands for the color of your skater: see showQuality)
+      showQuality();
       el.qualityMore.hidden = false;
       say("Analysis complete. Check the video under the report: the white skeleton should sit on your skater.");
       worked = true;
