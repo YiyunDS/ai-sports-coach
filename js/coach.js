@@ -118,7 +118,7 @@
     videoPanel: $("video-panel"), overlay: $("overlay"), pickTime: $("pick-time"), pickOut: $("pick-out"),
     seedInfo: $("seed-info"), trackInfo: $("track-info"), qualityNote: $("quality-note"),
     qualityMore: $("quality-more"), qualityLong: $("quality-long"),
-    kidTool: $("kid-tool"), kidNote: $("kid-note"), kidMore: $("kid-more"), kidLong: $("kid-long"),
+    kidNote: $("kid-note"), kidMore: $("kid-more"), kidLong: $("kid-long"),
     play: $("play-btn"), speed: $("speed"), worst: $("worst-btn"),
     frameInfo: $("frame-info"), curve: $("curve"), curveKey: $("curve-key"), curveNote: $("curve-note")
   };
@@ -137,7 +137,6 @@
     seed: null,       // where you clicked: { t, x, y } (x and y go from 0 to 1)
     analysis: null,   // scores for every pose
     rebuilt: null,    // the stride rebuilt from all the poses (see rebuild.js)
-    kidMode: "smooth",// what the orange skater shows: "smooth" = the rebuilt stride, "filmed" = the poses as the AI saw them
     kidNow: null,     // smooth mode: the clock and the numbers of the moment we are showing
     looping: false,   // smooth mode: the skaters stride round and round (not following the video)
     target: null,     // the target ranges for this age and level
@@ -212,7 +211,7 @@
       // (If the clip shows no full push, the rebuilt skater's push is drawn
       //  at the low end of the goal for this age. The note says so.)
       state.rebuilt = Rb ? Rb.build(state.frames, state.times, state.rhythm, state.analysis, { standardPush: target.strideExtension.min }) : null;
-      showKidMode();
+      showKidNote();
       drawCards(target);
       drawCurve();
       // (While the replay is playing, the next tick redraws by itself.
@@ -252,7 +251,9 @@
       state.kidNow = Rb.at(state.rebuilt, i, blend);
       C.setSync({ cycle: state.kidNow.cycle, drawKid: drawSmoothKid, label: "Loop my stride", onButton: startLoop });
     } else {
-      // AS FILMED: the pose the AI saw in this picture.
+      // PICTURE BY PICTURE: the pose the AI saw in this one picture.
+      // Only used when the smooth stride could not be built (fewer than
+      // 3 good pictures), and in measuring mode ("?dev" in the address).
       var f = state.analysis.perFrame[i], peak = pushAt(i);
       var pose = blend > 0 ? M.lerpPose(state.frames[i], state.frames[i + 1], blend) : state.frames[i];
 
@@ -305,12 +306,13 @@
   // One picture from the AI is wobbly, but all the good pictures
   // together tell us HOW this skater skates: how bent the knee is, how
   // far they lean, how far they push, and their rhythm (rebuild.js).
-  // In "Smooth stride" the orange skater skates exactly that way, with
+  // The orange skater skates exactly that way, with
   // the same stride builder as the pro and on the same clock. So what
   // looks different between the two IS different.
 
-  // Is the orange skater showing the rebuilt stride right now?
-  function smoothOn() { return state.kidMode === "smooth" && !!state.rebuilt && state.rebuilt.ok; }
+  // Is the orange skater showing the rebuilt stride? Yes, whenever it
+  // could be built. (In measuring mode we want every picture as it is.)
+  function smoothOn() { return !DEV && !!state.rebuilt && state.rebuilt.ok; }
 
   // The numbers the orange skater has right now. They glide toward the
   // numbers of the moment we are showing, so nothing snaps.
@@ -386,17 +388,9 @@
     if (state.frames && smoothOn() && !state.looping) startLoop();
   }
 
-  // The "Smooth stride / As filmed" switch, and the line that says what
-  // the orange skater is showing.
-  var kidButtons = document.querySelectorAll("[data-kid]");
-  function showKidMode() {
+  // The line under the report that says what the orange skater is showing.
+  function showKidNote() {
     var r = state.rebuilt, can = !!(r && r.ok);
-    el.kidTool.hidden = !state.frames;
-    Array.prototype.forEach.call(kidButtons, function (b) {
-      var mode = b.getAttribute("data-kid");
-      b.disabled = mode === "smooth" && !can;
-      b.setAttribute("aria-pressed", String(mode === (smoothOn() ? "smooth" : "filmed")));
-    });
     el.kidNote.hidden = !state.frames;
     el.kidMore.hidden = true;
     if (!state.frames) return;
@@ -404,9 +398,7 @@
     // (a standard push, a standard rhythm) must be said there.
     // "more" is the longer explanation, folded away until you ask.
     var text, more = "";
-    if (!can) {
-      text = "The " + Theme.word("you") + " skater shows the poses as the AI saw them. " + (r ? r.why : "");
-    } else if (smoothOn()) {
+    if (smoothOn()) {
       var o = r.overall, a = r.angles;
       // (A real video: say how many pictures the coach could read in all.)
       var outOf = state.useful && state.useful.total > r.pictures ? " (of " + state.useful.total + " the coach could read)" : "";
@@ -421,29 +413,20 @@
         (r.pushSeen ? ", push " + Math.round(o.strideExtension) + "°" : "") +
         (r.rhythmFound ? ", and one stride every " + r.clock.secondsPerCycle.toFixed(1) + " s" : "") + ". " +
         "One picture alone is wobbly, but the middle value of many pictures can be trusted, so the coach works out HOW you skate and lets a smooth skater skate that way. " +
-        "A one-time stumble does not show here; pick \"As filmed\" to see every picture as the AI saw it. " +
+        "A one-time stumble does not show here. " +
         "When the replay ends, both skaters keep striding so you can keep comparing.";
+    } else if (!can) {
+      // Too few good pictures to rebuild a stride from.
+      text = "The coach could not rebuild a smooth stride from this clip, so the " + Theme.word("you") +
+        " skater shows the poses picture by picture, as the AI saw them. " + (r ? r.why : "");
     } else {
-      text = "The " + Theme.word("you") + " skater shows the poses as the AI saw them, picture by picture.";
-      more = "That is wobbly, because every picture is read on its own. " +
-        "Pick \"Smooth stride\" to see your stride rebuilt from all the good pictures together.";
+      // Measuring mode ("?dev" in the address).
+      text = "Measuring mode: the " + Theme.word("you") + " skater shows the poses as the AI saw them, picture by picture.";
     }
     el.kidNote.textContent = text;
     el.kidMore.hidden = !more;
     el.kidLong.textContent = more;
   }
-  Array.prototype.forEach.call(kidButtons, function (b) {
-    b.addEventListener("click", function () {
-      state.kidMode = b.getAttribute("data-kid");
-      kidLive = null;
-      showKidMode();
-      // (While the replay is playing, the next tick redraws by itself.)
-      if (state.frames && !state.playing) {
-        // Smooth stride: the skaters stride right away. As filmed: one picture.
-        if (smoothOn()) startLoop(); else showFrame(state.index);
-      }
-    });
-  });
 
   // The look of the page changed (the switch in the top bar): take the
   // new colors and draw the picture we are showing once more.
@@ -455,7 +438,7 @@
   Theme.onChange(function (look) {
     COLORS = look.signs;
     INK = look.overlay;
-    showKidMode();     // its note says "the orange skater" (or "the pink skater")
+    showKidNote();     // its note says "the orange skater" (or "the pink skater")
     showQuality();
     if (state.frames && state.frames.length) {
       // (A playing replay and the striding loop redraw by themselves.)
@@ -824,7 +807,7 @@
     render(i, blend, videoRuns);
     if (i >= last || (state.hasVideo && el.preview.ended)) {
       setPlaying(false);
-      // The replay is over. In "Smooth stride" the skaters keep striding.
+      // The replay is over. The skaters keep striding.
       if (smoothOn()) startLoop();
     }
   });
@@ -860,8 +843,6 @@
     }
     kidLive = null;   // a new skater: forget the last one's numbers
     state.looping = false;
-    // (In measuring mode we want to see every picture as it is.)
-    if (DEV) state.kidMode = "filmed";
     state.raw = { frames: rawFrames, weights: extra.weights || null }; // kept so we can check the clean-up in the browser
     state.flat = extra.flat || null;
     state.rhythm = M.strideSignal(state.frames);
@@ -927,7 +908,7 @@
     state.focus = null;
     el.results.classList.remove("waiting", "reveal");
     el.view.classList.remove("has-report");
-    showKidMode();
+    showKidNote();
     state.hasVideo = false;
     state.index = 0;
     el.results.hidden = true;

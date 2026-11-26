@@ -18,7 +18,7 @@
       }
     } catch (e) { /* the browser will not let us read it: the first look it is */ }
   </script>
-  <link rel="stylesheet" href="style.css?v=19.0">
+  <link rel="stylesheet" href="style.css?v=20.0">
 </head>
 <body>
   <!--
@@ -147,13 +147,6 @@
             <div class="seg" role="group" aria-label="How to compare the two skaters">
               <button type="button" data-compare="side" aria-pressed="true" disabled>Side by side</button>
               <button type="button" data-compare="overlay" aria-pressed="false" disabled>Overlay</button>
-            </div>
-          </div>
-          <div class="tool extra" id="kid-tool" hidden>
-            <span class="tool-label">You</span>
-            <div class="seg" role="group" aria-label="How your skater moves">
-              <button type="button" data-kid="smooth" aria-pressed="true" title="Your stride, rebuilt smoothly from all the good pictures">Smooth stride</button>
-              <button type="button" data-kid="filmed" aria-pressed="false" title="The poses the AI saw, picture by picture">As filmed</button>
             </div>
           </div>
           <div class="tool extra">
@@ -557,7 +550,7 @@
     // by the browser from an earlier visit) does not work. This number
     // goes on the end of every file's address, so after an update the
     // browser fetches all of them fresh. RAISE IT whenever a .js file changes.
-    var VERSION = "19.0";
+    var VERSION = "20.0";
     // Load one of our .js files and wait until it has run.
     function load(src) {
       return new Promise(function (done, fail) {
