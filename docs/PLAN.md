@@ -1359,6 +1359,153 @@ stickhandle to the net), and offside for everyone on the ice.
   in Positioning), and so is the old game itself.
 - Pictures: `docs/screenshots/phase21/`. Version 21.0.
 
+### Phase 22: Take, full screen, a coach's report, the referee in the right place, more Referee plays (done)
+
+The team leader played version 21 and asked for five things. Decided
+with them: Take usually works when you are close, not always; and the
+Pass key no longer takes, only Take does.
+
+**1. Take.** Its own key (the space bar), its own touch button, X on
+a controller. `tryTake` in `js/gamesim.js`:
+- farther than 5 feet from the puck carrier nothing is taken, and the
+  line under the clock says "Too far to take";
+- inside 5 feet the chance goes from about 45% (from behind, at arm's
+  length) to about 90% (right in front, close), a third of that
+  during the carrier's quick move; a miss leaves you slow for a
+  moment and there is a short wait before the next try;
+- for the three youngest age groups a thin ring shows around the puck
+  carrier when you are close enough.
+The Pass button keeps saying "Pass"; the button to reach for (Take on
+defense, Pass otherwise) is the bright one. The pretend child still
+wins and loses about as before (5.3 to 0.1 at ages 4-5, 1.0 to 2.7 at
+16+), so Take did not change how hard the game is.
+
+**2. Full screen.** A button asks the browser for real full screen on
+the Game's board. Where that is not allowed (an iPhone) the board
+fills the whole window and covers the top bar and the tabs. The
+button or Esc leaves it, and leaving pauses the game. At the end of a
+game it leaves by itself, so the report can be read.
+
+**3. The coach's report** (`js/gamereport.js`, new). While you play it
+keeps notes about your skater; at the end it writes, under the rink:
+the two things you did best, the one thing to work on next with a
+tip, and a card each for Position, Passing, Shooting, Taking the puck,
+Whistles on you, and Face-offs (only when you are the center).
+- Position is read five times a second while you do not have the
+  puck: how far you are from the spot the Positioning playbook gives
+  your position (the same spots the computer players skate to, now
+  available as `spots()` in `js/gamebrain.js`). Chasing a loose puck
+  as the nearest player, or meeting a pass, does not count.
+- For the rest the rules now send quiet notes that the play-by-play
+  does not show: a pass leaving, who got it, a shot with where it was
+  from and how good that spot is (the game's own `shotChance`), a shot
+  wide or over the net, each take, who brought the puck in on an
+  offside, and how you did at a face-off.
+- "The moment to pass": you held the puck for more than a second and a
+  half, a defender was within 10 feet, a teammate was open, and then
+  the puck was taken from you.
+
+**4. The referee where a referee belongs.** `refSpot` in
+`js/gamesim.js` now knows the stoppage. Face-off: right at the dot, a
+step beside the two centers, there before the players have lined up.
+Offside: first onto that blue line. Goal or covered puck: first beside
+that net. Icing: straight to the dot at the far other end. After the
+drop the referee backs away to the boards.
+
+**5. More Referee plays** (`js/refplays.js`, `js/ref.js`; built by a
+helper task and then checked by me). From 10 kinds of plays to 24:
+10 at Rookie (were 6), 19 at Linesman, 24 at Pro.
+- New at Rookie: a puck SHOT in while a teammate is inside (offside)
+  and with everybody outside (good play); a long pass nobody reaches
+  (icing) and one a teammate catches (good play).
+- New at Linesman: the FAR winger decides the call (offside, and a
+  close onside twin); the puck comes out and goes back in while a
+  teammate is still inside (offside) or after everybody got back
+  (good play); a long pass to a teammate already inside (offside); a
+  teammate's tip behind the red line (still icing).
+- New at Pro: a tip past the red line (not icing); the player who has
+  the puck crosses the line ahead of it (not offside); skates in the
+  zone and the stick reaching back for the puck (offside); the other
+  team takes the puck back into its own zone (not offside).
+- The last three rest on USA Hockey Rule 630(b) and its casebook, and
+  the tips on the Note to Rule 624. I opened both rule pages myself
+  and found the sentences; they are quoted in `SOURCES.md`. The old
+  line there, "not taught because we could not confirm the wording",
+  is gone for the carrier case.
+- Four of the kinds (the long pass to a teammate inside, the two tips,
+  the reach with the stick) were not in my plan. The helper added
+  them so that about half of every deck still needs a whistle.
+- Inside every kind, old and new: who has the puck (center, winger or
+  defender), which side, how deep and how fast, and one to three
+  extra skaters who can never change the call.
+- The judge was extended, not replaced: it now also follows who has
+  the puck, whether the puck came out and went back in, and the last
+  touch by the shooting team.
+- Dealing: a shuffled deck per level. Every kind comes up once before
+  any comes back, and none twice within three plays.
+
+**What the tests and the checks caught while building:**
+- After icing the referee first skated to the far goal line and then
+  could not reach the face-off at the other end in time (68 feet away
+  when the players were lined up). Now the referee goes straight to
+  the dot, and a test checks the referee is there at every line-up.
+- My class name for a row of choices, and later a wrong distance in a
+  test of mine, were test mistakes, not page mistakes.
+- One touch check failed once while other browser tests were running
+  at the same time, and passed when repeated (and 6 of 6 times alone):
+  my script had looked before the page drew its next picture.
+
+**Checked:**
+- 18 test files pass. New or rewritten: 58 checks of the game's rules
+  (13 of them for Take and the referee's spots, 5 for the quiet
+  notes), 13 of the coach's report (every sentence from made-up games,
+  and 15 whole computer-only games), 22 of the Referee plays (the
+  judge agrees with 300 plays of every kind at every level on both
+  sides of the ice).
+- Referee tab: 60 plays dealt per level gave every kind of the level
+  (10, 19, 24), 29 or 30 whistles of 60, and no kind twice within
+  three plays. One play of each of the 14 new kinds watched, answered
+  and frozen at 1280x800 and 375x812: the call was right 28 of 28
+  times, the explanation fits, no page errors, no sideways scrolling.
+  The longest explanation used to push "Next play" 14 px under the
+  phone's tabs; shortened by a few words, it now ends 7 px above.
+- Test browser, real key presses, 1280x800, both looks: Space takes
+  from close and says "Too far to take" from far, `-` on defense does
+  nothing, the space bar does not scroll the page; the referee is
+  within 5 ft of the dot at a face-off by the blue line and at one in
+  our end after icing; full screen fills the window and Esc leaves it
+  and pauses; a controller's X takes.
+- A game steered by script ended with a report that counted exactly
+  what the script did: 1 pass that arrived, 1 shot, 3 takes (1 won, 1
+  from too far), 1 face-off won, 1 offside from carrying the puck in.
+- Fingers at 375x812 and 820x1180, both looks: five buttons, each at
+  least 44 px (Take is 64 by 136 on the phone); a finger on Take takes
+  the puck; rink and controls on one screen; the window-filling full
+  screen covers the top bar and the tabs and leaves again; the report
+  has no sideways scrolling and no words under 11 px.
+- Form analysis, Positioning and the Referee tab's first screen: every
+  element the same as in version 21, in both looks, at 1280 and 375.
+- Pictures: `docs/screenshots/phase22/`. Version 22.0.
+
+**Limits, said plainly:**
+- Still not played by hand by me: scripts, computer-only games and a
+  pretend child. The report's limits (12 and 24 feet, what counts as
+  a good spot or as "open") are my first choice and may be too strict
+  or too kind once the kids read real reports.
+- "The moment to pass" is a rule of thumb, not a coach's eye. The
+  report cannot see WHY you were out of position.
+- Real full screen was only tried with the window-filling way in the
+  test browser on touch sizes; the real one on a computer. Not tried
+  on a real phone or iPad.
+- The referee is one person: after icing they skate the length of the
+  rink in under three seconds, faster than a real referee.
+- The Referee plays are still built from formations (more of them
+  now), not recordings of real games. In the frozen close-up of a
+  far-side player the puck can be outside the picture, as before.
+- The live Game still judges offside more simply than the Referee tab
+  (the middle of a skater, not each skate), and does not have the
+  Pro-level exceptions.
+
 ### Phase 5: Check the pro against a real skater (needs a video)
 
 - Run a good side-view video of a strong skater through the Phase 1

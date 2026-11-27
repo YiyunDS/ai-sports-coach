@@ -47,11 +47,13 @@ team leader) for the Presidential SI Challenge. All work happens on the
   `node tests/chart.test.js` (added in Phase 17),
   `node tests/theme.test.js` (added in Phase 19),
   `node tests/gamebrain.test.js`, `node tests/controls.test.js`,
-  `node tests/sound.test.js` (added in Phase 21).
+  `node tests/sound.test.js` (added in Phase 21),
+  `node tests/gamereport.test.js` (added in Phase 22).
   Add tests for new math.
 - Do not break the Positioning tab. The Game tab is a separate, live
   game (`js/gamesim.js` = the rules, `js/gamebrain.js` = the computer
-  players, `js/controls.js` = keys, joystick and controller,
+  players, `js/gamereport.js` = the coach's report at the end,
+  `js/controls.js` = keys, joystick and controller,
   `js/sound.js` = the whistle, `js/game.js` = the page); it reuses the
   playbook in `js/positions.js` but never changes it. Every game step
   must give the same result from the same seed, so it can be tested.

@@ -115,9 +115,11 @@ The **Game** tab is a live hockey game on the whole rink. You skate **one skater
 
 1. Pick your **age group** (4 to 5 years up to 16 and up), your **position** and how many **minutes** to play, then press **Start game**.
 2. **Skate** with `W` `A` `S` `D` (or the arrow keys). On a phone or tablet a joystick appears under your left thumb. A game controller works too.
-3. The buttons are the last key of each row of the keyboard: `-` **pass**, `P` **shoot**, `L` **call for a pass**, `M` a **quick move** past a defender. When the other team has the puck, `-` is a **stick check**. `Esc` pauses. On a touch screen the same four buttons sit on the right.
-4. A pass or a shot takes **two taps**, with **two bars**. While you have the puck a mark runs up and down the **Power** bar. The first tap stops it. Then a mark runs on the **Height** bar; the second tap stops that one and sends the puck. Green is the good part of each bar. A soft pass is easy to pick off and a very hard one is hard to catch. A lifted pass flies over a stick. A high shot can beat the goalie, but too high goes over the net.
-5. A **pass goes to the teammate you are steering toward**. A thin line shows who that is.
+3. The buttons are the last key of each row of the keyboard: `-` **pass**, `P` **shoot**, `L` **call for a pass**, `M` a **quick move** past a defender. The **space bar takes** the puck from the other team. `Esc` pauses. On a touch screen the same five buttons sit on the right.
+4. **Take** only works when you are really close to the player with the puck: within about a stick's length (5 feet). From farther away nothing happens and the game says "Too far to take". Close up it usually works, best from right in front, and hardly at all during the other player's quick move. A miss leaves you slow for a moment. For the younger age groups a thin ring shows around the puck carrier when you are close enough.
+5. A pass or a shot takes **two taps**, with **two bars**. While you have the puck a mark runs up and down the **Power** bar. The first tap stops it. Then a mark runs on the **Height** bar; the second tap stops that one and sends the puck. Green is the good part of each bar. A soft pass is easy to pick off and a very hard one is hard to catch. A lifted pass flies over a stick. A high shot can beat the goalie, but too high goes over the net.
+6. A **pass goes to the teammate you are steering toward**. A thin line shows who that is.
+7. **Full screen** shows only the game. On a phone that has no real full screen, the game fills the whole window instead. The same button, or `Esc`, leaves it and pauses the game.
 
 **The referee** (the striped marker) blows the whistle for:
 
@@ -126,7 +128,18 @@ The **Game** tab is a live hockey game on the whole rink. You skate **one skater
 - **A save the goalie covers.** After a rebound there is no whistle, play goes on.
 - **A goal.**
 
-After every whistle there is a face-off. If you are the center, tap Pass the moment the puck drops. The whistle is a real sound (made by the browser, there is no sound file); the **Sound** button turns it off.
+After every whistle there is a face-off, and the referee skates to the dot to drop the puck (after an offside the referee first stands on the blue line, after a goal or a covered puck beside the net). If you are the center, tap Pass the moment the puck drops. The whistle is a real sound (made by the browser, there is no sound file); the **Sound** button turns it off.
+
+**The coach's report.** When the game is over, a report appears under the rink. It says the two things you did best and the **one thing to work on next**, and has a card for each part of your game:
+
+- **Position**: without the puck, how much of the time you were at the spot the Positioning playbook gives your position (within 12 feet counts as "at your spot", within 24 feet as "close"), and your usual slip, for example "too far up the ice". Chasing a loose puck when you are the nearest one, or meeting a pass, does not count against you.
+- **Passing**: how many of your passes reached a teammate, were picked off, or were offside, and the times a defender took the puck from you while a teammate was open ("that was the moment to pass").
+- **Shooting**: how many of your shots came from a good spot in front of the net and how many from far out or from the side, and how they ended (goal, saved, blocked, beside the net, over the net). It also says when you had the puck in a good spot and did not shoot.
+- **Taking the puck**: tries, wins, and tries from too far away.
+- **Whistles on you**: offside because you were in too early, offside because you brought the puck in while a teammate was inside, and icing.
+- **Face-offs**, when you are the center.
+
+The limits in the report (12 feet, what counts as a good spot, what counts as "open") are our own choices, at the top of `js/gamereport.js`.
 
 **The age groups** have the same rules. Older groups are harder: the other team skates and decides faster, their goalie stops more, the marks on your bars run faster with a smaller green part, and computer players go offside or ice the puck more often. For the three youngest groups the pass line turns red when that pass would be offside.
 
@@ -143,7 +156,10 @@ In this game **you are the referee**. A short play runs on the rink, then you ta
 
 - **Offside:** the puck must cross the other team's blue line before any attacker. A player is offside when both skates are completely over the line before the whole puck is. One skate still on the line is fine.
 - **Icing:** the puck is shot from the shooter's own half of the rink and goes all the way over the far goal line with nobody touching it. Not icing: it goes in the net, the other team plays it first, or it stops short.
-- Three levels: **Rookie** (plain to see), **Linesman** (close calls at the line, pucks that are touched, stop short or go in) and **Pro** (faster, and teams that are short a player).
+- Three levels: **Rookie** (plain to see), **Linesman** (close calls at the line, pucks that are touched, tipped, stop short or go in) and **Pro** (faster, teams that are short a player, and the rules that surprise people).
+- **24 kinds of plays** (10 at Rookie, 19 at Linesman, all 24 at Pro), and about half of them need a whistle. Besides carrying or passing the puck over the blue line and shooting it down the ice: a puck **shot in** while a teammate is inside, the puck that **comes out and goes back in**, the **far winger** who decides the call, a **long pass** nobody reaches (icing) or a teammate catches (good play), and a **tip** behind or past the red line. At Pro: the player who has the puck crosses the line first (not offside), reaching back with the stick from inside the zone (offside), and the other team taking the puck back into its own zone (not offside).
+- Inside every kind the play changes: who has the puck, which side it happens on, how deep and how fast, and one to three extra skaters who do not change the call.
+- The plays come from a **shuffled deck**: every kind comes up once before any comes back, and no kind is seen twice within three plays.
 
 The rules are the USA Hockey rules for players 12 and under: the whistle blows right away (no "tag-up"), and a team killing a penalty may **not** ice the puck (in the NHL it may). The links are in `SOURCES.md`. The plays are built by `js/refplays.js`, and a separate "judge" in the same file makes the call from the skates and the puck alone; `node tests/refplays.test.js` checks that the judge agrees with every play.
 
@@ -189,7 +205,8 @@ The goal angles live in [`targets.json`](targets.json). There is one set for eac
 | `js/coach.js` | Reads your video, finds your pose, makes the report and replay |
 | `js/gamesim.js` | The live hockey game: the rules (skating, the puck, passes, shots, the two bars, goalies, goals, offside, icing, face-offs), the seven age groups, the playbook for any puck position, and the chances |
 | `js/gamebrain.js` | The live hockey game: the computer players (where they skate, what they do with the puck, and the mistakes they make on purpose) |
-| `js/controls.js` | The live hockey game: keys, the touch joystick and buttons, and a game controller, all turned into one "which way" arrow and four buttons |
+| `js/gamereport.js` | The live hockey game: the coach's report. Keeps notes about your skater while you play and writes the report at the end. Run `node tests/gamereport.test.js` |
+| `js/controls.js` | The live hockey game: keys, the touch joystick and buttons, and a game controller, all turned into one "which way" arrow and five buttons |
 | `js/sound.js` | The referee's whistle, made by the browser from a recipe of numbers (no sound file), and the Sound button |
 | `js/game.js` | The live hockey game on the page: the loop, the rink, the bars, the scoreboard, the play-by-play |
 | `js/positions.js` | The playbook: where each position should stand in each situation |
@@ -205,6 +222,7 @@ The goal angles live in [`targets.json`](targets.json). There is one set for eac
 | `tests/gamesim.test.js` | Checks the rules of the live game: the playbook, the chances, skating, the bars, passes, every offside and icing case, saves, goals, the stick check, face-offs. Run `node tests/gamesim.test.js` |
 | `tests/gamebrain.test.js` | Checks the computer players, and plays whole games with only computer players at every age group. Run `node tests/gamebrain.test.js` |
 | `tests/controls.test.js` | Checks the math of the keys, the joystick and the controller. Run `node tests/controls.test.js` |
+| `tests/gamereport.test.js` | Checks every sentence of the coach's report from made-up games, and that whole games give a full report. Run `node tests/gamereport.test.js` |
 | `tests/sound.test.js` | Checks the whistle's recipe (short, quiet, as high as a real whistle). Run `node tests/sound.test.js` |
 | `tests/cleanup.test.js` | Checks the clean-up of video poses (smoothing, fixed bones, skates on the ice). Run `node tests/cleanup.test.js` |
 
