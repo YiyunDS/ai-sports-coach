@@ -169,7 +169,7 @@ Every tab works on a phone: nothing scrolls sideways, and everything you tap is 
 
 ### Two looks: Rink and Sunset
 
-The switch at the right end of the top bar changes the look of the whole page. **Rink** is the dark arena the page always had: the pro in blue, you in orange. **Sunset** is an outdoor rink at sunset: a pink and orange sky, a low sun, palm trees, a neon rail on the boards, the pro in **teal** and you in **hot pink**. The skaters change clothes too: white helmets and gloves, and the pro wears a mirrored visor instead of a cage (the kid keeps the cage, as kids must). The page remembers your choice on this device.
+The switch at the right end of the top bar changes the look of the whole page. The page starts in **Sunset** (since version 22.1); if you pick Rink, it stays Rink on that device. **Rink** is the dark arena the page always had: the pro in blue, you in orange. **Sunset** is an outdoor rink at sunset: a pink and orange sky, a low sun, palm trees, a neon rail on the boards, the pro in **teal** and you in **hot pink**. The skaters change clothes too: white helmets and gloves, and the pro wears a mirrored visor instead of a cage (the kid keeps the cage, as kids must). The page remembers your choice on this device.
 
 Only the paint changes. The skaters' bodies, their poses and every measured number are the same in both looks, green, yellow and red still mean the grade, and the lines of the rinks stay blue and red (the lessons talk about "the blue line"). In Sunset, light glows only inside the 3D picture; the page around it stays flat and calm. The sky, the sun and the palms are drawn by our own code, so nothing extra is downloaded. Where the idea came from is in [`SOURCES.md`](SOURCES.md).
 

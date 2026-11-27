@@ -4,6 +4,7 @@
 //  The page can wear two "coats of paint":
 //     rink    = the look it always had: a dark arena, blue and orange
 //     sunset  = an outdoor rink at sunset: purple, teal and hot pink
+//               (the look a new visitor gets, since version 22.1)
 //
 //  The colors of the PAGE (buttons, panels, words) live in style.css.
 //  This file holds the colors that JAVASCRIPT needs: the 3D rink, the
@@ -93,7 +94,8 @@
              helmet: 0xf4f0f7, glove: 0xf4f0f7, cage: 0xe9e4ee, stick: 0x2c1650, tape: 0x16b9c4, laces: 0x2fd6d9, visor: false }
     }
   };
-  var FIRST = "rink";            // the look a new visitor gets
+  var FIRST = "sunset";          // the look a new visitor gets
+  var PLAIN = "rink";            // the look style.css paints when <html> names no look
   var KEY = "coach-theme";       // the name we save the choice under
 
   // Which look to use, from what was saved. Anything we do not know
@@ -136,7 +138,7 @@
     return d > 180 ? 360 - d : d;
   }
 
-  var api = { THEMES: THEMES, FIRST: FIRST, KEY: KEY, pick: pick, contrast: contrast, hue: hue, hueApart: hueApart };
+  var api = { THEMES: THEMES, FIRST: FIRST, PLAIN: PLAIN, KEY: KEY, pick: pick, contrast: contrast, hue: hue, hueApart: hueApart };
 
   // In "node" (our tests) there is no page: hand over the math and stop.
   if (typeof document === "undefined") { module.exports = api; return; }
@@ -153,7 +155,7 @@
   // Put the look on the page: style.css reads data-theme on <html>.
   function show() {
     var html = document.documentElement;
-    if (name === FIRST) html.removeAttribute("data-theme"); else html.setAttribute("data-theme", name);
+    if (name === PLAIN) html.removeAttribute("data-theme"); else html.setAttribute("data-theme", name);
     // The color of the browser's own bar on a phone.
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute("content", THEMES[name].css.bg);

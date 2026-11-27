@@ -10,16 +10,37 @@ function test(name, fn) { fn(); console.log("OK  " + name); }
 var names = Object.keys(T.THEMES);
 
 // ---- Which look is used ----
-test("a saved look is used; anything else gives the first look", function () {
+test("a saved look is used; anything else gives the first look, and that is Sunset", function () {
+  assert.strictEqual(T.FIRST, "sunset");
   assert.strictEqual(T.pick("sunset"), "sunset");
-  assert.strictEqual(T.pick("rink"), "rink");
-  assert.strictEqual(T.pick(null), "rink");
-  assert.strictEqual(T.pick(undefined), "rink");
-  assert.strictEqual(T.pick(""), "rink");
-  assert.strictEqual(T.pick("Sunset"), "rink");        // a wrong spelling
-  assert.strictEqual(T.pick("toString"), "rink");      // a word every list knows, but not a look
-  assert.strictEqual(T.pick(7), "rink");
-  assert.strictEqual(T.FIRST, "rink");
+  assert.strictEqual(T.pick("rink"), "rink");          // someone who chose Rink keeps Rink
+  assert.strictEqual(T.pick(null), "sunset");          // a new visitor
+  assert.strictEqual(T.pick(undefined), "sunset");
+  assert.strictEqual(T.pick(""), "sunset");
+  assert.strictEqual(T.pick("Rink"), "sunset");        // a wrong spelling
+  assert.strictEqual(T.pick("toString"), "sunset");    // a word every list knows, but not a look
+  assert.strictEqual(T.pick(7), "sunset");
+});
+
+// The page must START in the first look, before any of our code has
+// run: index.html says so itself, in three places.
+test("index.html starts in the first look: the <html> line, the browser bar color, the switch", function () {
+  var page = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+  var html = /<html[^>]*>/.exec(page)[0], named = /data-theme="([a-z]+)"/.exec(html);
+  // (style.css paints the "plain" look when <html> names none.)
+  assert.strictEqual(named ? named[1] : T.PLAIN, T.FIRST, "the <html> line names another look: " + html);
+  var bar = /<meta name="theme-color" content="(#[0-9a-fA-F]{6})">/.exec(page);
+  assert.strictEqual(bar[1].toLowerCase(), T.THEMES[T.FIRST].css.bg, "the color of the browser's own bar");
+  names.forEach(function (n) {
+    var button = new RegExp('data-look="' + n + '" aria-pressed="(true|false)"').exec(page);
+    assert.strictEqual(button[1], String(n === T.FIRST), "the " + n + " button of the switch");
+  });
+  // The little script in the head undoes it for someone who chose the other look.
+  assert.ok(page.indexOf('localStorage.getItem("' + T.KEY + '") === "' + T.PLAIN + '"') > 0, "the head script does not look for a saved " + T.PLAIN);
+  // And the color words written in the page are the first look's words.
+  var words = T.THEMES[T.FIRST].words;
+  assert.ok(page.indexOf('<span data-word="you">' + words.you + '</span>') > 0, 'the page does not say "' + words.you + '"');
+  assert.ok(page.indexOf('<span data-word="Pro">' + words.pro.charAt(0).toUpperCase() + words.pro.slice(1) + '</span>') > 0);
 });
 
 // ---- The two lists have the same shape ----

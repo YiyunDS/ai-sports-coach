@@ -14,8 +14,12 @@ team leader) for the Presidential SI Challenge. All work happens on the
   rink and for measured numbers), and sizes from one ladder (spaces 4,
   8, 12, 16, 20, 24; corners 8, 12, 14). No text under 11 px.
 - The page has TWO looks, chosen with the switch in the top bar: "Rink"
-  (the dark arena, the default) and "Sunset" (an outdoor rink at
-  sunset: purple, teal for the pro, hot pink for you). The same four
+  (the dark arena) and "Sunset" (an outdoor rink at sunset: purple,
+  teal for the pro, hot pink for you). Sunset is the look a new visitor
+  gets (since version 22.1); someone who chose Rink keeps Rink. The
+  starting look is named in three places that must agree: `FIRST` in
+  `js/theme.js`, the `<html>` line of `index.html`, and the little
+  script in its `<head>` (`tests/theme.test.js` checks this). The same four
   rules hold in both. In Sunset, light may glow inside the 3D picture
   only. A look changes colors, never sizes, letters or movement. The
   page's colors are in `style.css` (one block per look), the 3D colors

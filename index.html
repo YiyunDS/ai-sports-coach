@@ -1,24 +1,25 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="sunset">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="claude:viewport-fit-sides" content="cover">
-  <meta name="theme-color" content="#0b0f14">
+  <meta name="theme-color" content="#120a1f">
   <title>AI Sports Coach - 3D Visual Coach</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
   <script>
-    // The page has two looks (see js/theme.js). If "Sunset" was chosen on
-    // this device before, put it on right away, before anything is
-    // drawn, so the page never flashes the other look first.
+    // The page has two looks (see js/theme.js). It starts in "Sunset"
+    // (that is written on the <html> line above). If "Rink" was chosen
+    // on this device before, put Rink on right away, before anything
+    // is drawn, so the page never flashes the other look first.
     try {
-      if (localStorage.getItem("coach-theme") === "sunset") {
-        document.documentElement.setAttribute("data-theme", "sunset");
-        document.querySelector('meta[name="theme-color"]').setAttribute("content", "#120a1f");
+      if (localStorage.getItem("coach-theme") === "rink") {
+        document.documentElement.removeAttribute("data-theme");
+        document.querySelector('meta[name="theme-color"]').setAttribute("content", "#0b0f14");
       }
     } catch (e) { /* the browser will not let us read it: the first look it is */ }
   </script>
-  <link rel="stylesheet" href="style.css?v=22.0">
+  <link rel="stylesheet" href="style.css?v=22.1">
 </head>
 <body>
   <!--
@@ -84,8 +85,8 @@
         <div class="bar-meta">Team PHL</div>
         <!-- The look of the page: the dark arena, or an outdoor rink at sunset. -->
         <div class="seg look" role="group" aria-label="The look of the page">
-          <button type="button" data-look="rink" aria-pressed="true"><i class="swatch rink" aria-hidden="true"></i>Rink</button>
-          <button type="button" data-look="sunset" aria-pressed="false"><i class="swatch sunset" aria-hidden="true"></i>Sunset</button>
+          <button type="button" data-look="rink" aria-pressed="false"><i class="swatch rink" aria-hidden="true"></i>Rink</button>
+          <button type="button" data-look="sunset" aria-pressed="true"><i class="swatch sunset" aria-hidden="true"></i>Sunset</button>
         </div>
       </div>
     </div>
@@ -201,7 +202,7 @@
       <section class="panel">
         <h2>Reference skater</h2>
         <div class="field row">
-          <label for="ref-mode"><span data-word="Pro">Blue</span> skater shows</label>
+          <label for="ref-mode"><span data-word="Pro">Teal</span> skater shows</label>
           <select id="ref-mode">
             <option value="pro">Pro reference</option>
             <option value="goal">Target for this age</option>
@@ -292,7 +293,7 @@
         <!-- Layer 3: how it was measured (folded away until you ask). -->
         <p id="kid-note" class="small kid-note" hidden></p>
         <details id="kid-more" class="more" hidden>
-          <summary>How the <span data-word="you">orange</span> skater was made</summary>
+          <summary>How the <span data-word="you">pink</span> skater was made</summary>
           <p id="kid-long" class="small"></p>
         </details>
         <details id="quality-more" class="more" hidden>
@@ -370,7 +371,7 @@
 
       <section class="panel">
         <h2>Your spot: <span id="pos-role-name"></span></h2>
-        <p class="small">Drag the <span data-word="you">orange</span> marker to where you should stand, then check it.</p>
+        <p class="small">Drag the <span data-word="you">pink</span> marker to where you should stand, then check it.</p>
         <div class="go">
           <button type="button" id="pos-check" class="primary">Check my spot</button>
           <button type="button" id="pos-answer">Show answer</button>
@@ -631,7 +632,7 @@
     // by the browser from an earlier visit) does not work. This number
     // goes on the end of every file's address, so after an update the
     // browser fetches all of them fresh. RAISE IT whenever a .js file changes.
-    var VERSION = "22.0";
+    var VERSION = "22.1";
     // Load one of our .js files and wait until it has run.
     function load(src) {
       return new Promise(function (done, fail) {

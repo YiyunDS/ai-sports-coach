@@ -1506,6 +1506,38 @@ helper task and then checked by me). From 10 kinds of plays to 24:
   (the middle of a skater, not each skate), and does not have the
   Pro-level exceptions.
 
+### Phase 23: Sunset is the look the page starts in (done)
+
+The team leader asked to make the Sunset look the default.
+
+- A new visitor now sees Sunset. Someone who picked Rink on their
+  device before keeps Rink, and the switch works as before.
+- Someone who never touched the switch saw Rink until now and sees
+  Sunset from now on. (Nothing was saved for them, so the page cannot
+  know they "had" Rink.)
+- How: `FIRST` in `js/theme.js` is "sunset"; the `<html>` line of
+  `index.html` names Sunset, so the very first paint is already right,
+  before any of our code runs; the little script in the `<head>` now
+  takes the look OFF for someone who saved Rink. The color of the
+  browser's own bar, the pressed button of the switch and the color
+  words written in the page ("Teal", "pink") start as Sunset's too.
+  `style.css` is not changed: the colors of both looks are the same.
+- A new test reads `index.html` and checks that these places agree
+  with `FIRST`, so the starting look cannot be changed in one place
+  and forgotten in another.
+- Checked in the test browser at 1280 and 375 wide: a new visitor, a
+  visitor who chose Rink, one who chose Sunset, one with an old or
+  broken saved word, and one whose browser blocks saving. Each starts
+  in the right look at the first moment (no flash of the other look),
+  with the right bar color, switch and words; flipping to Rink and
+  reloading keeps Rink, flipping back keeps Sunset; no page errors.
+  Every element of Form analysis and Positioning has the same colors,
+  sizes and place as before, in both looks. All 18 test files pass.
+- Limit: `README.md` still describes the page in Rink's colors (blue
+  and orange) and says to read teal and pink in Sunset. Not tried on a
+  real phone.
+- Pictures: `docs/screenshots/phase23/`. Version 22.1.
+
 ### Phase 5: Check the pro against a real skater (needs a video)
 
 - Run a good side-view video of a strong skater through the Phase 1
