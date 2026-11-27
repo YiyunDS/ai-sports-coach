@@ -1,5 +1,5 @@
 // Run with:  node tests/gamesim.test.js
-// Checks js/gamesim.js: the rules and the chances of the simulation game.
+// Checks js/gamesim.js: the rules and the chances of the live hockey game.
 var G = require("../js/gamesim.js");
 var P = require("../js/positions.js");
 var assert = require("assert");
@@ -24,13 +24,15 @@ test("the same seed gives the same dice rolls", function () {
   assert.ok(same && differs);
 });
 
-test("flipping the rink twice changes nothing, and a skater only gets so far in one beat", function () {
+test("flipping the rink twice changes nothing, and each team sees the rink from its own side", function () {
   var p = pt(12, 150);
   assert.deepStrictEqual(G.flip(G.flip(p)), p);
   assert.deepStrictEqual(G.flip(pt(42.5, 11)), pt(42.5, 189));     // our net <-> their net
-  var far = G.toward(pt(10, 10), pt(10, 110), G.REACH);
-  assert.ok(Math.abs(P.feetBetween(pt(10, 10), far) - G.REACH) < 1e-9);
-  assert.deepStrictEqual(G.toward(pt(10, 10), pt(10, 20), G.REACH), pt(10, 20));
+  assert.deepStrictEqual(G.see("us", p), p);
+  assert.deepStrictEqual(G.see("them", p), G.flip(p));
+  assert.deepStrictEqual(G.see("them", G.see("them", p)), p);      // turning twice = the first picture
+  assert.deepStrictEqual(G.toward(pt(10, 10), pt(10, 110), 45), pt(10, 55));
+  assert.deepStrictEqual(G.toward(pt(10, 10), pt(10, 20), 45), pt(10, 20));
 });
 
 // ---------- The playbook for any puck position --------------------------
@@ -123,183 +125,521 @@ test("a loose puck: the closer team usually gets it", function () {
   assert.ok(Math.abs(G.looseChance(pt(9, 191), far, near) - (1 - p)) < 1e-9);
 });
 
-// ---------- Starting a shift --------------------------------------------
-test("every start puts ten skaters on the ice with someone on the puck", function () {
-  G.STARTS.forEach(function (start) {
-    P.ROLES.forEach(function (you) {
-      var s = G.newShift(start.id, you, G.makeDice(5));
-      assert.ok(s.owner === "us" || s.owner === "them");
-      P.ROLES.forEach(function (r) { onTheIce(s.us[r], start.id + " us " + r); onTheIce(s.them[r], start.id + " them " + r); });
-      assert.deepStrictEqual(s[s.owner][s.carrier], s.puck, start.id + ": nobody is on the puck");
-      assert.strictEqual(s.beat, 0);
-      assert.strictEqual(s.stats.shifts, 1);
-    });
-  });
-  // The score and the counts carry over to the next shift.
-  var first = G.newShift("rush", "C", G.makeDice(1));
-  first.score.us = 2;
-  var second = G.newShift("faceoff", "C", G.makeDice(1), first);
-  assert.strictEqual(second.score.us, 2);
-  assert.strictEqual(second.stats.shifts, 2);
-});
-
-test("with the puck you get the right choices for where you are", function () {
-  function ids(startId, you) { return G.options(G.newShift(startId, you, G.makeDice(1))).map(function (o) { return o.id; }); }
-  // At their blue line: four passes, a stickhandle and a shot. No dump-in.
-  assert.deepStrictEqual(ids("oz-point", "LD").sort(), ["carry", "pass-C", "pass-LW", "pass-RD", "pass-RW", "shoot"]);
-  // In the middle of the ice: you can dump it in, but you cannot shoot yet.
-  var rush = ids("rush", "C");
-  assert.ok(rush.indexOf("dump") >= 0 && rush.indexOf("shoot") < 0 && rush.indexOf("pass-C") < 0);
-  // Behind our own net: only passes and a stickhandle.
-  var out = ids("breakout", "LD");
-  assert.ok(out.indexOf("dump") < 0 && out.indexOf("shoot") < 0 && out.length === 5);
-  G.options(G.newShift("oz-point", "LD", G.makeDice(1))).forEach(function (o) { assert.ok(o.chance > 0 && o.chance < 1); });
-});
-
-// ---------- Playing a beat ----------------------------------------------
-test("a beat is repeatable, and does not change the state it started from", function () {
-  var start = G.newShift("oz-point", "LD", G.makeDice(9)), frozen = JSON.stringify(start);
-  var one = G.step(start, { action: "pass-RD" }, G.makeDice(77));
-  var two = G.step(start, { action: "pass-RD" }, G.makeDice(77));
-  assert.deepStrictEqual(one, two);
-  assert.strictEqual(JSON.stringify(start), frozen);
-  assert.ok(one.events.length >= 1 && one.events[0].text.indexOf("You pass") === 0);
-  assert.strictEqual(one.state.beat, 1);
-  assert.strictEqual(one.state.stats.choices, 1);
-  // A choice that is not on the list is refused.
-  assert.throws(function () { G.step(start, { action: "fly" }, G.makeDice(1)); });
-  assert.throws(function () { G.step(start, {}, G.makeDice(1)); });
-});
-
-test("without the puck you skate where you choose, but only so far", function () {
-  var start = G.newShift("oz-corner", "RD", G.makeDice(9));   // the left wing has the puck
-  var from = start.us.RD;
-  var r = G.step(start, { moveTo: pt(42, 20) }, G.makeDice(3)); // all the way back to our net: too far for one beat
-  assert.ok(Math.abs(P.feetBetween(from, r.state.us.RD) - G.REACH) < 1e-6);
-  assert.strictEqual(r.state.lastSpot.grade, "far");
-  assert.strictEqual(r.state.stats.spots, 1);
-  assert.strictEqual(r.state.stats.onTarget, 0);
-  // Staying on the right spot is on target.
-  var stay = G.step(start, {}, G.makeDice(3));
-  assert.strictEqual(stay.state.lastSpot.grade, "good");
-  assert.strictEqual(stay.state.stats.onTarget, 1);
-  assert.ok(stay.state.lastSpot.tip.length > 20);
-});
-
-test("being open gets you the puck; being out of position does not", function () {
-  var s = G.newShift("oz-corner", "C", G.makeDice(9));
-  function passToYou(grade) {
-    s.lastSpot = { grade: grade };
-    return G.options(s).filter(function (o) { return o.id === "pass-C"; })[0].chance;
-  }
-  assert.ok(passToYou("good") > passToYou("close") && passToYou("close") > passToYou("far") + 0.2);
-  // On defense: their shot gets better when you are out of position.
-  var d = G.newShift("dz-point", "C", G.makeDice(9));
-  function theirShot(grade) {
-    d.lastSpot = { grade: grade };
-    return G.options(d).filter(function (o) { return o.id === "shoot"; })[0].chance;
-  }
-  assert.ok(theirShot("far") > theirShot("close") && theirShot("close") > theirShot("good"));
-});
-
-test("you can call for a pass, and an open spot makes it more likely to arrive", function () {
-  var s = G.newShift("oz-corner", "C", G.makeDice(9));        // our left wing has the puck in the corner
-  var open = G.callChance(s, s.us.C), lost = G.callChance(s, pt(70, 130));
-  assert.ok(open > 0.6 && open > lost + 0.2, open + " vs " + lost);
-  // Calling makes your teammate pass to you (with lucky dice it arrives).
-  var r = G.step(s, { call: true }, function () { return 0; });
-  assert.ok(G.youHavePuck(r.state));
-  assert.ok(/passes to you/.test(r.events[0].text));
-  // With unlucky dice the same pass is picked off.
-  var bad = G.step(s, { call: true }, function () { return 0.999; });
-  assert.strictEqual(bad.state.owner, "them");
-  // You cannot call for it when they have the puck, or when you have it.
-  assert.strictEqual(G.callChance(G.newShift("dz-corner", "C", G.makeDice(9))), null);
-  assert.strictEqual(G.callChance(G.newShift("rush", "C", G.makeDice(9))), null);
-});
-
-test("offside: you may not be inside their blue line before the puck", function () {
-  var s = G.newShift("rush", "LW", G.makeDice(9));
-  var always = function () { return 0; };       // dice that make everything work
-  // You wait at the blue line: the pass to you is fine.
-  var fine = G.step(s, {}, always);
-  assert.strictEqual(fine.state.over, null);
-  // You skate into their zone first: whistle.
-  var early = G.step(s, { moveTo: pt(10, 140) }, always);
-  assert.strictEqual(early.state.over.kind, "offside");
-  assert.ok(/offside/i.test(early.events[early.events.length - 1].text));
-});
-
-// ---------- Many whole shifts -------------------------------------------
-// Play n shifts with a made-up "you". Returns how the shifts ended.
-function playMany(n, seed, startId, you, how) {
-  var dice = G.makeDice(seed), keep = null, ended = {}, turnovers = 0, deepestBack = 200, s;
-  for (var i = 0; i < n; i++) {
-    s = G.newShift(startId, you, dice, keep);
-    var guard = 0;
-    while (!s.over) {
-      assert.ok(++guard <= G.MAX_BEATS, "a shift went on too long");
-      var input = G.youHavePuck(s) ? { action: how.choose(s, G.options(s), dice).id } : { moveTo: how.skate(s, dice) };
-      var owner = s.owner, r = G.step(s, input, dice);
-      s = r.state;
-      if (s.owner !== owner) turnovers++;
-      assert.ok(r.events.length >= 1 && r.events.every(function (e) { return e.text.length > 5; }));
-      r.events.forEach(function (e) { onTheIce(e.puck, "the puck"); });
-      onTheIce(s.puck, "the puck");
-      if (!s.over) assert.deepStrictEqual(s[s.owner][s.carrier], s.puck, "nobody is on the puck");
-      P.ROLES.forEach(function (role) { onTheIce(s.us[role], "us " + role); onTheIce(s.them[role], "them " + role); });
-      deepestBack = Math.min(deepestBack, s.puck.d);
-    }
-    ended[s.over.kind] = (ended[s.over.kind] || 0) + 1;
-    keep = s;
-  }
-  return { ended: ended, score: s.score, stats: s.stats, turnovers: turnovers, deepestBack: deepestBack };
+// =====================================================================
+//  THE LIVE GAME
+// =====================================================================
+var ROLES = P.ROLES, DT = 1 / 60;
+function near(a, b, tol, msg) { assert.ok(Math.abs(a - b) <= tol, (msg || "") + " got " + a + ", wanted " + b); }
+// Dice that give these rolls first, and then always "rest".
+function rolls(list, rest) {
+  var i = 0;
+  return function () { return i < list.length ? list[i++] : (rest === undefined ? 0.5 : rest); };
 }
-var computerChoice = function (s, list, dice) { return G.pickForComputer(s, list, dice); };
-var bestSpot = function (s) { var b = G.ideals(s).us[s.you]; return pt(b.a, b.d); };
-var GOOD = { choose: computerChoice, skate: bestSpot };                              // always skates to the best spot
-var LOST = { choose: computerChoice, skate: function (s) { return s.us[s.you]; } };  // never moves
-var HOG = { choose: function (s, list) { return list.filter(function (o) { return o.id === "carry"; })[0]; }, skate: bestSpot };
-var WILD = {                                                                          // picks and skates at random
-  choose: function (s, list, dice) { return list[Math.floor(dice() * list.length)]; },
-  skate: function (s, dice) { return pt(dice() * 85, dice() * 200); }
-};
+// A game in the middle of play with everybody parked by the left boards
+// (ours at d = 88, theirs at d = 112), so a test can put the few
+// players it needs where it wants them.
+function quiet(you, age) {
+  var s = G.newGame({ you: you || "C", age: age === undefined ? 3 : age, minutes: 3 });
+  G.startPlay(s);
+  ROLES.forEach(function (r, i) { put(s, "us", r, 4 + 4 * i, 88); put(s, "them", r, 4 + 4 * i, 112); });
+  return s;
+}
+function put(s, team, role, a, d) {
+  var k = s[team][role];
+  k.a = a; k.d = d; k.va = 0; k.vd = 0; k.fa = 0; k.fd = team === "us" ? 1 : -1;
+  return k;
+}
+// Play on for some seconds. "input" may be a function of the step number.
+// Stops early when "until" says so. Returns everything that happened.
+function run(s, seconds, input, dice, intents, until) {
+  var all = [];
+  for (var i = 0; i < Math.round(seconds * 60); i++) {
+    var inp = typeof input === "function" ? input(i) : (i === 0 ? input : keepMoving(input));
+    var ev = G.tick(s, inp, typeof intents === "function" ? intents(i) : intents, DT, dice || G.makeDice(3));
+    all = all.concat(ev);
+    if (until && until(s, ev)) break;
+  }
+  return all;
+}
+// A button is "pressed" in one step only; the steering stays.
+function keepMoving(input) { return input && input.move ? { move: input.move } : {}; }
+function kinds(events) { return events.map(function (e) { return e.kind; }); }
+function everybodyOnTheIce(s, what) {
+  ["us", "them"].forEach(function (t) { ROLES.forEach(function (r) { onTheIce(s[t][r], what + " " + t + " " + r); }); });
+  assert.ok(s.puck.a >= 0 && s.puck.a <= 85 && s.puck.d >= 0 && s.puck.d <= 200, what + ": the puck left the rink");
+}
 
-test("2,000 shifts of every kind stay inside the rules", function () {
-  G.STARTS.forEach(function (start, i) {
-    var r = playMany(300, 100 + i, start.id, P.ROLES[i % 5], i % 2 ? WILD : GOOD);
-    var total = 0;
-    Object.keys(r.ended).forEach(function (kind) {
-      assert.ok(["goal-us", "goal-them", "whistle", "change", "offside"].indexOf(kind) >= 0, "strange ending: " + kind);
-      total += r.ended[kind];
+// ---------- The age groups and the bars ---------------------------------
+test("seven age groups, from 4-5 to 16+, and every dial goes one way", function () {
+  assert.deepStrictEqual(G.AGE_NAMES, ["4-5", "6-7", "8-9", "10-11", "12-13", "14-15", "16+"]);
+  var harder = ["youSpeed", "mateSpeed", "themSpeed", "checkSkill", "theirGoalie", "early", "icing", "barSpeed"];
+  var easier = ["think", "ourGoalie", "green", "catchFeet", "faceoff"];
+  Object.keys(G.DIALS).forEach(function (k) { assert.strictEqual(G.DIALS[k].length, 7, k); });
+  for (var i = 1; i < 7; i++) {
+    harder.forEach(function (k) { assert.ok(G.DIALS[k][i] > G.DIALS[k][i - 1], k + " must go up at " + G.AGE_NAMES[i]); });
+    easier.forEach(function (k) { assert.ok(G.DIALS[k][i] < G.DIALS[k][i - 1], k + " must go down at " + G.AGE_NAMES[i]); });
+    assert.ok(!(G.DIALS.warn[i] && !G.DIALS.warn[i - 1]), "the offside warning never comes back for older players");
+  }
+  assert.strictEqual(harder.length + easier.length + 1, Object.keys(G.DIALS).length, "a dial is not checked");
+  var young = G.levelFor(0), old = G.levelFor(6);
+  assert.strictEqual(young.name, "4-5"); assert.strictEqual(old.name, "16+");
+  assert.ok(young.warn && !old.warn);
+  assert.ok(young.themSpeed < young.youSpeed * 0.7, "the youngest can always outskate the other team");
+  assert.strictEqual(G.levelFor(99).name, "16+"); assert.strictEqual(G.levelFor(-3).name, "4-5");
+});
+
+test("a bar's marker runs 0 -> 1 -> 0, and the green part is inside the bar", function () {
+  near(G.barAt(0, 2), 0, 1e-9); near(G.barAt(0.25, 2), 0.5, 1e-9); near(G.barAt(0.5, 2), 1, 1e-9);
+  near(G.barAt(0.75, 2), 0.5, 1e-9); near(G.barAt(1, 2), 0, 1e-9); near(G.barAt(1.25, 2), 0.5, 1e-9);
+  for (var t = 0; t < 9; t += 0.137) { var x = G.barAt(t, 1.3); assert.ok(x >= 0 && x <= 1); }
+  for (var age = 0; age < 7; age++) {
+    var lv = G.levelFor(age);
+    ["pass", "shoot"].forEach(function (kind) {
+      var g = G.greens(lv, kind);
+      [g.power, g.lift].forEach(function (z) { assert.ok(z[0] >= 0 && z[1] <= 1 && z[1] > z[0]); });
+      near(g.power[1] - g.power[0], lv.green, 1e-9);
     });
-    assert.strictEqual(total, 300);
-    assert.strictEqual(r.score.us, r.ended["goal-us"] || 0);
-    assert.strictEqual(r.score.them, r.ended["goal-them"] || 0);
-    assert.strictEqual(r.stats.shifts, 300);
+    assert.strictEqual(G.greens(lv, "pass").lift[0], 0, "the best pass is flat on the ice");
+    assert.ok(G.greens(lv, "shoot").lift[1] < 0.77, "the green part of the height bar never sends a shot over the net");
+  }
+  assert.ok(G.passSpeed(1) > G.passSpeed(0) && G.shotSpeed(1) > G.shotSpeed(0) && G.shotSpeed(0.5) > G.passSpeed(0.5));
+});
+
+// ---------- Starting, the clock, the face-off ----------------------------
+test("a new game lines everybody up for a face-off at center, each team on its own side", function () {
+  ROLES.forEach(function (you) {
+    var s = G.newGame({ you: you, age: 2, minutes: 2 });
+    assert.strictEqual(s.phase, "set"); assert.strictEqual(s.clock, 120);
+    ROLES.forEach(function (r) { assert.ok(s.us[r].d < 100, "us " + r); assert.ok(s.them[r].d > 100, "them " + r); });
+    near(s.us.C.a, 42.5, 1e-9); near(s.them.C.a, 42.5, 1e-9);
+    everybodyOnTheIce(s, "start");
   });
 });
 
-test("from their blue line: sometimes we score, and sometimes they come rushing back", function () {
-  var r = playMany(3000, 21, "oz-point", "LD", GOOD);
-  var goals = r.ended["goal-us"] / 3000, against = (r.ended["goal-them"] || 0) / 3000;
-  assert.ok(goals > 0.1 && goals < 0.35, "we score in " + Math.round(goals * 100) + "% of shifts");
-  assert.ok(against > 0.002 && against < goals, "they score in " + (against * 100).toFixed(1) + "% of shifts");
-  assert.ok(r.turnovers / 3000 > 1.5, "the puck hardly ever changes teams");
-  assert.ok(r.deepestBack < 40, "the puck never came back to our end");
+test("face-off spots near the boards still put everybody on the ice", function () {
+  [[20.5, 31], [64.5, 31], [20.5, 80], [64.5, 120], [20.5, 169], [64.5, 169], [42.5, 100]].forEach(function (q) {
+    var spots = G.lineUp(pt(q[0], q[1]));
+    ROLES.forEach(function (r) { onTheIce(spots.us[r], "us " + r); onTheIce(spots.them[r], "them " + r); });
+    assert.ok(spots.us.C.d < q[1] && spots.them.C.d > q[1], "the centers face each other across the dot");
+  });
 });
 
-test("good positioning and sharing the puck pay off over many shifts", function () {
-  var good = playMany(4000, 3, "faceoff", "C", GOOD);
-  var lost = playMany(4000, 3, "faceoff", "C", LOST);
-  var hog = playMany(4000, 3, "faceoff", "C", HOG);
-  function diff(r) { return r.score.us - r.score.them; }
-  // A player who never gets to the right spot gives up many more goals...
-  assert.ok(lost.score.them > good.score.them * 1.4, lost.score.them + " vs " + good.score.them);
-  assert.ok(diff(good) > diff(lost) + 40, diff(good) + " vs " + diff(lost));
-  // ...and one who always stickhandles and never passes scores far less.
-  assert.ok(good.score.us > hog.score.us * 1.5, good.score.us + " vs " + hog.score.us);
-  assert.ok(good.stats.onTarget / good.stats.spots > 0.85 && lost.stats.onTarget / lost.stats.spots < 0.4);
+test("the face-off: when you are the center, the fastest tap wins; tapping early loses", function () {
+  function faceOff(tapAt) {
+    var s = G.newGame({ you: "C", age: 3, minutes: 3 }), dice = G.makeDice(11), out = null, drawStep = -1;
+    for (var i = 0; i < 600 && !out; i++) {
+      if (s.phase === "draw" && drawStep < 0) drawStep = i;
+      var press = tapAt === "early" ? s.phase === "drop" : tapAt === "fast" ? s.phase === "draw" : false;
+      var ev = G.tick(s, press ? { pass: true } : {}, null, DT, dice);
+      ev.forEach(function (e) { if (e.kind === "faceoff") out = e; });
+      assert.ok(s.clock === 180, "the clock does not run before the puck is dropped");
+    }
+    assert.ok(out, "nobody won the face-off");
+    assert.strictEqual(s.phase, "play");
+    return out;
+  }
+  assert.strictEqual(faceOff("fast").team, "us");
+  assert.strictEqual(faceOff("never").team, "them");
+  var early = faceOff("early");
+  assert.strictEqual(early.team, "them");
+  assert.ok(/before the puck dropped/.test(early.text));
+  // When you are not the center, the dice decide.
+  var wins = 0;
+  for (var g = 0; g < 200; g++) {
+    var s = G.newGame({ you: "LW", age: 3 }), dice = G.makeDice(g + 1), won = null;
+    for (var i = 0; i < 600 && !won; i++) G.tick(s, {}, null, DT, dice).forEach(function (e) { if (e.kind === "faceoff") won = e.team; });
+    if (won === "us") wins++;
+  }
+  assert.ok(wins > 70 && wins < 130, "about half: " + wins);
 });
 
-console.log("All game tests passed!");
+test("the clock only runs during play, and the game ends when it reaches zero", function () {
+  var s = quiet("C");
+  s.clock = 1;
+  var ev = run(s, 2, {}, G.makeDice(1));
+  assert.strictEqual(s.phase, "over"); assert.strictEqual(s.clock, 0);
+  assert.deepStrictEqual(kinds(ev), ["end"]);
+  assert.ok(/Final score: us 0, them 0/.test(ev[0].text));
+  assert.deepStrictEqual(G.tick(s, { pass: true }, null, DT, G.makeDice(1)), [], "nothing happens after the end");
+});
+
+// ---------- Skating ---------------------------------------------------------
+test("you skate where you steer, no faster than your top speed, and glide to a stop", function () {
+  var s = quiet("C"), me = put(s, "us", "C", 60, 50), lv = s.lv;
+  run(s, 1.5, { move: { a: 0, d: 1 } });
+  near(Math.sqrt(me.va * me.va + me.vd * me.vd), lv.youSpeed, 0.01);
+  assert.ok(me.d > 50 + lv.youSpeed && me.d < 50 + lv.youSpeed * 1.5 && Math.abs(me.a - 60) < 1e-6);
+  near(me.fd, 1, 1e-9);                           // facing up the ice
+  // Steering harder than "all the way" is not faster.
+  var s2 = quiet("C"), me2 = put(s2, "us", "C", 60, 50);
+  run(s2, 1.5, { move: { a: 3, d: 4 } });
+  near(Math.sqrt(me2.va * me2.va + me2.vd * me2.vd), lv.youSpeed, 0.01);
+  // Let go: you keep gliding, slower and slower.
+  var before = me.d;
+  run(s, 0.5, {});
+  assert.ok(me.d > before + 3 && me.vd < lv.youSpeed && me.vd > 0);
+  run(s, 3, {});
+  near(me.vd, 0, 1e-9);
+});
+
+test("nobody skates through the boards, not even in the round corners", function () {
+  [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, 1], [1, 0]].forEach(function (way) {
+    var s = quiet("C"), me = put(s, "us", "C", 42, 100);
+    s.clock = 600;
+    run(s, 14, { move: { a: way[0], d: way[1] } });
+    onTheIce(me, "you, steering " + way);
+    // In a corner you end up on the round part, not in the square corner.
+    if (way[0] && way[1]) {
+      var corner = pt(way[0] < 0 ? 28 : 57, way[1] < 0 ? 28 : 172);
+      near(P.feetBetween(me, corner), 28 - 2.5, 0.01);
+    }
+  });
+  var p = pt(-4, 250);
+  G.keepIn(p, 1);
+  assert.ok(p.a >= 0 && p.d <= 200);
+});
+
+test("the quick move: faster for a moment, then slower, and only with the puck", function () {
+  var s = quiet("C"), me = put(s, "us", "C", 60, 30), lv = s.lv;
+  G.gain(s, "us", "C");
+  run(s, 1, { move: { a: 0, d: 1 } });
+  var normal = me.vd;
+  near(normal, lv.youSpeed * 0.92, 0.01);                       // a little slower with the puck
+  run(s, 0.5, { move: { a: 0, d: 1 }, burst: true });
+  assert.ok(me.vd > normal * 1.3, "the burst");
+  run(s, 1.2, { move: { a: 0, d: 1 } });
+  assert.ok(me.vd < normal * 0.8, "tired afterwards");
+  run(s, 1.5, { move: { a: 0, d: 1 } });
+  near(me.vd, normal, 0.01);
+  // Without the puck the button does nothing.
+  var s2 = quiet("C"), me2 = put(s2, "us", "C", 60, 30);
+  run(s2, 1.2, { move: { a: 0, d: 1 }, burst: true });
+  near(me2.vd, lv.youSpeed, 0.01);
+});
+
+// ---------- Passing and the two bars ----------------------------------------
+test("two taps: the first stops the power, the second stops the height and sends the puck", function () {
+  var s = quiet("C"), dice = G.makeDice(2);
+  put(s, "us", "C", 60, 50); put(s, "us", "RW", 75, 70);
+  G.gain(s, "us", "C");
+  assert.strictEqual(G.bars(s).stage, 0);
+  run(s, 0.4, {}, dice);
+  var sweeping = G.bars(s).power;
+  assert.ok(sweeping > 0 && sweeping <= 1);
+  G.tick(s, { pass: true }, null, DT, dice);                    // tap 1
+  var b = G.bars(s);
+  assert.strictEqual(b.stage, 1); assert.strictEqual(b.kind, "pass");
+  near(b.power, G.barAt(0.4 + 2 * DT, s.lv.barSpeed), 0.02);
+  assert.ok(G.youHavePuck(s), "the puck is still yours after one tap");
+  run(s, 0.2, {}, dice);
+  near(G.bars(s).power, b.power, 1e-12, "the power stays where you stopped it");
+  assert.ok(G.bars(s).lift > 0, "now the height marker moves");
+  G.tick(s, { pass: true }, null, DT, dice);                    // tap 2
+  assert.ok(!s.puck.owner && s.puck.pass && s.puck.pass.team === "us", "the puck is on its way");
+  assert.strictEqual(G.bars(s), null);
+  assert.strictEqual(s.stats.passes.us, 1);
+  // The other button after the first tap starts over.
+  var s2 = quiet("C");
+  put(s2, "us", "C", 60, 50); G.gain(s2, "us", "C");
+  G.tick(s2, { shoot: true }, null, DT, dice);
+  assert.strictEqual(G.bars(s2).kind, "shoot");
+  G.tick(s2, { pass: true }, null, DT, dice);
+  assert.strictEqual(G.bars(s2).stage, 0); assert.ok(G.youHavePuck(s2));
+});
+
+test("your pass goes to the teammate you steer toward", function () {
+  var s = quiet("C");
+  put(s, "us", "C", 45, 60); put(s, "us", "LW", 20, 62); put(s, "us", "RW", 72, 62); put(s, "us", "LD", 44, 35); put(s, "us", "RD", 46, 85);
+  G.gain(s, "us", "C");
+  assert.strictEqual(G.passTarget(s, { a: -1, d: 0 }), "LW");
+  assert.strictEqual(G.passTarget(s, { a: 1, d: 0 }), "RW");
+  assert.strictEqual(G.passTarget(s, { a: 0, d: -1 }), "LD");
+  assert.strictEqual(G.passTarget(s, { a: 0, d: 1 }), "RD");
+  // Not steering: the way you face (up the ice here).
+  assert.strictEqual(G.passTarget(s, { a: 0, d: 0 }), "RD");
+  s.us.C.fa = 1; s.us.C.fd = 0;
+  assert.strictEqual(G.passTarget(s, null), "RW");
+});
+
+test("a good flat pass to an open teammate arrives", function () {
+  var s = quiet("C"), dice = G.makeDice(4);
+  put(s, "us", "C", 45, 50); put(s, "us", "RW", 72, 70);
+  G.gain(s, "us", "C");
+  var acts = { us: { C: { move: { a: 0, d: 0 }, act: { kind: "pass", to: "RW", power: 0.6, lift: 0 } } } };
+  G.tick(s, { auto: true }, acts, DT, dice);
+  run(s, 2, { auto: true }, dice, null, function (s) { return !!s.puck.owner; });
+  assert.strictEqual(s.puck.owner, "us"); assert.strictEqual(s.puck.carrier, "RW");
+});
+
+test("a defender in the lane can pick off a flat pass; a lifted pass flies over the stick", function () {
+  function pass(lift, dice) {
+    var s = quiet("C");
+    put(s, "us", "C", 45, 50); put(s, "us", "RW", 75, 50); put(s, "them", "C", 60, 50.5);
+    G.gain(s, "us", "C");
+    G.tick(s, { auto: true }, { us: { C: { move: { a: 0, d: 0 }, act: { kind: "pass", to: "RW", power: 0.6, lift: lift } } } }, DT, dice);
+    run(s, 2, { auto: true }, dice, null, function (s) { return !!s.puck.owner; });
+    return s.puck.owner + " " + s.puck.carrier;
+  }
+  assert.strictEqual(pass(0, rolls([], 0)), "them C");         // the dice say: picked off
+  assert.strictEqual(pass(0.9, rolls([], 0)), "us RW");        // over the stick, even with the same dice
+  assert.strictEqual(pass(0, rolls([], 0.95)), "us RW");       // a lucky flat pass gets through
+});
+
+// ---------- Offside ----------------------------------------------------------
+// Skate the puck up the ice from d = 110 and see if the whistle blows.
+function carryIn(s, who) {
+  var role = who || s.you, mine = role === s.you;
+  var steer = { move: { a: 0, d: 1 } }, intents = mine ? null : { us: {} };
+  if (!mine) intents.us[role] = { move: { a: 0, d: 1 }, act: null };
+  return run(s, 2.5, mine ? steer : {}, G.makeDice(5), intents, function (s) { return s.phase !== "play" || s.puck.d > 140; });
+}
+test("offside: no whistle when you carry the puck in and nobody is ahead of it", function () {
+  var s = quiet("C");
+  put(s, "us", "C", 60, 110); put(s, "us", "RW", 75, 118);       // the wing waits outside the line
+  G.gain(s, "us", "C");
+  assert.deepStrictEqual(kinds(carryIn(s)), []);
+  assert.ok(s.puck.d > 126 && s.phase === "play");
+});
+test("offside: a teammate is inside their blue line when you carry the puck in", function () {
+  var s = quiet("C");
+  put(s, "us", "C", 60, 110); put(s, "us", "RW", 75, 135);
+  G.gain(s, "us", "C");
+  var ev = carryIn(s);
+  assert.deepStrictEqual(kinds(ev), ["offside"]);
+  assert.strictEqual(ev[0].team, "us"); assert.strictEqual(ev[0].role, "RW"); assert.ok(ev[0].whistle);
+  assert.ok(/Our right wing was inside their blue line before the puck/.test(ev[0].text), ev[0].text);
+  assert.strictEqual(s.phase, "dead"); assert.strictEqual(s.puck.owner, null);
+  assert.deepStrictEqual(s.stop.spot, pt(64.5, 120), "the face-off is just outside the line, on the puck's side");
+  assert.strictEqual(s.stats.offside.us, 1);
+});
+test("offside: YOU are inside when a teammate carries the puck in", function () {
+  var s = quiet("RW");
+  put(s, "us", "C", 50, 110); put(s, "us", "RW", 75, 140);
+  G.gain(s, "us", "C");
+  var ev = carryIn(s, "C");
+  assert.deepStrictEqual(kinds(ev), ["offside"]);
+  assert.strictEqual(ev[0].role, "RW");
+  assert.ok(/You were inside their blue line before the puck. Wait at the line/.test(ev[0].text), ev[0].text);
+});
+test("offside: a pass to a teammate who is already inside", function () {
+  var s = quiet("C"), dice = G.makeDice(6);
+  put(s, "us", "C", 50, 112); put(s, "us", "RW", 70, 140);
+  G.gain(s, "us", "C");
+  assert.strictEqual(G.passIsOffside(s, "us", "RW"), true);
+  assert.strictEqual(G.passIsOffside(s, "us", "LW"), false);
+  G.tick(s, { auto: true }, { us: { C: { move: { a: 0, d: 0 }, act: { kind: "pass", to: "RW", power: 0.6, lift: 0 } } } }, DT, dice);
+  var ev = run(s, 2, { auto: true }, dice, null, function (s) { return s.phase !== "play"; });
+  assert.deepStrictEqual(kinds(ev), ["offside"]);
+  assert.ok(s.puck.d > 126 && s.puck.d < 130, "the whistle blows as the puck crosses the line");
+});
+test("offside: the other team is called too", function () {
+  var s = quiet("C");
+  put(s, "them", "C", 30, 90); put(s, "them", "LW", 50, 60);     // their wing is already in our zone
+  G.gain(s, "them", "C");
+  var ev = run(s, 2.5, {}, G.makeDice(5), { them: { C: { move: { a: 0, d: -1 }, act: null } } }, function (s) { return s.phase !== "play"; });
+  assert.deepStrictEqual(kinds(ev), ["offside"]);
+  assert.strictEqual(ev[0].team, "them");
+  assert.ok(/Their left wing was inside our blue line before the puck/.test(ev[0].text), ev[0].text);
+  assert.deepStrictEqual(s.stop.spot, pt(20.5, 80));
+});
+test("offside: not when the defending team brings the puck into its own zone", function () {
+  var s = quiet("C");
+  put(s, "us", "RW", 75, 150);                                    // one of ours is in their zone
+  put(s, "them", "LD", 40, 118);
+  G.gain(s, "them", "LD");
+  var ev = run(s, 1.5, {}, G.makeDice(5), { them: { LD: { move: { a: 0, d: 1 }, act: null } } });
+  assert.deepStrictEqual(kinds(ev), []);
+  assert.ok(s.puck.d > 126 && s.phase === "play");
+});
+test("offside: the puck comes out and goes back in while a teammate is still inside", function () {
+  var s = quiet("C");
+  put(s, "us", "C", 60, 135); put(s, "us", "RW", 75, 150);
+  G.gain(s, "us", "C");
+  var ev = run(s, 1.2, { move: { a: 0, d: -1 } }, G.makeDice(5));   // out over the blue line
+  assert.deepStrictEqual(kinds(ev), []); assert.ok(s.puck.d < 124);
+  ev = run(s, 2, { move: { a: 0, d: 1 } }, G.makeDice(5), null, function (s) { return s.phase !== "play"; });
+  assert.deepStrictEqual(kinds(ev), ["offside"]);
+});
+
+// ---------- Icing ----------------------------------------------------------------
+// Our defender sends the puck up the right boards from depth "from".
+function clearIt(s, from, to, dice) {
+  put(s, "us", "RD", 70, from);
+  G.gain(s, "us", "RD");
+  G.tick(s, {}, { us: { RD: { move: { a: 0, d: 0 }, act: { kind: "send", to: to || pt(74, 197), speed: 95, lift: 0 } } } }, DT, dice || G.makeDice(8));
+  return run(s, 6, {}, dice || G.makeDice(8), null, function (s) { return s.phase !== "play" || !!s.puck.owner; });
+}
+test("icing: from our own half, over their goal line, and nobody touches it", function () {
+  var s = quiet("C"), ev = clearIt(s, 60);
+  assert.deepStrictEqual(kinds(ev), ["icing"]);
+  assert.strictEqual(ev[0].team, "us"); assert.ok(ev[0].whistle);
+  assert.ok(/Icing. We sent the puck from our own half/.test(ev[0].text), ev[0].text);
+  assert.deepStrictEqual(s.stop.spot, pt(64.5, 31), "the face-off comes back to our end");
+  assert.strictEqual(s.stats.icing.us, 1);
+});
+test("icing: not from past the center line", function () {
+  var s = quiet("C");
+  assert.deepStrictEqual(kinds(clearIt(s, 104)), []);
+  assert.strictEqual(s.phase, "play");
+});
+test("icing: not when the other team gets to the puck first", function () {
+  var s = quiet("C");
+  put(s, "them", "LD", 72, 150);
+  var ev = clearIt(s, 60, null, rolls([], 0));
+  assert.deepStrictEqual(kinds(ev), []);
+  assert.strictEqual(s.puck.owner, "them");
+});
+test("icing: not when it goes in the net (that is a goal), and the other team can ice it too", function () {
+  var s = quiet("C");
+  var ev = clearIt(s, 60, pt(42.5, 195), rolls([], 0.999));       // straight at the net; the goalie misses it
+  assert.deepStrictEqual(kinds(ev), ["goal"]);
+  assert.strictEqual(s.score.us, 1);
+  var s2 = quiet("C");
+  put(s2, "them", "RD", 70, 140);                                   // (their own half is the top half)
+  G.gain(s2, "them", "RD");
+  // "to" is given the way THEY see the rink: far up the ice, by their left boards = our right corner.
+  G.tick(s2, {}, { them: { RD: { move: { a: 0, d: 0 }, act: { kind: "send", to: pt(11, 197), speed: 95, lift: 0 } } } }, DT, G.makeDice(8));
+  var ev2 = run(s2, 6, {}, G.makeDice(8), null, function (s) { return s.phase !== "play"; });
+  assert.deepStrictEqual(kinds(ev2), ["icing"]);
+  assert.strictEqual(ev2[0].team, "them");
+  assert.ok(s2.stop.spot.d === 169, "the face-off goes to their end");
+});
+
+// ---------- Shots, saves and goals -----------------------------------------------------
+// You shoot from the slot. The first two rolls aim the shot; the next
+// ones are the goalie's.
+function shootFromSlot(diceList, rest, lift) {
+  var s = quiet("C"), dice = rolls(diceList, rest);
+  put(s, "us", "C", 42.5, 160);
+  G.gain(s, "us", "C");
+  for (var i = 0; i < 30; i++) G.tick(s, {}, null, DT, dice);    // let the goalie get set
+  G.tick(s, { auto: true }, { us: { C: { move: { a: 0, d: 0 }, act: { kind: "shoot", power: 0.7, lift: lift === undefined ? 0.5 : lift, side: 1 } } } }, DT, dice);
+  var ev = run(s, 3, { auto: true }, dice, null, function (s, ev) { return ev.length > 0; });
+  return { s: s, ev: ev };
+}
+test("a shot the goalie stops and covers: whistle, and a face-off in that end", function () {
+  var r = shootFromSlot([0.5, 0.5, 0, 0]);
+  assert.deepStrictEqual(kinds(r.ev), ["cover"]);
+  assert.ok(r.ev[0].whistle); assert.strictEqual(r.ev[0].team, "them");
+  assert.ok(/Save! Their goalie covers the puck/.test(r.ev[0].text), r.ev[0].text);
+  assert.strictEqual(r.s.phase, "dead"); assert.strictEqual(r.s.stop.spot.d, 169);
+  assert.strictEqual(r.s.stats.saves.them, 1); assert.strictEqual(r.s.stats.shots.us, 1);
+  assert.strictEqual(r.s.score.us, 0);
+});
+test("a save with a rebound: no whistle, play goes on", function () {
+  var r = shootFromSlot([0.5, 0.5, 0, 0.99]);
+  assert.deepStrictEqual(kinds(r.ev), ["save"]);
+  assert.ok(!r.ev[0].whistle);
+  assert.strictEqual(r.s.phase, "play");
+  assert.ok(r.s.puck.vd < 0, "the puck bounces back out, away from the net");
+  assert.strictEqual(r.s.stats.saves.them, 1);
+});
+test("a shot the goalie misses is a goal: whistle, and a face-off at center", function () {
+  var r = shootFromSlot([0.5, 0.5, 0.999]);
+  assert.deepStrictEqual(kinds(r.ev), ["goal"]);
+  assert.ok(r.ev[0].whistle); assert.strictEqual(r.ev[0].team, "us");
+  assert.strictEqual(r.ev[0].text, "Goal! You score!");
+  assert.strictEqual(r.s.score.us, 1); assert.strictEqual(r.s.score.them, 0);
+  assert.deepStrictEqual(r.s.stop.spot, pt(42.5, 100));
+});
+test("a shot that is lifted too much sails over the net: no goal", function () {
+  var r = shootFromSlot([0.5, 0.5], 0.999, 0.98);
+  assert.strictEqual(r.s.score.us, 0);
+  assert.ok(kinds(r.ev).indexOf("goal") < 0);
+});
+test("skating the puck into the goalie: the goalie takes it", function () {
+  var s = quiet("C");
+  put(s, "us", "C", 42.5, 170); G.gain(s, "us", "C");
+  var ev = run(s, 3, { move: { a: 0, d: 1 } }, G.makeDice(1), null, function (s) { return s.phase !== "play"; });
+  assert.deepStrictEqual(kinds(ev), ["cover"]);
+  assert.strictEqual(s.score.us, 0);
+});
+test("the goalies stay in front of their nets and follow the puck from side to side", function () {
+  var s = quiet("C");
+  put(s, "us", "C", 10, 150); G.gain(s, "us", "C");
+  run(s, 1, {}, G.makeDice(1));
+  var g = s.goalie.them;
+  assert.ok(g.a < 42.5 && g.d < 189 && g.d > 183, JSON.stringify(g));
+  put(s, "us", "C", 75, 150); G.gain(s, "us", "C");
+  run(s, 1.5, {}, G.makeDice(1));
+  assert.ok(s.goalie.them.a > 42.5);
+  assert.ok(s.goalie.us.d > 11 && s.goalie.us.d < 17 && Math.abs(s.goalie.us.a - 42.5) < 3);
+});
+test("over many shots: the slot beats the corner, and a better goalie stops more", function () {
+  function goals(age, a, d, shots) {
+    var n = 0, dice = G.makeDice(77);
+    for (var i = 0; i < shots; i++) {
+      var s = quiet("C", age);
+      put(s, "us", "C", a, d); G.gain(s, "us", "C");
+      for (var k = 0; k < 20; k++) G.tick(s, {}, null, DT, dice);
+      G.tick(s, { auto: true }, { us: { C: { move: { a: 0, d: 0 }, act: { kind: "shoot", power: 0.65, lift: 0.5, side: 0 } } } }, DT, dice);
+      run(s, 2.5, { auto: true }, dice, null, function (s) { return s.phase !== "play"; });
+      n += s.score.us;
+    }
+    return n / shots;
+  }
+  var slot = goals(3, 42.5, 165, 300), point = goals(3, 20, 130, 300), young = goals(0, 42.5, 165, 300), old = goals(6, 42.5, 165, 300);
+  assert.ok(slot > point * 1.5, "slot " + slot + " point " + point);
+  assert.ok(young > old, "their goalie is easier for the youngest: " + young + " " + old);
+  assert.ok(slot > 0.08 && slot < 0.6, "never a sure thing, never hopeless: " + slot);
+});
+
+// ---------- The stick check ---------------------------------------------------------------
+test("a stick check works from close, not from far, and a miss leaves you slow", function () {
+  function check(dist, roll) {
+    var s = quiet("C");
+    put(s, "them", "C", 50, 60); G.gain(s, "them", "C");
+    var me = put(s, "us", "C", 50, 60 - dist);                   // in front of them (they skate down the ice)
+    var ev = G.tick(s, { pass: true }, null, DT, rolls([roll, 0]));
+    return { ev: ev, s: s, me: me };
+  }
+  var won = check(4, 0);
+  assert.deepStrictEqual(kinds(won.ev), ["steal"]);
+  assert.strictEqual(won.s.puck.owner, "us"); assert.strictEqual(won.s.puck.carrier, "C");
+  assert.strictEqual(won.s.stats.steals.us, 1);
+  var missed = check(4, 0.99);
+  assert.deepStrictEqual(kinds(missed.ev), []);
+  assert.strictEqual(missed.s.puck.owner, "them");
+  assert.ok(missed.me.slow > 0, "a miss costs you a moment");
+  var far = check(12, 0);
+  assert.strictEqual(far.s.puck.owner, "them", "too far away to reach");
+  // You cannot hammer the button: there is a short wait between checks.
+  var again = G.tick(missed.s, { pass: true }, null, DT, rolls([0, 0]));
+  assert.deepStrictEqual(kinds(again), []);
+});
+test("over many checks: from the front beats from behind, and the quick move protects the puck", function () {
+  function rate(behind, burst) {
+    var wins = 0, dice = G.makeDice(31);
+    for (var i = 0; i < 600; i++) {
+      var s = quiet("C");
+      var c = put(s, "them", "C", 50, 60); G.gain(s, "them", "C");
+      if (burst) c.burst = 0.5;
+      put(s, "us", "C", 50, behind ? 64 : 56);
+      G.tick(s, { pass: true }, null, DT, dice);
+      if (s.stats.steals.us) wins++;
+    }
+    return wins / 600;
+  }
+  var front = rate(false, false), back = rate(true, false), deke = rate(false, true);
+  assert.ok(front > back + 0.1, front + " " + back);
+  assert.ok(deke < front * 0.5, deke + " " + front);
+  assert.ok(front < 0.8 && back > 0.05);
+});
+
+// ---------- The referee ------------------------------------------------------------------------
+test("the referee stays on the ice, away from the puck, and stands on the blue line for an offside", function () {
+  var last = pt(6, 100);
+  for (var a = 3; a <= 82; a += 4) {
+    for (var d = 3; d <= 197; d += 6) {
+      var r = G.refSpot(pt(a, d), last);
+      onTheIce(r, "referee");
+      assert.ok(Math.abs(r.a - a) >= 14, "the referee is in the play at " + a + "," + d);
+      assert.ok(Math.abs(r.d - d) <= 11, "the referee is too far up or down the ice from the puck");
+      last = r;
+    }
+  }
+  assert.strictEqual(G.refSpot(pt(60, 128), pt(6, 100), "offside").d, 125.5);
+  assert.strictEqual(G.refSpot(pt(60, 72), pt(6, 100), "offside").d, 74.5);
+});
+
+console.log("All game (gamesim) tests passed!");

@@ -11,6 +11,9 @@
      - Only ONE moment may take longer: the report appearing.
      - Someone who asked their device to "reduce motion" gets no
        sliding and no counting, only the end result.
+     - The live Game (game.js) is the one place where things must move
+       to work: a game cannot be played as a row of still pictures.
+       With "reduce motion" it still plays, but without the extras.
 
    The times and the curve are written once, at the top of style.css.
    ===================================================================== */

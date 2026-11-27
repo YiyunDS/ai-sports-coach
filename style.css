@@ -192,6 +192,7 @@ body {
    whole section would also drag the phone's bottom sheet along.) */
 main.layout { animation: fade-in var(--t-switch) ease-out; }
 @keyframes fade-in { from { opacity: 0; } }
+@keyframes fade-out { from { opacity: 1; } to { opacity: 0; } }
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
 
 /* ---------- Page layout: big view on the left, panel on the right ---------- */
@@ -220,7 +221,7 @@ main.layout { animation: fade-in var(--t-switch) ease-out; }
   border-radius: var(--r-panel);
   padding: 16px;
 }
-.panel h2, .replay h3, .popover h2, .popover h3, .game-story h2 {
+.panel h2, .panel h3, .replay h3, .popover h2, .popover h3, .game-story h2 {
   margin: 0 0 12px;
   font-size: 0.875rem; font-weight: 500; line-height: 20px; color: var(--fg-2);
   text-wrap: balance;
@@ -324,7 +325,7 @@ input[type="checkbox"] { width: 16px; height: 16px; margin: 0; accent-color: var
 }
 .pop-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
 .pop-head h2 { margin: 0; }
-.popover h3 { margin: 16px 0 8px; }
+.popover h3, .panel h3 { margin: 16px 0 8px; }
 .popover p { margin: 0; }
 .tick { display: flex; align-items: center; gap: 8px; min-height: 32px; cursor: pointer; }
 
@@ -684,11 +685,86 @@ details.more p { max-width: 85ch; }
   padding-right: max(24px, env(safe-area-inset-right, 0px));
 }
 
-/* ---------- Simulation game ---------- */
+/* ---------- The live hockey game ---------- */
 #game-rink .marker.has-puck circle { stroke: #0b0f14; stroke-width: 1.1; }
-#game-rink .reach { fill: none; stroke: var(--you-ink); stroke-width: 0.35; stroke-dasharray: 1.6 1.4; pointer-events: none; }
-#game-rink .preview { stroke: #0b0f14; stroke-width: 0.5; stroke-dasharray: 1.2 1.2; pointer-events: none; }
-.key.reach { background: none; border: 1px dashed var(--you); }
+/* The referee wears black and white stripes, the same in both looks. */
+#game-rink .marker.ref circle { fill: #fff; stroke: #0b0f14; stroke-width: 0.5; }
+#game-rink .marker.ref .stripe { fill: #0b0f14; }
+.key.ref { background: repeating-linear-gradient(90deg, #fff 0 2px, #0b0f14 2px 4px); border: 1px solid #0b0f14; }
+/* Who your pass would go to. Red when that pass would be offside. */
+#game-rink .pass-line { stroke: #0b0f14; stroke-width: 0.45; stroke-dasharray: 1.4 1.2; opacity: 0.55; pointer-events: none; }
+#game-rink .pass-line.warn { stroke: #c8243a; stroke-width: 0.8; opacity: 0.95; }
+/* Phone: where you are, when the camera had to leave you out of the picture. */
+#game-rink .you-away { fill: var(--you); stroke: #0b0f14; stroke-width: 0.5; stroke-linejoin: round; pointer-events: none; }
+/* The ring that opens once when the referee blows the whistle (and
+   around a goalie who makes a save). Yellow, like the lines the
+   Referee tab draws on the ice. */
+#game-rink .whistle-ring { fill: none; stroke: #ffd21f; stroke-width: 0.9; opacity: 0; transform-box: fill-box; transform-origin: center; pointer-events: none; }
+#game-rink .whistle-ring.go { animation: whistle-ring var(--t-show) var(--ease); }
+@keyframes whistle-ring { from { opacity: 1; transform: scale(0.35); } to { opacity: 0; transform: scale(1.7); } }
+
+/* The rink with the two bars beside it. */
+.rink-row { align-self: stretch; display: flex; align-items: stretch; gap: 12px; }
+.rink-box { position: relative; flex: 1 1 auto; min-width: 0; display: flex; justify-content: center; align-items: center; }
+/* THE TWO BARS: power and height. A mark runs up and down; green is
+   the good part. They are dim until you have the puck. */
+.meters { flex: 0 0 auto; display: grid; grid-template-columns: 40px 40px; grid-template-rows: 16px 1fr; gap: 4px; opacity: 0.4; transition: opacity var(--t-switch) var(--ease); }
+.meters.live { opacity: 1; }
+.meter { grid-row: 2; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.meter-track { position: relative; flex: 1 1 auto; min-height: 96px; width: 14px; border-radius: 8px; background: var(--bg); border: 1px solid var(--line); overflow: hidden; }
+.meter-green { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: var(--good); opacity: 0.6; }
+.meter-mark { position: absolute; left: 0; right: 0; bottom: -1.5px; height: 3px; background: var(--fg); }
+.meters.live:not(.second) .meter:nth-child(2) .meter-track { opacity: 0.45; }   /* the height bar waits for the first tap */
+.meters.second .meter:first-child .meter-mark { background: var(--ref); }       /* the power is set */
+.meter-name { font-size: 0.6875rem; line-height: 14px; color: var(--muted); }
+.meter-word { grid-row: 1; grid-column: 1 / 3; text-align: center; font-size: 0.75rem; line-height: 16px; font-weight: 600; color: var(--ref); }
+/* The referee's call, in scoreboard letters over the rink for a moment. */
+.game-call {
+  position: absolute; left: 50%; top: 14%; transform: translateX(-50%); padding: 2px 16px;
+  background: var(--pop-solid); border: 1px solid var(--hair); border-radius: var(--r-btn);
+  font-family: var(--display); font-weight: 700; font-size: 2rem; line-height: 1.3; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap;
+  opacity: 0; pointer-events: none; transition: opacity var(--t-switch) var(--ease);
+}
+.game-call.show { opacity: 1; }
+.game-call.good { color: var(--good); }
+.game-call.close { color: var(--close); }
+.game-call.far { color: var(--far); }
+/* The card over the rink: before a game, while paused, and at the end. */
+.game-card {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(360px, calc(100% - 16px));
+  background: var(--pop-solid); border: 1px solid var(--hair); border-radius: var(--r-card); padding: 16px; text-align: center;
+}
+.game-card p { margin: 0 0 8px; }
+.game-card .result-main { margin-top: 4px; font-size: 1.125rem; font-weight: 600; line-height: 1.3; }
+.game-card p:last-of-type { margin-bottom: 0; }
+.game-card .primary { margin-top: 12px; }
+.game-card.good .eyebrow { color: var(--good); }
+.game-card.close .eyebrow { color: var(--close); }
+.game-card.far .eyebrow { color: var(--far); }
+/* Under the rink: the choices before a game, Pause and the keys during one. */
+.game-controls { align-self: stretch; display: flex; align-items: flex-start; gap: 12px; }
+.game-rows { flex: 1 1 auto; min-width: 0; }
+.game-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.game-row[hidden] { display: none; }
+.game-row .pick { display: flex; align-items: center; gap: 8px; }
+.game-row .seg button { min-width: 44px; }
+.sound-btn { flex: 0 0 auto; white-space: nowrap; }
+.keys-help { margin: 0; flex: 1 1 280px; color: var(--muted); line-height: 1.9; }
+kbd { display: inline-block; min-width: 20px; margin: 0 1px; padding: 0 5px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; background: var(--panel-2); font: 600 0.75rem/18px var(--font); text-align: center; color: var(--fg); }
+/* TOUCH CONTROLS: a joystick on the left (it appears where your thumb
+   lands), four buttons on the right. Only on touch screens. */
+.pad { align-self: stretch; display: none; grid-template-columns: 1fr auto; gap: 12px; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.pad-stick { position: relative; min-height: 136px; border: 1px dashed var(--line); border-radius: var(--r-card); overflow: hidden; touch-action: none; }
+.pad-hint { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 0.8125rem; pointer-events: none; }
+.stick-base { position: absolute; left: -46px; top: -46px; width: 92px; height: 92px; border-radius: 50%; border: 2px solid var(--line); background: var(--glass); opacity: 0; pointer-events: none; }
+.stick-base.on { opacity: 1; }
+.stick-knob { position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; background: var(--you); }
+.pad-buttons { display: grid; grid-template-columns: 76px 76px; grid-auto-rows: 1fr; gap: 8px; }
+.pad-btn { min-height: 64px; padding: 4px; font-size: 1rem; font-weight: 600; touch-action: none; }
+.pad-btn.main { background: var(--ref); border-color: var(--ref); color: var(--ref-ink); }
+@media (pointer: coarse), (max-width: 700px) {
+  .pad:not([hidden]) { display: grid; }
+}
 /* THE SCOREBOARD: one dark bar like on TV, in scoreboard letters. A
    colored edge for each side, the numbers in their own boxes, the
    shift in the middle. */
@@ -712,34 +788,20 @@ details.more p { max-width: 85ch; }
   font-family: var(--display); letter-spacing: 0.06em; text-transform: uppercase;
 }
 .score-mid .small { font-size: 0.9375rem; }
-/* The puck's path: a thin line that grows behind the puck, then stays, fainter. */
-#game-rink .trail { fill: none; stroke: #0b0f14; stroke-width: 0.55; stroke-linejoin: round; stroke-linecap: round; opacity: 0.6; pointer-events: none; }
-#game-rink .trail.done { opacity: 0.26; stroke-dasharray: 1.4 1.2; }
+.score-mid .clock { font-size: 1.75rem; line-height: 1.1; font-weight: 600; color: var(--fg); }
 /* The referee's level switch, above the rink. */
 .level-row { align-self: stretch; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .level-note { flex: 1 1 220px; }
 .board-wrap .seg { background: var(--bg); }
-/* The plays you can pick. The dot in front of each one says how good
-   its chance is: green, yellow or red (blue = a shot). The dots stand
-   in one column, the chances in another. */
-.choices { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-.choice { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; }
-.choice::before { content: ""; flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
-.choice.good::before { background: var(--good); }
-.choice.close::before { background: var(--close); }
-.choice.far::before { background: var(--far); }
-.choice.shot::before { background: var(--ref); }
-.choice span:first-child { flex: 1; min-width: 0; }
-.choice .odds { color: var(--muted); white-space: nowrap; }
 .game-story { align-self: stretch; width: 100%; margin-top: 4px; border-top: 1px solid var(--hair); padding-top: 12px; }
 .game-story h2 { margin: 0 0 4px; }
 .game-log { list-style: none; margin: 0; padding: 0; max-height: 232px; overflow-y: auto; font-size: 0.875rem; }
 .game-log li { padding: 6px 0; border-bottom: 1px solid var(--hair); }
 .game-log li:last-child { border-bottom: 0; }
-.game-log li.shift { color: var(--muted); font-size: 0.8125rem; }
+.game-log li.start, .game-log li.faceoff { color: var(--muted); font-size: 0.8125rem; }
 .game-log li.goal-us { color: var(--good); font-weight: 600; }
 .game-log li.goal-them { color: var(--far); font-weight: 600; }
-.game-log li.whistle, .game-log li.change, .game-log li.offside { color: var(--close); }
+.game-log li.cover, .game-log li.offside, .game-log li.icing, .game-log li.end { color: var(--close); }
 
 /* ---------- You make the call (referee) ---------- */
 #ref-rink .marker.faded circle { fill-opacity: 0.35; }
@@ -865,8 +927,24 @@ details.more p { max-width: 85ch; }
   }
   .game-layout .panel.move h2 { display: none; }
   .game-layout .panel.move p.small { margin-bottom: 8px; }
-  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .choice { padding: 6px 8px; font-size: 0.875rem; line-height: 20px; gap: 6px; }
+  /* THE LIVE GAME on a phone: scoreboard, rink, Pause, then the joystick
+     and the buttons, all on one screen. Nothing sits on top of it. */
+  #view-game.game-layout { padding-bottom: 16px; }
+  #view-game .rink-row { gap: 4px; }
+  #view-game .meters { grid-template-columns: 36px 36px; gap: 4px 6px; }
+  #view-game .game-call { font-size: 1.5rem; }
+  #view-game .keys-help { display: none; }
+  #view-game .game-controls { flex-wrap: wrap; }
+  #view-game .game-row { gap: 8px; }
+  #view-game .game-row .pick { flex: 1 1 100%; }
+  #view-game .game-row .pick .seg { flex: 1; display: flex; }
+  #view-game .game-row .pick .seg button { flex: 1; padding-inline: 4px; }
+  #view-game .game-row .pick select { flex: 1; }
+  #view-game .game-row .pick .tool-label { min-width: 5.2em; }
+  /* The line under the clock stays one line, so the rink never jumps. */
+  #view-game .score-mid .small { white-space: nowrap; }
+  #view-game #game-new { flex: 1 1 100%; }
+  #view-game.in-game .game-story { order: 9; }
   .game-log { max-height: 88px; }
   .scorebar { margin-bottom: 0; }
   .score .big { min-width: 48px; font-size: 1.75rem; }
@@ -899,4 +977,8 @@ details.more p { max-width: 85ch; }
   button:active:not(:disabled), .file-btn:active, .check[role="button"]:active { transform: none; }
   .reveal .verdict, .reveal .check.enter, .pos-result, .start-card, .popover { animation-name: fade-in; }
   .bump, .steps li.now .step-mark::after { animation: none; }
+  /* The live Game still plays (it cannot work without moving), but the
+     whistle ring only fades. */
+  #game-rink .whistle-ring.go { animation-name: fade-out; }
+  .meters, .game-call { transition: none; }
 }

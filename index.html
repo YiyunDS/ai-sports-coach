@@ -18,7 +18,7 @@
       }
     } catch (e) { /* the browser will not let us read it: the first look it is */ }
   </script>
-  <link rel="stylesheet" href="style.css?v=20.0">
+  <link rel="stylesheet" href="style.css?v=21.0">
 </head>
 <body>
   <!--
@@ -44,8 +44,11 @@
     js/chart.js            the curve in the report: the angle in every picture, over the target band
     js/positions.js        the playbook: where each position should stand
     js/board.js            the positioning board you drag your marker on
-    js/gamesim.js          the simulation game: the rules and the chances
-    js/game.js             the simulation game: the rink, the buttons, the play-by-play
+    js/gamesim.js          the live hockey game: the rules (goals, saves, offside, icing) and the chances
+    js/gamebrain.js        the live hockey game: the computer players
+    js/controls.js         the live hockey game: keys, touch joystick and game controller
+    js/sound.js            the referee's whistle (made by the browser, no sound file)
+    js/game.js             the live hockey game: the rink, the bars, the buttons, the play-by-play
     js/rink.js             draws the whole rink from above (for the Game and the Referee tabs)
     js/refplays.js         "You make the call": the plays, and the judge who knows the rules
     js/ref.js              "You make the call": the little movie, your answer, the score
@@ -389,25 +392,104 @@
     </aside>
   </main>
 
-  <!-- ================= SECTION 3: THE SIMULATION GAME ================= -->
+  <!-- ================= SECTION 3: THE LIVE HOCKEY GAME ================= -->
   <main id="view-game" class="layout pos-layout game-layout" hidden>
-    <section class="board-wrap" aria-label="Simulation game">
-      <div class="scorebar" role="status" aria-live="polite">
+    <section class="board-wrap" aria-label="Live hockey game">
+      <!-- The scoreboard: the score, the clock, and one line about what is going on. -->
+      <div class="scorebar">
         <div class="score us"><span class="team">US</span><span id="game-us" class="num big">0</span></div>
         <div class="score-mid">
+          <span id="game-clock" class="num clock">3:00</span>
           <span id="game-info" class="small"></span>
-          <span id="game-tally" class="small num"></span>
         </div>
         <div class="score them"><span id="game-them" class="num big">0</span><span class="team">THEM</span></div>
       </div>
-      <svg id="game-rink" viewBox="0 0 200 85" role="group" tabindex="0"
-           aria-label="The whole rink seen from above. Without the puck, drag your marker or use the arrow keys, then press Enter."></svg>
+      <div class="rink-row">
+        <!-- The two bars for a pass or a shot: how hard, and how high. -->
+        <div id="game-bars" class="meters" aria-hidden="true">
+          <div class="meter">
+            <div class="meter-track"><i id="game-power-green" class="meter-green"></i><i id="game-power" class="meter-mark"></i></div>
+            <span class="meter-name">Power</span>
+          </div>
+          <div class="meter">
+            <div class="meter-track"><i id="game-lift-green" class="meter-green"></i><i id="game-lift" class="meter-mark"></i></div>
+            <span class="meter-name">Height</span>
+          </div>
+          <span id="game-bar-word" class="meter-word"></span>
+        </div>
+        <div class="rink-box">
+          <svg id="game-rink" viewBox="0 0 200 85" role="img"
+               aria-label="The rink seen from above, with both teams, the goalies, the referee and the puck."></svg>
+          <!-- The referee's call, in big letters for a moment. -->
+          <div id="game-call-word" class="game-call" aria-hidden="true"></div>
+          <!-- Shown before a game, while paused, and at the end. -->
+          <div id="game-card" class="game-card">
+            <div id="game-card-kind" class="eyebrow"></div>
+            <p id="game-card-text" class="result-main"></p>
+            <p id="game-card-more" class="small" hidden></p>
+            <button type="button" id="game-card-go" class="primary" hidden></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="game-controls">
+      <div class="game-rows">
+      <!-- Before a game: pick your age group, your position and how long to play. -->
+      <div id="game-setup" class="game-row">
+        <div class="pick">
+          <label class="tool-label" for="game-age">Age group</label>
+          <select id="game-age"></select>
+        </div>
+        <div class="pick">
+          <span class="tool-label">You play</span>
+          <div class="seg" role="group" aria-label="Your position in the game">
+            <button type="button" data-grole="LW" title="Left wing">LW</button>
+            <button type="button" data-grole="C" title="Center">C</button>
+            <button type="button" data-grole="RW" title="Right wing">RW</button>
+            <button type="button" data-grole="LD" title="Left defense">LD</button>
+            <button type="button" data-grole="RD" title="Right defense">RD</button>
+          </div>
+        </div>
+        <div class="pick">
+          <span class="tool-label">Minutes</span>
+          <div class="seg" role="group" aria-label="How many minutes the game lasts">
+            <button type="button" data-gmin="2">2</button>
+            <button type="button" data-gmin="3">3</button>
+            <button type="button" data-gmin="5">5</button>
+          </div>
+        </div>
+        <button type="button" id="game-new" class="primary">Start game</button>
+      </div>
+      <!-- During a game. -->
+      <div id="game-playing" class="game-row" hidden>
+        <button type="button" id="game-pause" aria-pressed="false">Pause</button>
+        <button type="button" id="game-end" class="ghost-btn">End game</button>
+        <p class="keys-help small"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> skate &middot; <kbd>-</kbd> pass, or stick check &middot; <kbd>P</kbd> shoot &middot; <kbd>L</kbd> call for a pass &middot; <kbd>M</kbd> quick move &middot; <kbd>Esc</kbd> pause</p>
+      </div>
+      </div>
+      <button type="button" id="game-sound" class="ghost-btn sound-btn" aria-pressed="true">Sound on</button>
+      </div>
+
+      <!-- Touch controls: a joystick on the left, four buttons on the right. -->
+      <div id="game-pad" class="pad" hidden>
+        <div id="game-stick" class="pad-stick">
+          <span class="pad-hint">Skate</span>
+          <i id="game-stick-base" class="stick-base"><i id="game-stick-knob" class="stick-knob"></i></i>
+        </div>
+        <div class="pad-buttons">
+          <button type="button" id="game-btn-call" class="pad-btn">Call</button>
+          <button type="button" id="game-btn-shoot" class="pad-btn">Shoot</button>
+          <button type="button" id="game-btn-burst" class="pad-btn">Move</button>
+          <button type="button" id="game-btn-pass" class="pad-btn main">Pass</button>
+        </div>
+      </div>
+
       <ul class="board-key">
         <li><span class="key you"></span>You</li>
         <li><span class="key mate"></span>Teammates</li>
         <li><span class="key opp"></span>Other team</li>
+        <li><span class="key ref"></span>Referee</li>
         <li><span class="key puck"></span>Puck</li>
-        <li><span class="key reach"></span>How far you can skate in one beat</li>
       </ul>
       <div class="game-story">
         <h2>Play-by-play</h2>
@@ -417,52 +499,27 @@
 
     <aside class="side">
       <section class="panel">
-        <h2>Start a shift</h2>
-        <div class="field">
-          <label for="game-start" class="sr">How the shift starts</label>
-          <select id="game-start" class="wide"></select>
-        </div>
-        <div class="field">
-          <span class="field-label">Your position</span>
-          <div class="seg" role="group" aria-label="Your position in the game">
-            <button type="button" data-grole="LW">LW</button>
-            <button type="button" data-grole="C">C</button>
-            <button type="button" data-grole="RW">RW</button>
-            <button type="button" data-grole="LD">LD</button>
-            <button type="button" data-grole="RD">RD</button>
-          </div>
-        </div>
-        <div class="go">
-          <button type="button" id="game-new" class="primary">Start shift</button>
-          <button type="button" id="game-reset" class="ghost-btn">Reset score</button>
-        </div>
-      </section>
-
-      <section class="panel move">
-        <h2>Your move</h2>
-        <p id="game-prompt" class="small" role="status" aria-live="polite"></p>
-        <div id="game-choices" class="choices"></div>
-        <div class="go">
-          <button type="button" id="game-go" class="primary" hidden>Play on</button>
-          <button type="button" id="game-call" hidden>Call for a pass</button>
-          <label class="inline"><input type="checkbox" id="game-hint"> Show my best spot</label>
-        </div>
-        <div id="game-result" class="pos-result call-result" role="status" aria-live="polite" hidden>
-          <div id="game-result-kind" class="eyebrow"></div>
-          <p id="game-result-text" class="result-main"></p>
-        </div>
-        <div id="game-spot" class="pos-result" hidden>
-          <div class="pos-result-head">
-            <span id="game-spot-grade" class="chip"></span>
-            <span id="game-spot-feet" class="num"></span>
-          </div>
-          <p id="game-spot-tip"></p>
-        </div>
+        <h2>How to play</h2>
+        <p class="small">You skate one skater for the whole game. The computer plays your teammates, the other team and both goalies.</p>
+        <dl class="glossary">
+          <dt>Skate</dt><dd><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or the arrow keys. On a phone, a joystick appears under your left thumb.</dd>
+          <dt>Pass</dt><dd><kbd>-</kbd> The pass goes to the teammate you are steering toward. A thin line shows who.</dd>
+          <dt>Shoot</dt><dd><kbd>P</kbd> Steer toward one side of the net to aim there.</dd>
+          <dt>Call</dt><dd><kbd>L</kbd> When a teammate has the puck: "I am open, pass to me!"</dd>
+          <dt>Move</dt><dd><kbd>M</kbd> A quick move past a defender. You are fast for a moment, then slow for a moment.</dd>
+          <dt>Check</dt><dd><kbd>-</kbd> When they have the puck: get close and poke it away. From the front works best.</dd>
+        </dl>
+        <h3>The two bars</h3>
+        <p class="small">A pass or a shot takes two taps. While you have the puck, a mark runs up and down the <strong>Power</strong> bar. The first tap stops it. Then a mark runs on the <strong>Height</strong> bar, and the second tap stops that one and sends the puck. Green is the good part. A soft pass is easy to pick off, and a very hard one is hard to catch. A high shot can beat the goalie, but too high goes over the net.</p>
       </section>
 
       <section class="panel">
-        <h2>How the chances work</h2>
-        <p class="small">Nobody knows if one play will work. The game rolls dice, like real hockey: a short pass to an open teammate works almost every time, a long pass past a defender often does not. A shot from the slot scores far more often than a shot from the corner. Being in the right spot makes you open for a pass, and makes their shots harder. The numbers can be changed in <code>js/gamesim.js</code>.</p>
+        <h2>The whistle</h2>
+        <p class="small"><strong>Offside.</strong> Nobody on the attacking team may be inside the other team's blue line before the puck. That goes for you, your teammates and the other team. So look before you pass or carry the puck in. The player with the puck may cross ahead of it.</p>
+        <p class="small"><strong>Icing.</strong> A puck sent from your own half that goes all the way over the far goal line with nobody touching it. The face-off comes back to your end.</p>
+        <p class="small"><strong>Saves.</strong> When a goalie covers the puck the whistle blows. After a rebound there is no whistle: keep playing.</p>
+        <p class="small"><strong>Face-off.</strong> If you are the center, tap Pass the moment the puck drops. Too early and you lose it.</p>
+        <p class="small">Older age groups are harder: the other team is faster, the goalie stops more, and computer players go offside or ice the puck more often. Nobody knows if one shot will go in, so the game still rolls dice, like real hockey. The numbers can be changed in <code>js/gamesim.js</code>.</p>
       </section>
     </aside>
   </main>
@@ -544,13 +601,13 @@
   <script type="module">
     // Our own code, in the order it needs to load.
     var OURS = ["js/theme.js", "js/angles.js", "js/stride.js", "js/measure.js", "js/rebuild.js", "js/retarget.js", "js/tracker.js", "js/default-targets.js",
-                "js/skate.js", "js/figure.js", "js/rigged-figure.js", "js/ui.js", "js/scene.js", "js/chart.js", "js/coach.js", "js/positions.js", "js/board.js", "js/rink.js", "js/gamesim.js", "js/game.js",
+                "js/skate.js", "js/figure.js", "js/rigged-figure.js", "js/ui.js", "js/scene.js", "js/chart.js", "js/coach.js", "js/positions.js", "js/board.js", "js/rink.js", "js/gamesim.js", "js/gamebrain.js", "js/controls.js", "js/sound.js", "js/game.js",
                 "js/refplays.js", "js/ref.js"];
     // Our files belong together: a new coach.js with an old scene.js (kept
     // by the browser from an earlier visit) does not work. This number
     // goes on the end of every file's address, so after an update the
     // browser fetches all of them fresh. RAISE IT whenever a .js file changes.
-    var VERSION = "20.0";
+    var VERSION = "21.0";
     // Load one of our .js files and wait until it has run.
     function load(src) {
       return new Promise(function (done, fail) {

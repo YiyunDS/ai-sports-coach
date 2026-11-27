@@ -1,155 +1,163 @@
 // =====================================================================
-//  game.js  --  THE SIMULATION GAME ON THE PAGE
+//  game.js  --  THE LIVE HOCKEY GAME ON THE PAGE
 //
-//  This draws the whole rink from above and lets you play a shift:
-//    * pick how the shift starts and which position you play,
-//    * when you have the puck, pick a play (each one shows its chance),
-//    * when you do not, drag your orange marker to where you should be
-//      and press "Play on",
-//    * watch what happens, read the play-by-play, keep the score.
+//  This draws the rink from above and lets you PLAY: you skate one
+//  skater yourself (keys, a touch joystick or a game controller, see
+//  controls.js), and the computer plays everybody else (gamebrain.js).
+//  The rules are in gamesim.js. This file only draws, listens, and
+//  keeps the game running.
 //
-//  The rules and the chances are in gamesim.js. This file only draws
-//  and listens to your clicks.
+//  HOW A GAME RUNS ON THE PAGE
+//    The browser calls "frame" each time it is ready to paint, about
+//    60 times a second. Each time we
+//      1. ask the controls what you are doing,
+//      2. move the game forward by the time that has passed, in steps
+//         of 1/60 of a second (so the game is the same on a fast and
+//         on a slow device),
+//      3. say what happened (the play-by-play, the whistle),
+//      4. move the shapes on the rink to where everything is now.
 //
 //  We draw in FEET, like the positioning board. The rink lies on its
 //  side on a wide screen (our net on the left) and stands up on a
-//  phone (our net at the bottom).
+//  phone (our net at the bottom). A phone shows the 120 feet of ice
+//  around the play, like a TV camera following the puck.
+//
+//  MOVEMENT: this game is the one place on the page where things must
+//  move to work. With "reduce motion" it still plays, but without the
+//  extras: the camera steps instead of gliding, and rings do not grow.
 // =====================================================================
 (function () {
   "use strict";
-  var G = window.CoachGame, P = window.CoachPositions, R = window.CoachRink;
+  var G = window.CoachGame, B = window.CoachBrain, P = window.CoachPositions, R = window.CoachRink;
+  var Keys = window.CoachControls, Sound = window.CoachSound;
   var svg = document.getElementById("game-rink");
-  if (!G || !P || !R || !svg) return;
+  if (!G || !B || !P || !R || !Keys || !svg) return;
   var shape = R.shape, words = R.words;   // the drawing helpers from rink.js
 
   function $(id) { return document.getElementById(id); }
   var el = {
-    start: $("game-start"), begin: $("game-new"), prompt: $("game-prompt"), choices: $("game-choices"),
-    go: $("game-go"), call: $("game-call"), spot: $("game-spot"), spotGrade: $("game-spot-grade"), spotFeet: $("game-spot-feet"),
-    spotTip: $("game-spot-tip"), hint: $("game-hint"), log: $("game-log"), us: $("game-us"), them: $("game-them"),
-    info: $("game-info"), tally: $("game-tally"), result: $("game-result"),
-    resultKind: $("game-result-kind"), resultText: $("game-result-text")
+    view: $("view-game"), us: $("game-us"), them: $("game-them"), clock: $("game-clock"), info: $("game-info"),
+    log: $("game-log"), age: $("game-age"), begin: $("game-new"), pause: $("game-pause"), end: $("game-end"),
+    sound: $("game-sound"), setup: $("game-setup"), playing: $("game-playing"), pad: $("game-pad"),
+    bars: $("game-bars"), power: $("game-power"), lift: $("game-lift"), powerGreen: $("game-power-green"), liftGreen: $("game-lift-green"),
+    barWord: $("game-bar-word"), call: $("game-call-word"), card: $("game-card"), cardKind: $("game-card-kind"),
+    cardText: $("game-card-text"), cardMore: $("game-card-more"), cardGo: $("game-card-go"), passBtn: $("game-btn-pass")
   };
 
-  // What the game remembers.
-  var game = null;          // the state from gamesim.js (null before the first shift)
-  var role = "LD";          // the position you picked
+  // What the page remembers.
+  var game = null;            // the state from gamesim.js (null before the first game)
+  var role = "C";             // the position you picked
+  var minutes = 3;            // how long a game is
   var dice = G.makeDice(Date.now());
-  var target = null;        // where you dragged your marker for this beat
-  var busy = false;         // true while a beat is being played out on screen
-  var preview = null;       // the choice your mouse is over (drawn as a dotted line)
-  var showRings = null;     // the best spot we are showing rings for (after a beat, or as a hint)
-  var lastTrail = null;     // the path the puck took in the last beat (drawn as a thin line)
+  var paused = false;
+  var lastTime = null;        // when the last picture was painted
+  var owed = 0;               // game time we still have to play (seconds)
+  var held = {};              // buttons pressed while no step was played yet
 
   var tall = window.matchMedia("(max-width: 700px)");
   var calm = window.matchMedia("(prefers-reduced-motion: reduce)");
-  var rink = null;          // the rink drawing (from rink.js)
-  var live = null;          // the layer with everything that moves
+  var rink = null;            // the rink drawing (from rink.js)
+  var live = null;            // the layer with everything that moves
+  var parts = null;           // the shapes on that layer
+  var camera = 40;            // phone: the first foot of ice in the picture
+  var SHOW = 120;             // phone: how many feet of the rink's length we show
 
-  function place(p) { return rink.place(p); }
   function clamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
-  function mix(p, q, t) { return { a: p.a + (q.a - p.a) * t, d: p.d + (q.d - p.d) * t }; }
-  function ease(t) { return t * t * (3 - 2 * t); }   // start gently, stop gently
-  // A path as the drawing wants it: "x,y x,y x,y" (x = feet up the ice, y = feet across).
-  function pathOf(spots) {
-    return spots.map(function (p) { return p.d.toFixed(1) + "," + p.a.toFixed(1); }).join(" ");
-  }
+  function running() { return !!game && game.phase !== "over" && !paused; }
 
-  // The rink lies on its side on a wide screen and stands up on a phone.
-  // A phone is small, so there we only show the 120 feet of ice around
-  // the play (like a TV camera following the puck). Then the markers are
-  // big enough for a finger.
-  var SHOW = 120;
-  // Make sure these depths (feet up the ice) are in the picture. The
-  // first one is the puck: it always is.
-  function fit(depths) {
-    var from = 0, to = 200;
-    if (tall.matches) {
-      var mid = (Math.min.apply(null, depths) + Math.max.apply(null, depths)) / 2;
-      from = clamp(mid - SHOW / 2, depths[0] - SHOW + 14, depths[0] - 14);
-      from = Math.round(clamp(from, 0, 200 - SHOW) / 5) * 5;
-      to = from + SHOW;
-    }
-    if (rink && rink.from === from && rink.to === to && rink.upright === tall.matches) return;
-    rink = R.build(svg, { upright: tall.matches, from: from, to: to });
-    live = shape("g", {}, rink.root);
-  }
-  function fitToGame() { fit(game ? [game.puck.d, game.us[game.you].d] : [100]); }
-  function build() {
-    rink = null;
-    fitToGame();
-    draw();
-  }
-
-  // ---------- The players and the puck ---------------------------------
-  function marker(at, label, className) {
-    var g = shape("g", { class: "marker " + className, transform: place(at) }, live);
+  // ---------- Drawing the rink and everything on it --------------------------
+  function marker(label, className) {
+    var g = shape("g", { class: "marker " + className }, live);
     shape("circle", { r: 3.1 }, g);
-    words(label, { y: "0.35em" }, g);
+    if (label) words(label, { y: "0.35em" }, g);
     return g;
   }
-  var parts = null;   // the shapes on screen right now, so we can slide them
-
-  // Draw everything that moves. "at" lets the animation say where things
-  // are right now: { us, them, puck } (leave it out to use the game).
-  function draw(at) {
-    if (!live) return;
-    live.textContent = "";
-    parts = null;
-    if (!game) return;
-    at = at || { us: game.us, them: game.them, puck: game.puck };
-    var mine = at.us[game.you];
-    var myMove = !busy && !game.over && !G.youHavePuck(game);
-
-    // Rings on the best spot (after a beat, or when the hint is on).
-    var under = shape("g", { "clip-path": rink.clip }, live);
-    if (showRings) {
-      shape("circle", { cx: showRings.d, cy: showRings.a, r: G.CLOSE_FEET, class: "zone-close" }, under);
-      shape("circle", { cx: showRings.d, cy: showRings.a, r: G.GOOD_FEET, class: "zone-good" }, under);
-    }
-    // How far you can skate in this beat.
-    if (myMove) {
-      var home = game.us[game.you];
-      shape("circle", { cx: home.d, cy: home.a, r: G.REACH, class: "reach" }, under);
-      if (target) shape("line", { x1: home.d, y1: home.a, x2: target.d, y2: target.a, class: "measure" }, under);
-    }
-    // The play your mouse is over.
-    if (preview && !busy) {
-      shape("line", { x1: at.puck.d, y1: at.puck.a, x2: preview.d, y2: preview.a, class: "preview" }, live);
-    }
-
-    // The puck's path: a thin line that grows behind the puck while the
-    // beat plays, and stays (fainter) so you can see what just happened.
-    var trail = shape("polyline", { class: "trail" + (busy ? "" : " done"), points: !busy && lastTrail ? pathOf(lastTrail) : "" }, live);
-
-    parts = { us: {}, them: {}, trail: trail };
-    P.ROLES.forEach(function (r) { parts.them[r] = marker(at.them[r], r, "opp"); });
-    P.ROLES.forEach(function (r) { if (r !== game.you) parts.us[r] = marker(at.us[r], r, "mate"); });
-    parts.us[game.you] = marker(mine, game.you, "you");
-    // Standing still, the puck sits just beside whoever has it, so you can see both.
-    // (Toward the middle of the rink, so it never ends up in the boards.)
-    var puckAt = !busy && !game.over ? G.toward(at.puck, { a: 42.5, d: 100 }, 4) : at.puck;
-    parts.puck = shape("circle", { cx: puckAt.d, cy: puckAt.a, r: 1.4, class: "puck" }, live);
-    // A ring around whoever has the puck.
-    if (!game.over && !busy) parts[game.owner][game.carrier].setAttribute("class",
-      parts[game.owner][game.carrier].getAttribute("class") + " has-puck");
+  function build() {
+    rink = R.build(svg, { upright: tall.matches });
+    // The goalies move in this game, so we draw our own and take the
+    // painted ones off this rink.
+    Array.prototype.forEach.call(svg.querySelectorAll(".goalie"), function (g) { g.parentNode.removeChild(g); });
+    live = shape("g", {}, rink.root);
+    parts = { us: {}, them: {}, goalie: {} };
+    parts.passLine = shape("line", { class: "pass-line", x1: 0, y1: 0, x2: 0, y2: 0 }, live);
+    parts.ring = shape("circle", { class: "whistle-ring", r: 7, cx: 0, cy: 0 }, live);
+    parts.goalie.us = shape("circle", { class: "goalie ours", r: 2.2 }, live);
+    parts.goalie.them = shape("circle", { class: "goalie theirs", r: 2.2 }, live);
+    // The referee: a striped marker, no letter.
+    parts.ref = shape("g", { class: "marker ref" }, live);
+    shape("circle", { r: 2.6 }, parts.ref);
+    [-1.3, 0, 1.3].forEach(function (x) { shape("rect", { x: x - 0.3, y: -2.2, width: 0.6, height: 4.4, class: "stripe" }, parts.ref); });
+    P.ROLES.forEach(function (r) { parts.them[r] = marker(r, "opp"); });
+    P.ROLES.forEach(function (r) { parts.us[r] = marker(r, r === role ? "you" : "mate"); });
+    parts.puck = shape("circle", { class: "puck", r: 1.4 }, live);
+    // Phone only: a small arrow at the edge of the picture when you are outside it.
+    parts.away = shape("path", { class: "you-away", d: "M2.8,0 L-1.8,-2.6 L-1.8,2.6 Z", visibility: "hidden" }, live);
+    look(true);
+    draw();
   }
-  // Slide the shapes without redrawing them (used many times a second).
-  function slide(at) {
+  // The phone's camera: keep the puck and you in the picture.
+  function look(jump) {
+    if (!rink.upright) return;
+    var want = 40;
+    if (game) {
+      var me = game.us[game.you], puck = game.puck;
+      var mid = (puck.d * 2 + me.d) / 3;                    // mostly the puck, a little bit you
+      want = clamp(mid - SHOW / 2, puck.d - SHOW + 16, puck.d - 16);
+      want = clamp(want, 0, 200 - SHOW);
+    }
+    if (jump) camera = want;
+    else if (calm.matches) { if (Math.abs(want - camera) > 14) camera = Math.round(want / 10) * 10; }   // in steps
+    else camera += (want - camera) * 0.12;                                                           // a smooth glide
+    // (The standing rink is the lying one turned a quarter turn: depth d is at 200 - d from the top.)
+    svg.setAttribute("viewBox", "0 " + (200 - camera - SHOW).toFixed(2) + " 85 " + SHOW);
+  }
+  function draw() {
     if (!parts) return;
+    var s = game;
+    live.setAttribute("visibility", s ? "visible" : "hidden");
+    if (!s) return;
     ["us", "them"].forEach(function (team) {
-      P.ROLES.forEach(function (r) { parts[team][r].setAttribute("transform", place(at[team][r])); });
+      P.ROLES.forEach(function (r) { parts[team][r].setAttribute("transform", rink.place(s[team][r])); });
+      parts.goalie[team].setAttribute("cx", s.goalie[team].d);
+      parts.goalie[team].setAttribute("cy", s.goalie[team].a);
     });
-    parts.puck.setAttribute("cx", at.puck.d);
-    parts.puck.setAttribute("cy", at.puck.a);
-    if (at.trail) parts.trail.setAttribute("points", pathOf(at.trail));
+    parts.ref.setAttribute("transform", rink.place(s.ref));
+    var p = s.puck;
+    parts.puck.setAttribute("cx", p.d); parts.puck.setAttribute("cy", p.a);
+    parts.puck.setAttribute("r", (1.4 + Math.min(p.h, 5) * 0.14).toFixed(2));   // a puck in the air looks a little bigger
+    // A ring around whoever has the puck.
+    var has = p.owner ? p.owner + p.carrier : "";
+    if (has !== parts.has) {
+      if (parts.hasEl) parts.hasEl.classList.remove("has-puck");
+      parts.hasEl = p.owner ? parts[p.owner][p.carrier] : null;
+      if (parts.hasEl) parts.hasEl.classList.add("has-puck");
+      parts.has = has;
+    }
+    // The pass line: who would get your pass right now?
+    var mine = G.youHavePuck(s) && s.phase === "play";
+    parts.passLine.setAttribute("visibility", mine ? "visible" : "hidden");
+    if (mine) {
+      var me = s.us[s.you], to = G.passTarget(s, steer), mate = s.us[to];
+      parts.passLine.setAttribute("x1", me.d); parts.passLine.setAttribute("y1", me.a);
+      parts.passLine.setAttribute("x2", mate.d); parts.passLine.setAttribute("y2", mate.a);
+      // For the younger age groups the line turns red when that pass would be offside.
+      parts.passLine.setAttribute("class", "pass-line" + (s.lv.warn && G.passIsOffside(s, "us", to) ? " warn" : ""));
+    }
+    look(false);
+    // The camera follows the puck. If that leaves YOU outside the picture,
+    // an arrow at the edge shows where you are.
+    var my = s.us[s.you], above = my.d > camera + SHOW - 2, below = my.d < camera + 2;
+    var lost = rink.upright && (above || below);
+    parts.away.setAttribute("visibility", lost ? "visible" : "hidden");
+    if (lost) parts.away.setAttribute("transform", "translate(" + (above ? camera + SHOW - 4 : camera + 4) + "," + my.a.toFixed(1) + ")" + (above ? "" : " scale(-1,1)"));
   }
 
-  // ---------- The words around the rink --------------------------------
-  var KIND = { pass: "Pass to ", carry: "Stickhandle ", shoot: "Shoot", dump: "Dump it into the corner" };
-  var GRADE_WORDS = { good: "On target", close: "Close", far: "Out of position" };
-  function percent(x) { return Math.round(x * 100) + "%"; }
-
+  // ---------- The words around the rink ------------------------------------------
+  function setText(node, text) { if (node.textContent !== text) node.textContent = text; }
+  function clockText(seconds) {
+    var whole = Math.ceil(seconds), m = Math.floor(whole / 60), sec = whole % 60;
+    return m + ":" + (sec < 10 ? "0" : "") + sec;
+  }
   function addLog(text, className) {
     var li = document.createElement("li");
     li.textContent = text;
@@ -157,258 +165,215 @@
     el.log.insertBefore(li, el.log.firstChild);
     while (el.log.children.length > 40) el.log.removeChild(el.log.lastChild);
   }
+  // The one line under the clock: what is going on right now.
+  function statusLine() {
+    var s = game;
+    if (!s) return "Press Start game";
+    if (s.phase === "over") return "Final score";
+    if (paused) return "Paused";
+    if (s.phase === "dead") return CALL_WORDS[s.stop.reason] || "Whistle";
+    if (s.phase === "set") return "Face-off";
+    if (s.phase === "drop") return s.you === "C" ? "Wait for the drop..." : "Face-off";
+    if (s.phase === "draw") return "Now! Tap Pass";
+    if (G.youHavePuck(s)) return s.aim && s.aim.stage === 1 ? "Tap " + (s.aim.kind === "pass" ? "Pass" : "Shoot") + " again" : "You have the puck";
+    if (s.puck.owner === "us") return "We have the puck";
+    if (s.puck.owner === "them") return "They have the puck";
+    return "Loose puck";
+  }
+  var CALL_WORDS = { goal: "Goal", cover: "Save", offside: "Offside", icing: "Icing", end: "Time" };
 
-  // The buttons for when you have the puck.
-  function drawChoices() {
-    el.choices.textContent = "";
-    if (!game || game.over || busy || !G.youHavePuck(game)) return;
-    G.options(game).forEach(function (o) {
-      var b = document.createElement("button");
-      b.type = "button";
-      b.className = "choice " + (o.kind === "shoot" ? "shot" : o.chance >= 0.7 ? "good" : o.chance >= 0.45 ? "close" : "far");
-      var name = document.createElement("span"), odds = document.createElement("span");
-      name.textContent = o.kind === "pass" ? KIND.pass + P.ROLE_NAMES[o.to].toLowerCase() + " (" + o.to + ")"
-        : o.kind === "carry" ? KIND.carry + (o.toNet ? "to the net" : "up the ice") : KIND[o.kind];
-      odds.className = "odds num";
-      odds.textContent = (o.kind === "shoot" ? "goal " : o.kind === "dump" ? "we get it " : "") + percent(o.chance);
-      b.appendChild(name); b.appendChild(odds);
-      // Show on the rink where this play goes while the mouse is on it.
-      var goesTo = o.kind === "pass" ? game.us[o.to] : o.kind === "shoot" ? G.GOAL
-        : o.kind === "carry" ? G.carryTarget(game.puck) : { a: game.puck.a < 42.5 ? 9 : 76, d: 191 };
-      function on() { preview = goesTo; draw(); }
-      function off() { preview = null; draw(); }
-      b.addEventListener("pointerenter", on); b.addEventListener("focus", on);
-      b.addEventListener("pointerleave", off); b.addEventListener("blur", off);
-      b.addEventListener("click", function () { play({ action: o.id }); });
-      el.choices.appendChild(b);
-    });
+  // The two bars. The markers move with "transform" only.
+  var barTall = 0;
+  function drawBars() {
+    var b = game && !paused ? G.bars(game) : null;
+    el.bars.classList.toggle("live", !!b);
+    if (!b) { setText(el.barWord, ""); return; }
+    if (!barTall) barTall = el.power.parentNode.clientHeight;
+    el.power.style.transform = "translateY(" + (-b.power * barTall).toFixed(1) + "px)";
+    el.lift.style.transform = "translateY(" + (-b.lift * barTall).toFixed(1) + "px)";
+    green(el.powerGreen, b.greenPower);
+    green(el.liftGreen, b.greenLift);
+    el.bars.classList.toggle("second", b.stage === 1);
+    setText(el.barWord, b.stage === 1 ? (b.kind === "pass" ? "Pass" : "Shoot") : "");
+  }
+  function green(node, zone) {
+    var key = zone ? zone.join() : "";
+    if (node.zone === key) return;
+    node.zone = key;
+    node.style.opacity = zone ? "" : "0";
+    if (zone) { node.style.bottom = (zone[0] * 100) + "%"; node.style.height = ((zone[1] - zone[0]) * 100) + "%"; }
   }
 
+  // Everything that only changes now and then: the score, which buttons show.
   function refresh() {
-    var has = !!game;
-    el.us.textContent = has ? game.score.us : 0;
-    el.them.textContent = has ? game.score.them : 0;
-    el.info.textContent = has ? "Shift " + game.stats.shifts + " · beat " + Math.min(game.beat + (game.over ? 0 : 1), G.MAX_BEATS) + " of " + G.MAX_BEATS : "Pick a start and press Start shift";
-    el.tally.textContent = has && game.stats.spots ? "Your spots: " + game.stats.onTarget + " of " + game.stats.spots + " on target" : "";
-    el.begin.textContent = has ? (game.over ? "Next shift" : "Start over") : "Start shift";
-    el.begin.className = !has || game.over ? "primary" : "";
-    el.result.hidden = !(has && game.over);
-    if (has && game.over) {
-      // How the shift ended, said like the top of the skating report:
-      // a small colored word, then the sentence.
-      var kind = game.over.kind;
-      el.result.className = "pos-result call-result " + (kind === "goal-us" ? "good" : kind === "goal-them" ? "far" : "close");
-      el.resultKind.textContent = kind === "goal-us" ? "Goal" : kind === "goal-them" ? "Goal against" : kind === "offside" ? "Offside"
-        : kind === "change" ? "Line change" : "Whistle";
-      // The small word already says "Offside", so the sentence under it
-      // does not start with the same word again.
-      var word = el.resultKind.textContent, text = game.over.text;
-      if (text.indexOf(word + ": ") === 0) text = text.charAt(word.length + 2).toUpperCase() + text.slice(word.length + 3);
-      el.resultText.textContent = text;
+    var s = game, on = !!s && s.phase !== "over";
+    setText(el.us, String(s ? s.score.us : 0));
+    setText(el.them, String(s ? s.score.them : 0));
+    el.setup.hidden = on;
+    el.playing.hidden = !on;
+    el.pad.hidden = !on;
+    el.view.classList.toggle("in-game", on);
+    setText(el.pause, paused ? "Resume" : "Pause");
+    el.pause.setAttribute("aria-pressed", String(paused));
+    setText(el.begin, s ? "Play again" : "Start game");
+    // The card over the rink: before a game, while paused, and at the end.
+    var kind = "", text = "", more = "", go = "";
+    if (!s) { kind = "Live game"; text = "Pick your age group and your position, then press Start game."; }
+    else if (s.phase === "over") {
+      kind = s.score.us > s.score.them ? "You win" : s.score.us < s.score.them ? "They win" : "A tie";
+      text = "Final score: us " + s.score.us + ", them " + s.score.them + ".";
+      var t = s.stats;
+      more = "Shots " + t.shots.us + " to " + t.shots.them + ". Saves by our goalie " + t.saves.us + ", by theirs " + t.saves.them +
+        ". Offside: us " + t.offside.us + ", them " + t.offside.them + ". Icing: us " + t.icing.us + ", them " + t.icing.them +
+        ". Face-offs won: " + t.faceoffs.us + " of " + (t.faceoffs.us + t.faceoffs.them) + ".";
+    } else if (paused) { kind = "Paused"; text = "The game waits for you."; go = "Resume"; }
+    el.card.hidden = !kind;
+    el.card.className = "game-card" + (s && s.phase === "over" ? (s.score.us > s.score.them ? " good" : s.score.us < s.score.them ? " far" : " close") : "");
+    setText(el.cardKind, kind); setText(el.cardText, text); setText(el.cardMore, more);
+    el.cardMore.hidden = !more;
+    el.cardGo.hidden = !go; setText(el.cardGo, go);
+  }
+  function showSound() {
+    if (!el.sound || !Sound) return;
+    setText(el.sound, Sound.on() ? "Sound on" : "Sound off");
+    el.sound.setAttribute("aria-pressed", String(Sound.on()));
+  }
+
+  // ---------- What happened: the story, the whistle, the ring --------------------
+  var callTimer = null;
+  function tell(e) {
+    if (e.kind === "steal") return;                       // too many to read; you see them on the ice
+    addLog(e.text, e.kind + (e.team ? " " + e.kind + "-" + e.team : ""));
+    if (e.kind === "save") ringAt(game.goalie[e.team]);
+    if (!e.whistle) return;
+    if (Sound) Sound.blow(e.kind);
+    ringAt(game.ref);
+    if (e.kind === "end") return;                          // (the card over the rink says how it ended)
+    // The call, in big letters over the rink for a moment.
+    setText(el.call, CALL_WORDS[e.kind] || "Whistle");
+    el.call.className = "game-call show " + (e.kind === "goal" ? (e.team === "us" ? "good" : "far") : "close");
+    clearTimeout(callTimer);
+    callTimer = setTimeout(function () { el.call.classList.remove("show"); }, 1500);
+  }
+  // A ring that opens once around a spot (the referee, or a goalie who made a save).
+  function ringAt(spot) {
+    var r = parts.ring;
+    r.setAttribute("cx", spot.d); r.setAttribute("cy", spot.a);
+    r.classList.remove("go");
+    void r.getBoundingClientRect();                        // (so the browser starts the animation again)
+    r.classList.add("go");
+  }
+
+  // ---------- The loop --------------------------------------------------------------
+  var steer = { a: 0, d: 0 };   // which way you are steering right now (the pass line uses it)
+  function frame(now) {
+    requestAnimationFrame(frame);
+    // The Game tab is not showing, or the whole page is hidden: the game waits.
+    if (game && !paused && game.phase !== "over" && (el.view.hidden || document.hidden)) setPaused(true);
+    var input = Keys.read(rink.upright);
+    if (input.pause && game && game.phase !== "over") { setPaused(!paused); input.pause = false; }
+    if (lastTime === null) lastTime = now;
+    var passed = Math.min(0.1, (now - lastTime) / 1000);   // (never more than a tenth of a second at once)
+    lastTime = now;
+    if (!running()) { owed = 0; drawBars(); setText(el.info, statusLine()); return; }
+    steer = input.move;
+    ["pass", "shoot", "call", "burst"].forEach(function (b) { if (input[b]) held[b] = true; });
+    owed += passed;
+    var changed = false;
+    while (owed >= G.TICK) {
+      owed -= G.TICK;
+      // A button counts in ONE step; the steering counts in all of them.
+      var events = B.play(game, { move: input.move, pass: held.pass, shoot: held.shoot, call: held.call, burst: held.burst }, G.TICK, dice);
+      held = {};
+      events.forEach(tell);
+      if (events.length) changed = true;
+      if (game.phase === "over") break;
     }
-    var mine = has && !game.over && G.youHavePuck(game);
-    el.go.hidden = !has || game.over || mine;
-    el.go.disabled = busy;
-    showCall();
-    if (!has) el.prompt.textContent = "Choose how the shift starts and your position. Then the play begins.";
-    else if (game.over) el.prompt.textContent = "The shift is over. Press Next shift to play again, or pick another start.";
-    else if (busy) el.prompt.textContent = "Watch the play...";
-    // (Shorter on a phone, where the rink needs the room.)
-    else if (mine) el.prompt.textContent = "You have the puck. Pick a play: the number is its chance to work." +
-      (tall.matches ? "" : " You can also tap a teammate to pass.");
-    else if (game.owner === "us") el.prompt.textContent = "Our " + P.ROLE_NAMES[game.carrier].toLowerCase() + " has the puck. Drag your marker to where you should be. Then press Play on, or call for a pass if you are open.";
-    else el.prompt.textContent = "They have the puck. Drag your marker to where you should defend, then press Play on.";
-    drawChoices();
-    if (!busy) fitToGame();
+    if (changed || game.phase === "over") refresh();
+    setText(el.clock, clockText(game.clock));
+    setText(el.info, statusLine());
+    setText(el.passBtn, game.puck.owner === "them" ? "Check" : "Pass");
+    drawBars();
     draw();
   }
 
-  // "Call for a pass" is there when a teammate has the puck. Its number
-  // changes as you drag: it is the chance a pass to that spot arrives.
-  function showCall() {
-    var chance = game && !busy ? G.callChance(game, target) : null;
-    el.call.hidden = chance === null;
-    el.call.disabled = busy;
-    if (chance !== null) el.call.textContent = "Call for a pass · " + percent(chance);
-  }
-
-  function showSpot() {
-    var s = game && game.lastSpot;
-    el.spot.hidden = !s;
-    if (!s) return;
-    el.spot.className = "pos-result " + s.grade;
-    el.spotGrade.textContent = GRADE_WORDS[s.grade];
-    el.spotFeet.textContent = Math.round(s.feet) + " ft from the best spot";
-    el.spotTip.textContent = s.tip;
-  }
-
-  // ---------- Playing a beat -------------------------------------------
-  function play(input) {
-    if (!game || game.over || busy) return;
-    var before = game, result = G.step(game, input, dice);
-    var after = result.state;
-    // Where everything is when the beat starts (you are already where you dragged to).
-    var from = { us: JSON.parse(JSON.stringify(before.us)), them: before.them, puck: before.puck };
-    if (!G.youHavePuck(before)) from.us[before.you] = G.toward(before.us[before.you], target || before.us[before.you], G.REACH);
-    game = after;
-    busy = true; target = null; preview = null; lastTrail = null;
-    // Keep the whole beat in the picture: where the puck starts, where it goes, and you.
-    fit([before.puck.d].concat(result.events.map(function (e) { return e.puck.d; }), [from.us[before.you].d]));
-    showRings = after.lastSpot ? after.lastSpot.ideal : null;
-    showSpot();
-    refresh();
-    animate(from, { us: after.us, them: after.them, puck: after.puck }, result.events, function () {
-      busy = false;
-      showRings = el.hint.checked ? hintSpot() : null;
-      if (game.over) addLog(game.over.text, game.over.kind);
-      refresh();
-    });
-  }
-
-  // Show the beat: the puck follows what happened, step by step, while
-  // the skaters glide to their new spots.
-  function animate(from, to, events, done) {
-    var said = -1, finished = false;
-    function say(upTo) { while (said < upTo) { said++; addLog(events[said].text); } }
-    // Every spot the puck went through in this beat.
-    var stops = [from.puck].concat(events.map(function (e) { return e.puck; }));
-    function finish() {
-      if (finished) return;
-      finished = true;
-      say(events.length - 1);
-      lastTrail = stops.length > 1 ? stops : null;
-      done();
-    }
-    if (calm.matches || !events.length) { finish(); return; }
-    // Each step takes longer when the puck travels farther.
-    var spans = events.map(function (e, i) {
-      return clamp(260 + 7 * P.feetBetween(i ? events[i - 1].puck : from.puck, e.puck), 420, 950);
-    });
-    var total = spans.reduce(function (a, b) { return a + b; }, 0), began = null;
-    draw(from);
-    function frame(now) {
-      if (finished) return;
-      if (began === null) began = now;
-      var t = now - began, k = 0, sofar = 0;
-      while (k < spans.length - 1 && t > sofar + spans[k]) { sofar += spans[k]; k++; }
-      say(k);
-      var puck = mix(k ? events[k - 1].puck : from.puck, events[k].puck, ease(clamp((t - sofar) / spans[k], 0, 1)));
-      // The line behind the puck: every stop it has passed, then the puck itself.
-      var w = ease(clamp(t / total, 0, 1)), now10 = { us: {}, them: {}, puck: puck, trail: stops.slice(0, k + 1).concat([puck]) };
-      P.ROLES.forEach(function (r) {
-        now10.us[r] = mix(from.us[r], to.us[r], w);
-        now10.them[r] = mix(from.them[r], to.them[r], w);
-      });
-      slide(now10);
-      if (t >= total) finish(); else requestAnimationFrame(frame);
-    }
-    requestAnimationFrame(frame);
-    // If the page is in the background the browser stops drawing; do not get stuck.
-    setTimeout(finish, total + 500);
-  }
-
-  function hintSpot() {
-    if (!game || game.over || G.youHavePuck(game)) return null;
-    var best = G.ideals(game).us[game.you];
-    return { a: best.a, d: best.d };
-  }
-
-  function newShift() {
-    if (busy) return;
-    game = G.newShift(el.start.value, role, dice, game);   // the score carries over
-    target = null; preview = null; lastTrail = null;
-    showRings = el.hint.checked ? hintSpot() : null;
-    el.spot.hidden = true;
-    addLog("Shift " + game.stats.shifts + ": " + game.intro, "shift");
+  function setPaused(next) {
+    if (!game || game.phase === "over") return;
+    paused = next;
+    held = {};
+    Keys.letGo();
     refresh();
   }
-
-  // ---------- Dragging your marker, tapping a teammate ------------------
-  function pointerToRink(ev) { return rink ? rink.toRink(ev) : null; }
-  function moveTo(spot) {
-    if (!spot || !game || game.over || busy || G.youHavePuck(game)) return;
-    target = G.toward(game.us[game.you], spot, G.REACH);
-    var at = { us: JSON.parse(JSON.stringify(game.us)), them: game.them, puck: game.puck };
-    at.us[game.you] = target;
-    draw(at);
-    showCall();
-  }
-  var dragging = false;
-  svg.addEventListener("pointerdown", function (ev) {
-    if (!game || game.over || busy) return;
-    var spot = pointerToRink(ev);
-    if (!spot) return;
-    ev.preventDefault();
-    if (G.youHavePuck(game)) {
-      // Tap a teammate to pass to them.
-      var near = G.nearest(game.us, spot, game.you);
-      if (near.feet <= 7) play({ action: "pass-" + near.role });
-      return;
-    }
-    dragging = true;
-    if (svg.setPointerCapture) { try { svg.setPointerCapture(ev.pointerId); } catch (e) { /* fine */ } }
-    moveTo(spot);
-  });
-  svg.addEventListener("pointermove", function (ev) { if (dragging) moveTo(pointerToRink(ev)); });
-  function stopDrag() { dragging = false; }
-  svg.addEventListener("pointerup", stopDrag);
-  svg.addEventListener("pointercancel", stopDrag);
-
-  // Arrow keys move your marker 3 feet at a time. Enter plays on.
-  svg.addEventListener("keydown", function (ev) {
-    if (!game || game.over || busy || G.youHavePuck(game)) return;
-    // On screen: right = up the ice when the rink lies down, up = up the ice when it stands.
-    var step = rink.upright
-      ? { ArrowLeft: [-3, 0], ArrowRight: [3, 0], ArrowUp: [0, 3], ArrowDown: [0, -3] }[ev.key]
-      : { ArrowLeft: [0, -3], ArrowRight: [0, 3], ArrowUp: [-3, 0], ArrowDown: [3, 0] }[ev.key];
-    if (step) {
-      ev.preventDefault();
-      var now = target || game.us[game.you];
-      moveTo({ a: clamp(now.a + step[0], 3, 82), d: clamp(now.d + step[1], 3, 197) });
-    } else if (ev.key === "Enter") {
-      ev.preventDefault();
-      play({ moveTo: target });
-    }
-  });
-
-  // ---------- Buttons and choosers -------------------------------------
-  G.STARTS.forEach(function (s) {
-    var o = document.createElement("option");
-    o.value = s.id; o.textContent = s.name;
-    el.start.appendChild(o);
-  });
-  var roleButtons = document.querySelectorAll("[data-grole]");
-  function syncRole() {
-    Array.prototype.forEach.call(roleButtons, function (b) {
-      b.setAttribute("aria-pressed", String(b.getAttribute("data-grole") === role));
-    });
-  }
-  Array.prototype.forEach.call(roleButtons, function (b) {
-    b.addEventListener("click", function () { role = b.getAttribute("data-grole"); syncRole(); });
-  });
-  // Picking a start where we have the puck puts YOU on the puck (you can still change it).
-  el.start.addEventListener("change", function () {
-    var s = G.STARTS.filter(function (x) { return x.id === el.start.value; })[0];
-    if (s && s.carrier) { role = s.carrier; syncRole(); }
-  });
-  el.begin.addEventListener("click", newShift);
-  $("game-reset").addEventListener("click", function () {
-    if (busy) return;
-    game = null; target = null; preview = null; showRings = null; lastTrail = null;
+  function newGame() {
+    game = G.newGame({ you: role, age: Number(el.age.value), minutes: minutes });
+    paused = false; owed = 0; held = {}; barTall = 0;
     el.log.textContent = "";
-    el.spot.hidden = true;
+    addLog("A new game: ages " + game.lv.name + ", you are the " + P.ROLE_NAMES[role].toLowerCase() + ". Face-off at center.", "start");
+    setText(el.clock, clockText(game.clock));
+    if (Sound) Sound.wake();        // (the browser lets us make sound now: you just pressed a button)
+    build();
     refresh();
-  });
-  el.go.addEventListener("click", function () { play({ moveTo: target }); });
-  el.call.addEventListener("click", function () { play({ moveTo: target, call: true }); });
-  el.hint.addEventListener("change", function () {
-    if (!busy) { showRings = el.hint.checked ? hintSpot() : null; draw(); }
-  });
-  function rebuild() { if (!busy) build(); }
-  if (tall.addEventListener) tall.addEventListener("change", rebuild); else if (tall.addListener) tall.addListener(rebuild);
+    // On a phone, bring the rink to the top so the rink and the controls are both on screen.
+    if (tall.matches && el.view.scrollIntoView) el.view.scrollIntoView({ block: "start" });
+  }
+  function endGame() {
+    game = null; paused = false;
+    clearTimeout(callTimer);
+    el.call.classList.remove("show");
+    el.log.textContent = "";
+    setText(el.clock, clockText(minutes * 60));
+    Keys.letGo();
+    refresh();
+    draw();
+  }
 
-  syncRole();
+  // ---------- Buttons and choosers ----------------------------------------------------
+  G.AGE_NAMES.forEach(function (name, i) {
+    var o = document.createElement("option");
+    o.value = String(i);
+    o.textContent = "Ages " + name.replace("-", " to ").replace("+", " and up");
+    if (i === 2) o.selected = true;
+    el.age.appendChild(o);
+  });
+  function group(attr, read, write) {
+    var buttons = document.querySelectorAll("[" + attr + "]");
+    function sync() {
+      Array.prototype.forEach.call(buttons, function (b) { b.setAttribute("aria-pressed", String(b.getAttribute(attr) === String(read()))); });
+    }
+    Array.prototype.forEach.call(buttons, function (b) {
+      b.addEventListener("click", function () { write(b.getAttribute(attr)); sync(); });
+    });
+    sync();
+  }
+  group("data-grole", function () { return role; }, function (v) { role = v; });
+  group("data-gmin", function () { return minutes; }, function (v) { minutes = Number(v); if (!game) setText(el.clock, clockText(minutes * 60)); });
+  el.begin.addEventListener("click", newGame);
+  el.pause.addEventListener("click", function () { setPaused(!paused); });
+  el.cardGo.addEventListener("click", function () { setPaused(false); });
+  el.end.addEventListener("click", endGame);
+  if (el.sound && Sound) {
+    el.sound.addEventListener("click", function () { Sound.wake(); Sound.set(!Sound.on()); });
+    Sound.onChange(showSound);
+  }
+  showSound();
+
+  Keys.attach({
+    // The keys and the touch buttons belong to the game while a game is on and this tab is showing.
+    active: function () { return !!game && game.phase !== "over" && !el.view.hidden; },
+    stickArea: $("game-stick"), base: $("game-stick-base"), knob: $("game-stick-knob"),
+    buttons: { pass: el.passBtn, shoot: $("game-btn-shoot"), call: $("game-btn-call"), burst: $("game-btn-burst") }
+  });
+  document.addEventListener("visibilitychange", function () { if (document.hidden) setPaused(true); });
+
+  function rebuild() { barTall = 0; build(); }
+  if (tall.addEventListener) tall.addEventListener("change", rebuild); else if (tall.addListener) tall.addListener(rebuild);
+  window.addEventListener("resize", function () { barTall = 0; });
+
+  setText(el.clock, clockText(minutes * 60));
   build();
   refresh();
-  window.CoachGameUI = { state: function () { return game; } };   // for checking in the browser
+  requestAnimationFrame(frame);
+  // For checking in the browser.
+  window.CoachGameUI = { state: function () { return game; }, paused: function () { return paused; },
+                         start: newGame, setDice: function (d) { dice = d; } };
 })();
