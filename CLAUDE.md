@@ -28,6 +28,9 @@ team leader) for the Presidential SI Challenge. All work happens on the
   the times and the curve from the top of `style.css` (`--t-press`,
   `--t-switch`, `--t-panel`, `--ease`). Short, no bounce, only
   `transform` and `opacity` move, and "reduce motion" gets fades only.
+  The live Game is the one place where things must move to work. With
+  "reduce motion" it still plays, but without extras: the camera steps
+  instead of gliding and the whistle ring only fades.
 - Keep code comments in plain language a 3rd grader's parent can read
   aloud with them.
 - Keep all tests passing:
@@ -42,11 +45,16 @@ team leader) for the Presidential SI Challenge. All work happens on the
   `node tests/rebuild.test.js` (added in Phase 15),
   `node tests/ui.test.js` (added in Phase 16),
   `node tests/chart.test.js` (added in Phase 17),
-  `node tests/theme.test.js` (added in Phase 19).
+  `node tests/theme.test.js` (added in Phase 19),
+  `node tests/gamebrain.test.js`, `node tests/controls.test.js`,
+  `node tests/sound.test.js` (added in Phase 21).
   Add tests for new math.
-- Do not break the Positioning tab. The Game tab is a separate game
-  (`js/gamesim.js` = rules and chances, `js/game.js` = the page); it
-  reuses the playbook in `js/positions.js` but never changes it.
+- Do not break the Positioning tab. The Game tab is a separate, live
+  game (`js/gamesim.js` = the rules, `js/gamebrain.js` = the computer
+  players, `js/controls.js` = keys, joystick and controller,
+  `js/sound.js` = the whistle, `js/game.js` = the page); it reuses the
+  playbook in `js/positions.js` but never changes it. Every game step
+  must give the same result from the same seed, so it can be tested.
 - Phone first: every tab must work at 375 px wide with no sideways
   scrolling, and everything you tap is at least 44 px tall.
 - Any outside asset must be free to use and listed in `SOURCES.md` with

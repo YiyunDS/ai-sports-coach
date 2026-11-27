@@ -72,10 +72,12 @@ or text from them.
 | Movement must have a purpose, be short, and never be the only way to learn something | Apple Human Interface Guidelines, "Motion", https://developer.apple.com/design/human-interface-guidelines/motion |
 | A list of the signs that make a page look machine-made (glows, washes of color, LABELS IN CAPITALS, uneven spaces, badges everywhere), and the order to fix them in: spaces, color, icons, words, letters, layout, details, pictures, movement | "unslop" by Damir Sokolovsky (@heydamir), https://github.com/heydamir/unslop , license CC BY 4.0 (read on 2026-11-21). We checked our page against its lists in Phase 18 and wrote our own four rules from them at the top of `style.css`. We copied none of its code or pictures. |
 | A second look for the page, "Sunset": purple dusk, teal and hot pink, a low sun and palm trees | The 1980s-Miami look of the "Vice City" games by Rockstar Games ("Grand Theft Auto: Vice City" and "Grand Theft Auto VI"), which the team leader named on 2026-11-21 as the look to aim for. We took only the IDEA of the colors and of a sunset with palm trees. No logo, font, name, character, picture, music or code of the games is used. The sky, the sun and the palm trees are drawn by our own code in `js/scene.js`, the colors are our own choice in `js/theme.js` and `style.css`, and on the page the look is called "Sunset". |
+| The live Game's controls: a joystick with action buttons on a touch screen, a second meaning for a button on defense, and a power bar you stop with a tap | These are common to many sports video games (the team leader named the "FIFA" soccer games by EA Sports on 2026-11-26 as the kind of game to aim for). We took only the IDEA of that way of playing. No name, logo, picture, sound or code of any game is used, and no game is named on the page. The rules are hockey rules, the players and the rink are our own drawings, and the whistle is made by our own code in `js/sound.js`. |
 
 ## Hockey rules used in the Referee game
 
 We wrote the plays and the explanations ourselves. The rules they teach come from these pages (read on 2026-11-19):
+The live Game (version 21) calls offside and icing by these same rules, at every age group.
 
 | What we used | Where it came from |
 |---|---|

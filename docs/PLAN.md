@@ -1185,6 +1185,180 @@ with it, not only the page.
   until the next picture is drawn. Seen while checking this phase; not
   looked into yet.
 
+### Phase 20: The "As filmed" choice is removed (done)
+
+The team leader asked to delete "As filmed" from the video analysis.
+
+- "As filmed" was one of two buttons in the "You" switch
+  (`Smooth stride | As filmed`). With one button left a switch makes
+  no sense, so the whole switch is gone. Your skater is always the
+  smooth stride, rebuilt from all the good pictures.
+- Kept, hidden: the picture-by-picture drawing is still what the page
+  falls back to when a clip has fewer than 3 good pictures (then no
+  stride can be rebuilt), and what `?dev` measuring mode shows. The
+  note under the report says so in plain words when that happens.
+- Changed: `index.html` (the switch), `js/coach.js` (`smoothOn()`,
+  `showKidNote()`), `README.md`. No measuring code was touched.
+- Checked: the sample session at 1280 and 375 wide in both looks; a
+  session whose stride cannot be rebuilt; `?dev`; all tests. Compared
+  with version 19, every element of the Form, Positioning and Referee
+  tabs has the same colors, sizes and place; the only difference is
+  the missing switch. The real test clip, alone, is checked together
+  with Phase 21 (see there).
+- The sign-size slip noted under Phase 19 was only seen in "As
+  filmed", so you can no longer run into it by choosing that view.
+- Pictures: `docs/screenshots/phase20/`. Version 20.0.
+
+### Phase 21: The Game becomes a live hockey game (done, first version)
+
+The team leader asked for a referee who blows the whistle on an offside
+and on a goalie save, and then for much more: a game you control
+directly, like a sports video game. WASD on a keyboard, a joystick on a
+phone or iPad, no more beats where the play stops, buttons on the last
+key of each keyboard row (`-` pass, `P` shoot, `L` call for a pass, `M`
+stickhandle to the net), and offside for everyone on the ice.
+
+**Decided with the team leader (the brainstorm):**
+- You control one skater all game. A real game with a clock (2, 3 or
+  5 minutes), face-offs, Pause, a summary at the end.
+- On defense `-` is a stick check. No body checks.
+- `M` is a quick move past a defender: fast for a moment, then slow.
+- Touch: one joystick and four buttons.
+- A pass goes to the teammate you steer toward; a thin line shows who.
+- Difficulty comes from the age group you pick: seven groups of two
+  years, 4-5 up to 16+. The same rules at every age.
+- A power bar and a height bar, set with two taps on Pass or Shoot.
+- Icing is called. A game controller works.
+- The whistle is a real sound with an off button. On a save it blows
+  only when the goalie covers the puck.
+- Not chosen, so not built: a best-spot ring with a position score,
+  and practice starts. The old beat-by-beat Game (Phase 12) is deleted.
+
+**What was built:**
+- `js/gamesim.js`, rewritten: the rules. The game moves in steps of
+  1/60 second. Skaters speed up, glide and stop; the puck sits on a
+  stick, slides, flies and bounces off the round boards. Passes,
+  shots, the two bars, the stick check, the quick move, goalies that
+  follow the puck, goals, offside, icing, covers, rebounds, face-offs,
+  the referee's spot, and the table of dials for the seven age groups.
+  The playbook and the chance formulas of the old game are kept and
+  used by the computer players.
+- `js/gamebrain.js`, new: the computer players. They skate to their
+  playbook spot, one goes at the puck, the carrier picks a play. On
+  purpose, now and then, a forward crosses the blue line early and a
+  pressured defender ices the puck (how often depends on the age).
+- `js/controls.js`, new: keys (read by where they sit, so any keyboard
+  language works), the touch joystick and buttons, a game controller.
+- `js/sound.js`, new: the whistle, made by the browser from a recipe of
+  numbers (two close high notes with a flutter). No sound file.
+- `js/game.js`, rewritten: the loop, the drawing, the phone camera, the
+  bars, the scoreboard with the clock, the call in big letters, the
+  ring around the referee, Pause, the end card.
+- The rule for movement got one sentence (in `CLAUDE.md` and
+  `js/ui.js`): the live Game is the one place where things must move to
+  work; with "reduce motion" it still plays, without the extras.
+
+**What the tests caught while building** (so they earned their keep):
+- The "good" part of the height bar could send a shot over the net for
+  the youngest group. Fixed: its top is now just under the crossbar.
+- From the blue line an open shot scored 25%, far too often. Goalies
+  now get time to see a shot from far away (9% at ages 10-11).
+- A skater who had just passed the puck back at the blue line counted
+  as offside while a skate was still on the line. A skater now counts
+  as inside only a foot and a half past the line (both skates over).
+- Computer teammates passed the puck on in the same instant they got
+  it. A new carrier now holds it for a moment.
+- The before/after record of every element showed that my new class
+  name "bar" had shifted the page's top bar on all four tabs. Renamed.
+
+**Checked:**
+- 17 test files pass. New: 45 checks of the rules (every offside and
+  icing case, saves, goals, bars, passes, checks, face-offs), 13 of
+  the computer players (including 28 whole games with only computer
+  players, 4 at each age), 7 of the controls, 4 of the sound.
+- In the test browser with real key presses at 1280x800, both looks:
+  the face-off as center, skating, both bars with two taps, the pass
+  to the teammate I steer toward, a shot, the quick move, the stick
+  check, calling for a pass, an offside and an icing set up on
+  purpose (words, big call, ring, one whistle each), Esc, the Pause
+  button, another tab and a hidden page all pause it, the end card,
+  Sound off and remembered.
+- With fingers at 375x812 and 820x1180, both looks: the joystick, a
+  second finger on Shoot while the thumb steers, the rink and all
+  controls on one screen, dragging on the joystick or the rink does
+  not scroll the page, "Check" on defense, every button at least
+  44 px, no words under 11 px, no sideways scrolling.
+- A pretend controller: the stick, a button held down counts once,
+  Start pauses.
+- The whistle rendered by the browser's offline sound maker and
+  measured: 0.39 s long, peak 0.11 of full volume, about 2,270 hertz,
+  as the recipe says. One whistle per call was counted.
+- "Reduce motion": the camera moved in 2 steps where it otherwise took
+  18 positions, and the ring only fades. With saving blocked the game
+  and the Sound button still work.
+- Speed, on this computer only: a picture every 16.7 ms (60 a second),
+  one game step takes about 0.01 ms.
+- Positioning and Referee tabs: every element the same as in version
+  19, in both looks, at 1280 and 375 wide. At 1440x900 no tab scrolls
+  sideways.
+- The real test clip, alone (the video analysis, because `js/coach.js`
+  changed in Phase 20): 9 good pictures, 126 / 32 / 174, 3 of 3 on
+  target, no errors. The untouched version 19, run the same way right
+  after, gave exactly the same. So the measuring did not change. These
+  numbers are lower than the 20 pictures and 131 / 27 / 180 noted in
+  Phase 19: the test-browser scripts of that day were lost and I wrote
+  new ones (another click point on the skater, maybe other browser
+  settings). I have not looked into which of those makes the
+  difference. The pictures stay in `local-videos/screenshots/phase21/`.
+- In the app's own Browser pane: version 21.0 loads with no errors and
+  a game starts. That pane draws only about one picture a second while
+  it is in the background, so real-time play was looked at in the test
+  browser, not there.
+- A pretend child played 12 games at each age group (it chases the
+  puck, heads for the net, shoots from close, taps the bars at random
+  moments):
+
+  | Age group | Score, us-them | Won of 12 | Offside against us |
+  |---|---|---|---|
+  | 4-5 | 8.1 - 0.0 | 12 | 4.8 |
+  | 6-7 | 5.4 - 0.0 | 12 | 2.3 |
+  | 8-9 | 4.0 - 0.3 | 9 | 2.8 |
+  | 10-11 | 3.0 - 0.6 | 9 | 3.3 |
+  | 12-13 | 1.4 - 1.3 | 5 | 2.3 |
+  | 14-15 | 1.5 - 1.8 | 6 | 1.9 |
+  | 16+ | 1.2 - 2.9 | 2 | 1.3 |
+
+  A second pretend child that waits at the blue line and looks before
+  passing had 0.3 to 1.5 offsides a game instead of 2 to 4. So looking
+  first really pays, which is the lesson the team leader asked for.
+
+**Limits, said plainly:**
+- Nobody has played it by hand yet. The numbers above come from
+  computer players and scripted key presses. How it FEELS (speed, how
+  hard the bars are, how often the whistle blows) has to be judged by
+  the kids, so expect one round of tuning. All the dials are in one
+  table at the top of the age-group part of `js/gamesim.js`.
+- Not tried on a real phone, a real iPad or a real controller. I
+  cannot hear the whistle; an iPhone's mute switch also silences it.
+- There are still many whistles: about 12 to 18 stops in a 3-minute
+  game for a careless player (goals, offsides, covers), each followed
+  by a face-off of about 4 seconds.
+- The two-tap bars take time, and the game does not wait. For the
+  youngest groups the marks run slowly, but a 4-year-old may still
+  find two taps hard. An easier one-tap way was offered and not chosen.
+- One period, no penalties, no line changes, no body checks. Our
+  goalie is played by the computer. A goal only counts for a puck that
+  was passed or shot: skating the puck into the goalie gives a cover.
+- Offside is the "immediate" rule at every age, judged from the middle
+  of a skater a foot and a half past the line, not from each skate as
+  the Referee tab does. Icing is called the moment the puck crosses
+  the goal line.
+- On a phone the camera follows the puck. When that leaves you outside
+  the picture, an arrow at the edge shows where you are.
+- The best-spot lesson of the old Game is gone from this tab (it stays
+  in Positioning), and so is the old game itself.
+- Pictures: `docs/screenshots/phase21/`. Version 21.0.
+
 ### Phase 5: Check the pro against a real skater (needs a video)
 
 - Run a good side-view video of a strong skater through the Phase 1

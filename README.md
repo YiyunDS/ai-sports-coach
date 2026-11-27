@@ -111,20 +111,31 @@ The spots come from common youth-hockey coverage, and coaches use different syst
 
 ### Game (the third tab)
 
-The **Game** tab is the positioning board brought to life: a whole shift on the whole rink, where what happens next is decided by **chance**, like in real hockey.
+The **Game** tab is a live hockey game on the whole rink. You skate **one skater** yourself for the whole game. The computer plays your four teammates, the other team and both goalies. Nothing stops between plays: the play only stops when the referee blows the whistle.
 
-1. Pick **how the shift starts** (for example "Their blue line: our defense has the puck") and **your position**, then press **Start shift**.
-2. **When you have the puck**, pick a play: pass to a teammate, stickhandle, shoot, or dump it in. Every play shows its chance to work. You can also tap a teammate on the rink to pass.
-3. **When you do not have the puck**, drag your orange marker to where you should be (the dashed circle is how far you can skate in one beat), then press **Play on**. If a teammate has the puck and you are open, you can **Call for a pass** instead.
-4. Watch the play and read the **play-by-play**. After every beat the game tells you how good your spot was and what your job is.
+1. Pick your **age group** (4 to 5 years up to 16 and up), your **position** and how many **minutes** to play, then press **Start game**.
+2. **Skate** with `W` `A` `S` `D` (or the arrow keys). On a phone or tablet a joystick appears under your left thumb. A game controller works too.
+3. The buttons are the last key of each row of the keyboard: `-` **pass**, `P` **shoot**, `L` **call for a pass**, `M` a **quick move** past a defender. When the other team has the puck, `-` is a **stick check**. `Esc` pauses. On a touch screen the same four buttons sit on the right.
+4. A pass or a shot takes **two taps**, with **two bars**. While you have the puck a mark runs up and down the **Power** bar. The first tap stops it. Then a mark runs on the **Height** bar; the second tap stops that one and sends the puck. Green is the good part of each bar. A soft pass is easy to pick off and a very hard one is hard to catch. A lifted pass flies over a stick. A high shot can beat the goalie, but too high goes over the net.
+5. A **pass goes to the teammate you are steering toward**. A thin line shows who that is.
 
-A shift ends with a goal, a whistle (the goalie covers the puck, or offside) or a line change after 12 beats. The score carries on to the next shift.
+**The referee** (the striped marker) blows the whistle for:
 
-Why chance? Nobody can know if one shot will go in. But over many tries, a short pass to an open teammate works much more often than a long pass past a defender, and a shot from the slot scores much more often than a shot from the corner. Good hockey is picking the play with the best chance. The same pass from the blue line can end with our forward scoring, or with a missed shot, a rebound to the other team and a rush at our net.
+- **Offside**: an attacker is inside the other team's blue line before the puck. This goes for everyone: you, your teammates and the other team. So look before you carry or pass the puck in. The player with the puck may cross ahead of it.
+- **Icing**: a puck sent from a team's own half goes all the way over the far goal line and nobody touches it.
+- **A save the goalie covers.** After a rebound there is no whistle, play goes on.
+- **A goal.**
 
-- Where everybody should be comes from the same playbook as the Positioning tab (`js/positions.js`), plus patterns for the rush, the backcheck and the forecheck.
-- Being in the right spot matters: you are open for passes, and the other team's shots get harder.
-- The chances are our own estimates, not measured from real games. They are in `js/gamesim.js` and are easy to change. `node tests/gamesim.test.js` plays thousands of shifts to check that the game stays fair and that good positioning and passing really pay off.
+After every whistle there is a face-off. If you are the center, tap Pass the moment the puck drops. The whistle is a real sound (made by the browser, there is no sound file); the **Sound** button turns it off.
+
+**The age groups** have the same rules. Older groups are harder: the other team skates and decides faster, their goalie stops more, the marks on your bars run faster with a smaller green part, and computer players go offside or ice the puck more often. For the three youngest groups the pass line turns red when that pass would be offside.
+
+Why chance? Nobody can know if one shot will go in. A goalie who is in the right place stops most pucks, but not all. So the game still rolls dice, the way real hockey does.
+
+- Where the computer players skate comes from the same playbook as the Positioning tab (`js/positions.js`), plus patterns for the rush, the backcheck and the forecheck.
+- The numbers (speeds, chances, how often computer players make mistakes) are our own choices, not measured from real games. They are at the top of the age-group part of `js/gamesim.js` and are easy to change.
+- `node tests/gamesim.test.js` and `node tests/gamebrain.test.js` check the rules one by one and play whole games with only computer players at every age group.
+- Not in the game: penalties, line changes, body checks, more than one period. Our goalie is played by the computer. Until version 20 this tab was a slower game played one move at a time; it was replaced in version 21.
 
 ### Referee (the fourth tab): You make the call
 
@@ -138,7 +149,7 @@ The rules are the USA Hockey rules for players 12 and under: the whistle blows r
 
 ### On a phone
 
-Every tab works on a phone: nothing scrolls sideways, and everything you tap is at least 44 pixels tall. The four tabs sit at the bottom of the screen, where your thumb is. In Form analysis the 3D picture gets smaller once there is a report and stays at the top of the screen while you read, so the answer is on the first screen and you still see the skaters when you tap a card. The tool bar shows only **Side by side / Overlay**; **More** opens the rest. In the Game and the Referee tab the rink stands up, and your buttons sit in a sheet just above the tabs so you see the rink and the buttons together. In the Game the picture follows the puck, so the markers stay big enough for a finger. On a narrow screen the pictures are made simpler instead of smaller: next to your skater the pro shows only its name (tap a card to see the pro's number for that joint), and in the Referee tab the players are plain dots.
+Every tab works on a phone: nothing scrolls sideways, and everything you tap is at least 44 pixels tall. The four tabs sit at the bottom of the screen, where your thumb is. In Form analysis the 3D picture gets smaller once there is a report and stays at the top of the screen while you read, so the answer is on the first screen and you still see the skaters when you tap a card. The tool bar shows only **Side by side / Overlay**; **More** opens the rest. In the Game and the Referee tab the rink stands up. In the Referee tab your buttons sit in a sheet just above the tabs. In the Game the joystick and the four buttons sit right under the rink, so the rink and the controls are on one screen, and the picture follows the puck, so the markers stay big enough to see. On a narrow screen the pictures are made simpler instead of smaller: next to your skater the pro shows only its name (tap a card to see the pro's number for that joint), and in the Referee tab the players are plain dots.
 
 ### Two looks: Rink and Sunset
 
@@ -176,8 +187,11 @@ The goal angles live in [`targets.json`](targets.json). There is one set for eac
 | `js/scene.js` | The rink (real size, with boards and glass), lights, camera, the pro skater, and moving the skaters |
 | `js/tracker.js` | Follows the one skater you clicked through the video |
 | `js/coach.js` | Reads your video, finds your pose, makes the report and replay |
-| `js/gamesim.js` | The simulation game: where everyone should be for any puck position, and the chances for passes, stickhandling and shots |
-| `js/game.js` | The simulation game on the page: the rink, your choices, the play-by-play |
+| `js/gamesim.js` | The live hockey game: the rules (skating, the puck, passes, shots, the two bars, goalies, goals, offside, icing, face-offs), the seven age groups, the playbook for any puck position, and the chances |
+| `js/gamebrain.js` | The live hockey game: the computer players (where they skate, what they do with the puck, and the mistakes they make on purpose) |
+| `js/controls.js` | The live hockey game: keys, the touch joystick and buttons, and a game controller, all turned into one "which way" arrow and four buttons |
+| `js/sound.js` | The referee's whistle, made by the browser from a recipe of numbers (no sound file), and the Sound button |
+| `js/game.js` | The live hockey game on the page: the loop, the rink, the bars, the scoreboard, the play-by-play |
 | `js/positions.js` | The playbook: where each position should stand in each situation |
 | `js/board.js` | The positioning board you drag your marker on |
 | `tests/angles.test.js` | Checks the math. Run `node tests/angles.test.js` |
@@ -188,7 +202,10 @@ The goal angles live in [`targets.json`](targets.json). There is one set for eac
 | `js/refplays.js` | The Referee game: builds short plays and judges them from the rule book (offside, icing) |
 | `js/ref.js` | The Referee game on the page: the little movie, your call, the zoomed-in reason, the score |
 | `tests/refplays.test.js` | Checks the Referee game: the judge agrees with 9,000 built plays. Run `node tests/refplays.test.js` |
-| `tests/gamesim.test.js` | Checks the simulation game: the playbook, the chances, and thousands of whole shifts. Run `node tests/gamesim.test.js` |
+| `tests/gamesim.test.js` | Checks the rules of the live game: the playbook, the chances, skating, the bars, passes, every offside and icing case, saves, goals, the stick check, face-offs. Run `node tests/gamesim.test.js` |
+| `tests/gamebrain.test.js` | Checks the computer players, and plays whole games with only computer players at every age group. Run `node tests/gamebrain.test.js` |
+| `tests/controls.test.js` | Checks the math of the keys, the joystick and the controller. Run `node tests/controls.test.js` |
+| `tests/sound.test.js` | Checks the whistle's recipe (short, quiet, as high as a real whistle). Run `node tests/sound.test.js` |
 | `tests/cleanup.test.js` | Checks the clean-up of video poses (smoothing, fixed bones, skates on the ice). Run `node tests/cleanup.test.js` |
 
 ### Good to know
