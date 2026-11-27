@@ -28,7 +28,11 @@ test("two keys at once: a slanted arrow, but not a faster one", function () {
   // Keys we do not know do nothing.
   assert.deepStrictEqual(C.fromKeys({ KeyQ: true, Space: true }), { x: 0, y: 0 });
 });
-test("the buttons are the last key of each row: - P L M", function () {
+test("the buttons are the last key of each row: - P L M, and the space bar takes", function () {
+  assert.strictEqual(C.ACTION_KEYS.Space, "take");
+  // Only ONE key takes, and the key that passes does not.
+  var takers = Object.keys(C.ACTION_KEYS).filter(function (k) { return C.ACTION_KEYS[k] === "take"; });
+  assert.deepStrictEqual(takers, ["Space"]);
   assert.strictEqual(C.ACTION_KEYS.Minus, "pass");
   assert.strictEqual(C.ACTION_KEYS.KeyP, "shoot");
   assert.strictEqual(C.ACTION_KEYS.KeyL, "call");
@@ -64,7 +68,14 @@ test("a controller's stick: a small dead part, then up to full", function () {
   near(len(C.fromPad(1, 1)), 1, 1e-9, "a stick pushed into the corner is still length 1");
   assert.deepStrictEqual(C.fromPad(undefined, undefined), { x: 0, y: 0 });
   assert.strictEqual(C.PAD_BUTTONS[0], "pass");
+  assert.strictEqual(C.PAD_BUTTONS[1], "shoot");
+  assert.strictEqual(C.PAD_BUTTONS[2], "take");
   assert.strictEqual(C.PAD_BUTTONS[9], "pause");
+  // Every button of the game can be reached from the keyboard and from a controller.
+  C.ACTIONS.forEach(function (action) {
+    assert.ok(Object.keys(C.ACTION_KEYS).some(function (k) { return C.ACTION_KEYS[k] === action; }), "no key for " + action);
+    assert.ok(Object.keys(C.PAD_BUTTONS).some(function (k) { return C.PAD_BUTTONS[k] === action; }), "no controller button for " + action);
+  });
 });
 
 // ---- Putting it together ----

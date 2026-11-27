@@ -163,7 +163,11 @@ function run(s, seconds, input, dice, intents, until) {
 }
 // A button is "pressed" in one step only; the steering stays.
 function keepMoving(input) { return input && input.move ? { move: input.move } : {}; }
-function kinds(events) { return events.map(function (e) { return e.kind; }); }
+// What you would read in the play-by-play. (The quiet notes for the
+// coach's report, like "pass" and "catch", are left out here.)
+var LOUD = ["goal", "save", "cover", "offside", "icing", "faceoff", "steal", "end"];
+function kinds(events) { return events.map(function (e) { return e.kind; }).filter(function (k) { return LOUD.indexOf(k) >= 0; }); }
+function notes(events, kind) { return events.filter(function (e) { return e.kind === kind; }); }
 function everybodyOnTheIce(s, what) {
   ["us", "them"].forEach(function (t) { ROLES.forEach(function (r) { onTheIce(s[t][r], what + " " + t + " " + r); }); });
   assert.ok(s.puck.a >= 0 && s.puck.a <= 85 && s.puck.d >= 0 && s.puck.d <= 200, what + ": the puck left the rink");
@@ -513,9 +517,9 @@ function shootFromSlot(diceList, rest, lift) {
   put(s, "us", "C", 42.5, 160);
   G.gain(s, "us", "C");
   for (var i = 0; i < 30; i++) G.tick(s, {}, null, DT, dice);    // let the goalie get set
-  G.tick(s, { auto: true }, { us: { C: { move: { a: 0, d: 0 }, act: { kind: "shoot", power: 0.7, lift: lift === undefined ? 0.5 : lift, side: 1 } } } }, DT, dice);
+  var first = G.tick(s, { auto: true }, { us: { C: { move: { a: 0, d: 0 }, act: { kind: "shoot", power: 0.7, lift: lift === undefined ? 0.5 : lift, side: 1 } } } }, DT, dice);
   var ev = run(s, 3, { auto: true }, dice, null, function (s, ev) { return ev.length > 0; });
-  return { s: s, ev: ev };
+  return { s: s, ev: ev, first: first };
 }
 test("a shot the goalie stops and covers: whistle, and a face-off in that end", function () {
   var r = shootFromSlot([0.5, 0.5, 0, 0]);
@@ -584,62 +588,251 @@ test("over many shots: the slot beats the corner, and a better goalie stops more
   assert.ok(slot > 0.08 && slot < 0.6, "never a sure thing, never hopeless: " + slot);
 });
 
-// ---------- The stick check ---------------------------------------------------------------
-test("a stick check works from close, not from far, and a miss leaves you slow", function () {
-  function check(dist, roll) {
-    var s = quiet("C");
-    put(s, "them", "C", 50, 60); G.gain(s, "them", "C");
-    var me = put(s, "us", "C", 50, 60 - dist);                   // in front of them (they skate down the ice)
-    var ev = G.tick(s, { pass: true }, null, DT, rolls([roll, 0]));
-    return { ev: ev, s: s, me: me };
-  }
-  var won = check(4, 0);
+// ---------- Take: taking the puck away ---------------------------------------------------------
+// Their center has the puck at (50, 60), skating down the ice. You stand
+// "dist" feet in front of them and press Take.
+function take(dist, roll, input) {
+  var s = quiet("C");
+  put(s, "them", "C", 50, 60); G.gain(s, "them", "C");
+  var me = put(s, "us", "C", 50, 60 - dist);
+  var ev = G.tick(s, input || { take: true }, null, DT, rolls([roll, 0]));
+  return { ev: ev, s: s, me: me };
+}
+test("take: from close it wins the puck, and the game says who took it from whom", function () {
+  var won = take(4, 0);
   assert.deepStrictEqual(kinds(won.ev), ["steal"]);
   assert.strictEqual(won.s.puck.owner, "us"); assert.strictEqual(won.s.puck.carrier, "C");
   assert.strictEqual(won.s.stats.steals.us, 1);
-  var missed = check(4, 0.99);
+  var e = won.ev[0];
+  assert.strictEqual(e.team, "us"); assert.strictEqual(e.role, "C"); assert.strictEqual(e.from, "C");
+  assert.strictEqual(e.text, "You take the puck away.");
+});
+test("take: from too far away nothing is taken, and the game notes \"far\"", function () {
+  [5.5, 8, 12, 60, 150].forEach(function (dist) {
+    var far = take(Math.min(dist, 55), 0);            // (the best dice there are)
+    if (dist > 55) put(far.s, "us", "C", 50, 190);     // the other end of the rink
+    assert.strictEqual(far.s.puck.owner, "them", "taken from " + dist + " ft away");
+    assert.deepStrictEqual(kinds(far.ev), []);
+    var n = notes(far.ev, "take");
+    assert.strictEqual(n.length, 1); assert.strictEqual(n[0].result, "far");
+    assert.ok(n[0].feet > G.TAKE_REACH);
+  });
+  assert.strictEqual(G.TAKE_REACH, 5);
+  // Close enough is close enough, right up to the edge of the reach.
+  assert.strictEqual(take(4.9, 0).s.puck.owner, "us");
+});
+test("take: a miss leaves you slow for a moment, and you cannot hammer the key", function () {
+  var missed = take(4, 0.99);
   assert.deepStrictEqual(kinds(missed.ev), []);
+  assert.strictEqual(notes(missed.ev, "take")[0].result, "miss");
   assert.strictEqual(missed.s.puck.owner, "them");
   assert.ok(missed.me.slow > 0, "a miss costs you a moment");
-  var far = check(12, 0);
-  assert.strictEqual(far.s.puck.owner, "them", "too far away to reach");
-  // You cannot hammer the button: there is a short wait between checks.
-  var again = G.tick(missed.s, { pass: true }, null, DT, rolls([0, 0]));
-  assert.deepStrictEqual(kinds(again), []);
+  // Right away again: nothing at all happens (there is a short wait).
+  var again = G.tick(missed.s, { take: true }, null, DT, rolls([0, 0]));
+  assert.deepStrictEqual(again, []);
+  assert.strictEqual(missed.s.puck.owner, "them");
 });
-test("over many checks: from the front beats from behind, and the quick move protects the puck", function () {
-  function rate(behind, burst) {
+test("take: only the Take button takes. Pass, Shoot, Call and the quick move do not", function () {
+  [{ pass: true }, { shoot: true }, { call: true }, { burst: true }, {}].forEach(function (input) {
+    var r = take(3, 0, input);
+    assert.strictEqual(r.s.puck.owner, "them", JSON.stringify(input));
+    assert.deepStrictEqual(r.ev, []);
+  });
+  // And Take does nothing when nobody on the other team has the puck.
+  var s = quiet("C");
+  put(s, "us", "RW", 50, 60); G.gain(s, "us", "RW"); put(s, "us", "C", 50, 57);
+  assert.deepStrictEqual(G.tick(s, { take: true }, null, DT, rolls([0, 0])), []);
+  assert.strictEqual(s.puck.carrier, "RW");
+});
+test("take: \"can I take it?\" is yes only within reach of the puck carrier", function () {
+  assert.strictEqual(G.canTake(take(4, 0.99, {}).s), true);
+  assert.strictEqual(G.canTake(take(9, 0.99, {}).s), false);
+  var s = quiet("C");
+  put(s, "us", "RW", 50, 60); G.gain(s, "us", "RW"); put(s, "us", "C", 50, 57);
+  assert.strictEqual(G.canTake(s), false, "not from a teammate");
+});
+test("over many takes: from the front beats from behind, and the quick move protects the puck", function () {
+  function rate(behind, burst, dist) {
     var wins = 0, dice = G.makeDice(31);
-    for (var i = 0; i < 600; i++) {
+    for (var i = 0; i < 800; i++) {
       var s = quiet("C");
       var c = put(s, "them", "C", 50, 60); G.gain(s, "them", "C");
       if (burst) c.burst = 0.5;
-      put(s, "us", "C", 50, behind ? 64 : 56);
-      G.tick(s, { pass: true }, null, DT, dice);
+      put(s, "us", "C", 50, behind ? 60 + dist : 60 - dist);
+      G.tick(s, { take: true }, null, DT, dice);
       if (s.stats.steals.us) wins++;
+    }
+    return wins / 800;
+  }
+  var front = rate(false, false, 3.7), back = rate(true, false, 3.7), deke = rate(false, true, 3.7), edge = rate(true, false, 4.9);
+  assert.ok(front > back + 0.15, front + " " + back);
+  assert.ok(deke < front * 0.5, deke + " " + front);
+  assert.ok(front > 0.65 && front < 0.92, "usually, not always: " + front);
+  assert.ok(edge > 0.35 && edge < 0.55, "from behind at arm's length it is about a coin flip: " + edge);
+});
+test("the computer players take the same way, and the older the age group the better they are at it", function () {
+  function theirs(age) {
+    var wins = 0, dice = G.makeDice(8);
+    for (var i = 0; i < 600; i++) {
+      var s = quiet("LW", age);
+      put(s, "us", "C", 50, 60); G.gain(s, "us", "C");
+      put(s, "them", "C", 50, 64);
+      G.tick(s, {}, { them: { C: { move: { a: 0, d: 0 }, act: { kind: "check" } } } }, DT, dice);
+      wins += s.stats.steals.them;
     }
     return wins / 600;
   }
-  var front = rate(false, false), back = rate(true, false), deke = rate(false, true);
-  assert.ok(front > back + 0.1, front + " " + back);
-  assert.ok(deke < front * 0.5, deke + " " + front);
-  assert.ok(front < 0.8 && back > 0.05);
+  var young = theirs(0), old = theirs(6);
+  assert.ok(old > young * 2 && young > 0.02 && old < 0.9, young + " " + old);
 });
 
 // ---------- The referee ------------------------------------------------------------------------
-test("the referee stays on the ice, away from the puck, and stands on the blue line for an offside", function () {
+test("while the play goes on the referee is on the ice, by the boards, away from the puck", function () {
   var last = pt(6, 100);
   for (var a = 3; a <= 82; a += 4) {
     for (var d = 3; d <= 197; d += 6) {
-      var r = G.refSpot(pt(a, d), last);
+      var r = G.refSpot(pt(a, d), last, null);
       onTheIce(r, "referee");
+      assert.ok(r.a === 6 || r.a === 79, "by the boards");
       assert.ok(Math.abs(r.a - a) >= 14, "the referee is in the play at " + a + "," + d);
       assert.ok(Math.abs(r.d - d) <= 11, "the referee is too far up or down the ice from the puck");
       last = r;
     }
   }
-  assert.strictEqual(G.refSpot(pt(60, 128), pt(6, 100), "offside").d, 125.5);
-  assert.strictEqual(G.refSpot(pt(60, 72), pt(6, 100), "offside").d, 74.5);
+});
+test("after a whistle the referee goes where a referee belongs", function () {
+  var dot = pt(64.5, 120), by = pt(6, 100);
+  // Offside: on that blue line.
+  assert.strictEqual(G.refSpot(pt(60, 128), by, { phase: "dead", reason: "offside", spot: dot }).d, 125.5);
+  assert.strictEqual(G.refSpot(pt(60, 72), by, { phase: "dead", reason: "offside", spot: pt(64.5, 80) }).d, 74.5);
+  // A goal or a covered puck: beside that net, at the goal line.
+  ["goal", "cover"].forEach(function (why) {
+    var up = G.refSpot(pt(42.5, 189), by, { phase: "dead", reason: why, spot: dot });
+    assert.ok(up.d > 185 && up.d < 189 && Math.abs(up.a - 42.5) > 8 && Math.abs(up.a - 42.5) < 22, why + " " + JSON.stringify(up));
+    var down = G.refSpot(pt(42.5, 11), by, { phase: "dead", reason: why, spot: dot });
+    assert.ok(down.d > 11 && down.d < 15);
+  });
+  // Icing: the face-off is at the far other end, so the referee sets off for that dot at once.
+  var icing = G.refSpot(pt(70, 192), by, { phase: "dead", reason: "icing", spot: pt(64.5, 31) });
+  assert.ok(P.feetBetween(icing, pt(64.5, 31)) <= 5, JSON.stringify(icing));
+});
+test("at a face-off the referee stands right at the dot, a step beside the centers", function () {
+  [[20.5, 31], [64.5, 31], [20.5, 80], [64.5, 80], [20.5, 120], [64.5, 120], [20.5, 169], [64.5, 169], [42.5, 100]].forEach(function (q) {
+    var dot = pt(q[0], q[1]), spots = G.lineUp(dot);
+    ["set", "drop", "draw"].forEach(function (phase) {
+      // Wherever the puck and the referee were before.
+      [pt(6, 20), pt(79, 180)].forEach(function (last) {
+        var r = G.refSpot(pt(42.5, 100), last, { phase: phase, reason: "offside", spot: dot });
+        onTheIce(r, "referee");
+        assert.ok(P.feetBetween(r, dot) <= 5, "the referee is " + P.feetBetween(r, dot).toFixed(1) + " ft from the dot " + q);
+        assert.ok(P.feetBetween(r, spots.us.C) > 3.6 && P.feetBetween(r, spots.them.C) > 3.6, "the referee stands on a center at " + q);
+        ROLES.forEach(function (role) { assert.ok(P.feetBetween(r, spots.us[role]) > 3 && P.feetBetween(r, spots.them[role]) > 3); });
+      });
+    });
+  });
+});
+test("in a game the referee is at the dot when the puck drops, also after a whistle far away", function () {
+  // The very first face-off.
+  var s = G.newGame({ you: "LW", age: 3 }), dice = G.makeDice(4), dropped = false;
+  for (var i = 0; i < 600 && !dropped; i++) {
+    var before = { phase: s.phase, ref: pt(s.ref.a, s.ref.d), dot: s.stop && s.stop.spot };
+    dropped = notes(G.tick(s, {}, null, DT, dice), "faceoff").length > 0;
+    if (dropped) assert.ok(P.feetBetween(before.ref, before.dot) <= 5, "at the first drop the referee is " + P.feetBetween(before.ref, before.dot).toFixed(1) + " ft away");
+  }
+  assert.ok(dropped);
+  // Icing at one end: the face-off is at the far other end, 150 feet away.
+  var s2 = quiet("LW");
+  clearIt(s2, 60);
+  assert.strictEqual(s2.phase, "dead");
+  var at = null, far = 0;
+  for (i = 0; i < 900 && !at; i++) {
+    var was = { ref: pt(s2.ref.a, s2.ref.d), dot: s2.stop && s2.stop.spot, phase: s2.phase };
+    if (was.phase === "dead") far = Math.max(far, P.feetBetween(was.ref, was.dot));
+    if (notes(G.tick(s2, {}, null, DT, G.makeDice(2)), "faceoff").length) at = was;
+    // The referee is already there when the players have lined up, well before the drop.
+    if (was.phase === "set" && s2.phase === "drop") assert.ok(P.feetBetween(s2.ref, was.dot) <= 5, "the players were lined up before the referee came: " + P.feetBetween(s2.ref, was.dot).toFixed(1) + " ft");
+  }
+  assert.ok(far > 100, "this face-off really was far away: " + far.toFixed(0));
+  assert.ok(P.feetBetween(at.ref, at.dot) <= 5, "the referee did not get there in time: " + P.feetBetween(at.ref, at.dot).toFixed(1) + " ft");
+  // After the drop the referee backs away to the boards again.
+  for (i = 0; i < 180; i++) G.tick(s2, {}, null, DT, G.makeDice(2));
+  assert.ok(s2.phase !== "play" || s2.ref.a < 10 || s2.ref.a > 75, "the referee stayed in the middle: " + JSON.stringify(s2.ref));
+});
+
+// ---------- The quiet notes for the coach's report ---------------------------------------------
+test("a pass is noted when it leaves, and again when somebody gets it", function () {
+  var s = quiet("C"), dice = G.makeDice(4);
+  put(s, "us", "C", 45, 50); put(s, "us", "RW", 72, 70);
+  G.gain(s, "us", "C");
+  var first = G.tick(s, { auto: true }, { us: { C: { move: { a: 0, d: 0 }, act: { kind: "pass", to: "RW", power: 0.6, lift: 0 } } } }, DT, dice);
+  var sent = notes(first, "pass");
+  assert.strictEqual(sent.length, 1);
+  assert.strictEqual(sent[0].role, "C"); assert.strictEqual(sent[0].to, "RW"); assert.strictEqual(sent[0].offside, false);
+  assert.strictEqual(sent[0].power, 0.6);
+  var got = notes(run(s, 2, { auto: true }, dice, null, function (s) { return !!s.puck.owner; }), "catch");
+  assert.strictEqual(got.length, 1);
+  assert.deepStrictEqual(got[0].sent, { team: "us", role: "C" });
+  assert.strictEqual(got[0].team, "us"); assert.strictEqual(got[0].role, "RW"); assert.strictEqual(got[0].meant, true);
+  assert.strictEqual(got[0].shot, false);
+  // A pass to a teammate who is already inside their blue line is noted as offside the moment it leaves.
+  var s2 = quiet("C");
+  put(s2, "us", "C", 50, 112); put(s2, "us", "RW", 70, 140); G.gain(s2, "us", "C");
+  var risky = notes(G.tick(s2, { auto: true }, { us: { C: { move: { a: 0, d: 0 }, act: { kind: "pass", to: "RW", power: 0.6, lift: 0 } } } }, DT, dice), "pass");
+  assert.strictEqual(risky[0].offside, true);
+});
+test("a pass that is picked off is noted with who sent it and who got it", function () {
+  var s = quiet("C"), dice = rolls([], 0);
+  put(s, "us", "C", 45, 50); put(s, "us", "RW", 75, 50); put(s, "them", "C", 60, 50.5);
+  G.gain(s, "us", "C");
+  G.tick(s, { auto: true }, { us: { C: { move: { a: 0, d: 0 }, act: { kind: "pass", to: "RW", power: 0.6, lift: 0 } } } }, DT, dice);
+  var got = notes(run(s, 2, { auto: true }, dice, null, function (s) { return !!s.puck.owner; }), "catch");
+  assert.strictEqual(got[0].team, "them"); assert.strictEqual(got[0].meant, false);
+  assert.deepStrictEqual(got[0].sent, { team: "us", role: "C" });
+});
+test("a shot is noted with where it was from and how good that spot is; its end says who shot", function () {
+  var slot = shootFromSlot([0.5, 0.5, 0.999]);
+  var shot = notes(slot.first, "shot")[0];
+  assert.strictEqual(shot.team, "us"); assert.strictEqual(shot.role, "C"); assert.strictEqual(shot.power, 0.7); assert.strictEqual(shot.lift, 0.5);
+  near(shot.feet, 26.6, 0.1);     // (the puck sits on the stick, 2.4 feet ahead of the skater at 160)
+  assert.ok(shot.chance > 0.1, "the slot is a good spot: " + shot.chance);
+  assert.deepStrictEqual(slot.ev[0].by, { team: "us", role: "C" }, "the goal says who scored");
+  assert.deepStrictEqual(shootFromSlot([0.5, 0.5, 0, 0]).ev[0].by, { team: "us", role: "C" }, "a covered shot says who shot");
+  assert.deepStrictEqual(shootFromSlot([0.5, 0.5, 0, 0.99]).ev[0].by, { team: "us", role: "C" }, "a rebound too");
+  // From the corner the same shot is a poor chance.
+  var s = quiet("C");
+  put(s, "us", "C", 8, 186); G.gain(s, "us", "C");
+  var poor = notes(G.tick(s, { auto: true }, { us: { C: { move: { a: 0, d: 0 }, act: { kind: "shoot", power: 0.7, lift: 0.5, side: 0 } } } }, DT, rolls([])), "shot")[0];
+  assert.ok(poor.chance < shot.chance / 3, poor.chance + " " + shot.chance);
+});
+test("a shot over the net, or beside it, is noted as a miss", function () {
+  var over = shootFromSlot([0.5, 0.5], 0.999, 0.98);
+  var w = notes(over.ev, "wide");
+  assert.strictEqual(w.length, 1);
+  assert.strictEqual(w[0].over, true); assert.strictEqual(w[0].role, "C");
+  // Aimed far to the side: the first roll of the dice pushes the shot wide.
+  var wide = shootFromSlot([0.999, 0.5], 0.999, 0.3);
+  var w2 = notes(wide.ev, "wide");
+  if (w2.length) assert.strictEqual(w2[0].over, false);
+  assert.strictEqual(wide.s.score.us, 0);
+});
+test("an offside says who brought the puck in, and a face-off says how YOU did as the center", function () {
+  var s = quiet("C");
+  put(s, "us", "C", 60, 110); put(s, "us", "RW", 75, 135); G.gain(s, "us", "C");
+  var ev = carryIn(s);
+  assert.strictEqual(ev[0].role, "RW"); assert.strictEqual(ev[0].by, "C", "you carried it in");
+  // The face-off: won, lost, too early.
+  function draw(when) {
+    var g = G.newGame({ you: "C", age: 3 }), dice = G.makeDice(11), out = null;
+    for (var i = 0; i < 600 && !out; i++) {
+      var press = when === "early" ? g.phase === "drop" : when === "fast" ? g.phase === "draw" : false;
+      out = notes(G.tick(g, press ? { pass: true } : {}, null, DT, dice), "faceoff")[0] || null;
+    }
+    return out.you;
+  }
+  assert.strictEqual(draw("fast"), "won"); assert.strictEqual(draw("never"), "lost"); assert.strictEqual(draw("early"), "early");
+  var wing = G.newGame({ you: "LW", age: 3 }), d2 = G.makeDice(3), f = null;
+  for (var i = 0; i < 600 && !f; i++) f = notes(G.tick(wing, {}, null, DT, d2), "faceoff")[0] || null;
+  assert.strictEqual(f.you, null, "a winger does not take the face-off");
 });
 
 console.log("All game (gamesim) tests passed!");

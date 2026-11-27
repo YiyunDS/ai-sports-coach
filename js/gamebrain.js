@@ -188,6 +188,27 @@
     });
   }
 
+  // The spot the playbook wants for every position of a team right now,
+  // in the real rink: { attacking: true or false, spots: { LW: { a, d, tip }, ... } }.
+  // These are the spots the computer players skate to (before one of
+  // them leaves to chase the puck). The coach's report uses them to
+  // say how well YOU held your position.
+  function spots(s, team) {
+    var p = s.puck, mine = {}, out = {};
+    ROLES.forEach(function (r) { mine[r] = G.see(team, s[team][r]); });
+    var puck = G.see(team, p);
+    var has = p.owner === team, coming = !p.owner && !!p.pass && p.pass.team === team;
+    var attacking = has || coming || (!p.owner && !p.pass && s.side === team);
+    var plan = attacking ? G.attackSpots(puck, has ? p.carrier : coming ? p.pass.to : G.nearest(mine, puck).role) : G.defendSpots(puck);
+    ROLES.forEach(function (r) {
+      var to = pt(plan[r].a, plan[r].d);
+      if (attacking && puck.d <= G.ZONE) to.d = Math.min(to.d, G.ZONE - 3.5);   // onside: wait outside their blue line
+      out[r] = G.see(team, to);
+      out[r].tip = plan[r].tip;
+    });
+    return { attacking: attacking, spots: out };
+  }
+
   // What all the computer players want in this step.
   function decide(s, dice, dt) {
     var out = { us: {}, them: {} };
@@ -205,7 +226,7 @@
     return G.tick(s, input, decide(s, dice, dt), dt, dice);
   }
 
-  var api = { decide: decide, play: play, choices: choices, carryTarget: carryTarget, passPower: passPower };
+  var api = { decide: decide, play: play, choices: choices, spots: spots, carryTarget: carryTarget, passPower: passPower };
   if (node) module.exports = api;
   else root.CoachBrain = api;
 })(typeof window !== "undefined" ? window : globalThis);

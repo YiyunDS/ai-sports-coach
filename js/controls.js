@@ -3,16 +3,17 @@
 //
 //  Three ways to play, and they all end up as the same two things:
 //      an ARROW   which way to skate, and how hard (never longer than 1)
-//      BUTTONS    pass, shoot, call for a pass, the quick move, pause
+//      BUTTONS    pass, shoot, call for a pass, the quick move, take, pause
 //
 //      Keyboard     W A S D (or the arrow keys) to skate.
 //                   The last key of each row for the buttons:
-//                     -  pass (a stick check when they have the puck)
-//                     P  shoot      L  call for a pass      M  quick move
+//                     -  pass       P  shoot
+//                     L  call for a pass      M  quick move
+//                   The space bar TAKES the puck from the other team.
 //                   Esc pauses.
 //      Touch        A joystick appears under your thumb on the left
-//                   side; four buttons are on the right.
-//      Controller   The left stick, and A (pass), B or X (shoot),
+//                   side; five buttons are on the right.
+//      Controller   The left stick, and A (pass), B (shoot), X (take),
 //                   Y (call), the right bumper (quick move), Start (pause).
 //
 //  We read keys by WHERE they sit on the keyboard ("the key right of
@@ -40,9 +41,10 @@
     KeyW: [0, -1], ArrowUp: [0, -1], KeyS: [0, 1], ArrowDown: [0, 1],
     KeyA: [-1, 0], ArrowLeft: [-1, 0], KeyD: [1, 0], ArrowRight: [1, 0]
   };
-  var ACTION_KEYS = { Minus: "pass", NumpadSubtract: "pass", KeyP: "shoot", KeyL: "call", KeyM: "burst", Escape: "pause" };
+  var ACTION_KEYS = { Minus: "pass", NumpadSubtract: "pass", KeyP: "shoot", KeyL: "call", KeyM: "burst", Space: "take", Escape: "pause" };
   // The buttons of a standard game controller, by their number.
-  var PAD_BUTTONS = { 0: "pass", 1: "shoot", 2: "shoot", 3: "call", 5: "burst", 9: "pause" };
+  var PAD_BUTTONS = { 0: "pass", 1: "shoot", 2: "take", 3: "call", 5: "burst", 9: "pause" };
+  var ACTIONS = ["pass", "shoot", "call", "burst", "take", "pause"];
 
   // The arrow from the keys that are held down.
   //   down = { KeyW: true, KeyD: true, ... }
@@ -90,7 +92,7 @@
     return upright ? { a: v.x, d: -v.y || 0 } : { a: v.y, d: v.x };
   }
 
-  var api = { MOVE_KEYS: MOVE_KEYS, ACTION_KEYS: ACTION_KEYS, PAD_BUTTONS: PAD_BUTTONS,
+  var api = { MOVE_KEYS: MOVE_KEYS, ACTION_KEYS: ACTION_KEYS, PAD_BUTTONS: PAD_BUTTONS, ACTIONS: ACTIONS,
               fromKeys: fromKeys, fromStick: fromStick, fromPad: fromPad, strongest: strongest, toRink: toRink };
 
   // In "node" (our tests) there is no page: hand over the math and stop.
@@ -113,7 +115,12 @@
     if (MOVE_KEYS[ev.code]) { down[ev.code] = true; ev.preventDefault(); }
     else if (ACTION_KEYS[ev.code]) { if (!ev.repeat) press(ACTION_KEYS[ev.code]); ev.preventDefault(); }
   });
-  window.addEventListener("keyup", function (ev) { delete down[ev.code]; });
+  window.addEventListener("keyup", function (ev) {
+    delete down[ev.code];
+    // (The space bar also "clicks" a button that has the keyboard's
+    // attention, when the key comes up. During a game it must only take.)
+    if (ev.code === "Space" && opts.active() && !typing(ev.target)) ev.preventDefault();
+  });
   // The window lost the keyboard (another tab, another program): let go of everything.
   window.addEventListener("blur", function () { down = {}; });
 
@@ -148,7 +155,7 @@
   // Tell this file where the touch controls are.
   //   o.active()   -> true while the game is being played
   //   o.stickArea  the area for the left thumb; o.base, o.knob = the joystick's two circles
-  //   o.buttons    { pass: element, shoot: element, call: element, burst: element }
+  //   o.buttons    { pass: element, shoot: element, call: element, burst: element, take: element }
   api.attach = function (o) {
     opts = o;
     if (o.stickArea) {
@@ -168,7 +175,7 @@
 
   // The game asks, once per picture: what is the player doing?
   //   upright = is the rink standing up (a phone)?
-  // Returns { move: { a, d }, pass, shoot, call, burst, pause }. A button
+  // Returns { move: { a, d }, pass, shoot, call, burst, take, pause }. A button
   // is true only once per press.
   api.read = function (upright) {
     var arrows = [fromKeys(down)];
@@ -188,7 +195,7 @@
       padWas[pad.index] = now;
     }
     var out = { move: toRink(strongest(arrows), upright) };
-    ["pass", "shoot", "call", "burst", "pause"].forEach(function (a) { out[a] = !!pressed[a]; });
+    ACTIONS.forEach(function (a) { out[a] = !!pressed[a]; });
     pressed = {};
     return out;
   };

@@ -29,9 +29,9 @@
 (function () {
   "use strict";
   var G = window.CoachGame, B = window.CoachBrain, P = window.CoachPositions, R = window.CoachRink;
-  var Keys = window.CoachControls, Sound = window.CoachSound;
+  var Keys = window.CoachControls, Sound = window.CoachSound, Report = window.CoachReport;
   var svg = document.getElementById("game-rink");
-  if (!G || !B || !P || !R || !Keys || !svg) return;
+  if (!G || !B || !P || !R || !Keys || !Report || !svg) return;
   var shape = R.shape, words = R.words;   // the drawing helpers from rink.js
 
   function $(id) { return document.getElementById(id); }
@@ -41,7 +41,9 @@
     sound: $("game-sound"), setup: $("game-setup"), playing: $("game-playing"), pad: $("game-pad"),
     bars: $("game-bars"), power: $("game-power"), lift: $("game-lift"), powerGreen: $("game-power-green"), liftGreen: $("game-lift-green"),
     barWord: $("game-bar-word"), call: $("game-call-word"), card: $("game-card"), cardKind: $("game-card-kind"),
-    cardText: $("game-card-text"), cardMore: $("game-card-more"), cardGo: $("game-card-go"), passBtn: $("game-btn-pass")
+    cardText: $("game-card-text"), cardMore: $("game-card-more"), cardGo: $("game-card-go"), passBtn: $("game-btn-pass"),
+    takeBtn: $("game-btn-take"), full: $("game-full"), board: $("game-board"),
+    report: $("game-report"), well: $("game-report-well"), nextTitle: $("game-report-next"), nextTip: $("game-report-tip"), cards: $("game-report-cards")
   };
 
   // What the page remembers.
@@ -53,6 +55,8 @@
   var lastTime = null;        // when the last picture was painted
   var owed = 0;               // game time we still have to play (seconds)
   var held = {};              // buttons pressed while no step was played yet
+  var notes = null;           // what the coach's report remembers about you (gamereport.js)
+  var flash = null;           // a short word under the clock: { text, until }
 
   var tall = window.matchMedia("(max-width: 700px)");
   var calm = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -81,6 +85,7 @@
     parts = { us: {}, them: {}, goalie: {} };
     parts.passLine = shape("line", { class: "pass-line", x1: 0, y1: 0, x2: 0, y2: 0 }, live);
     parts.ring = shape("circle", { class: "whistle-ring", r: 7, cx: 0, cy: 0 }, live);
+    parts.reach = shape("circle", { class: "take-ring", r: G.TAKE_REACH, cx: 0, cy: 0, visibility: "hidden" }, live);
     parts.goalie.us = shape("circle", { class: "goalie ours", r: 2.2 }, live);
     parts.goalie.them = shape("circle", { class: "goalie theirs", r: 2.2 }, live);
     // The referee: a striped marker, no letter.
@@ -143,6 +148,11 @@
       // For the younger age groups the line turns red when that pass would be offside.
       parts.passLine.setAttribute("class", "pass-line" + (s.lv.warn && G.passIsOffside(s, "us", to) ? " warn" : ""));
     }
+    // Close enough to take the puck? A thin ring around their puck carrier
+    // says so (for the younger age groups, like the red pass line).
+    var near = s.lv.warn && G.canTake(s);
+    parts.reach.setAttribute("visibility", near ? "visible" : "hidden");
+    if (near) { var c = s.them[p.carrier]; parts.reach.setAttribute("cx", c.d); parts.reach.setAttribute("cy", c.a); }
     look(false);
     // The camera follows the puck. If that leaves YOU outside the picture,
     // an arrow at the edge shows where you are.
@@ -171,13 +181,14 @@
     if (!s) return "Press Start game";
     if (s.phase === "over") return "Final score";
     if (paused) return "Paused";
+    if (flash && s.phase === "play" && s.time < flash.until) return flash.text;
     if (s.phase === "dead") return CALL_WORDS[s.stop.reason] || "Whistle";
     if (s.phase === "set") return "Face-off";
     if (s.phase === "drop") return s.you === "C" ? "Wait for the drop..." : "Face-off";
     if (s.phase === "draw") return "Now! Tap Pass";
     if (G.youHavePuck(s)) return s.aim && s.aim.stage === 1 ? "Tap " + (s.aim.kind === "pass" ? "Pass" : "Shoot") + " again" : "You have the puck";
     if (s.puck.owner === "us") return "We have the puck";
-    if (s.puck.owner === "them") return "They have the puck";
+    if (s.puck.owner === "them") return G.canTake(s) ? "Close enough: Take!" : "They have the puck";
     return "Loose puck";
   }
   var CALL_WORDS = { goal: "Goal", cover: "Save", offside: "Offside", icing: "Icing", end: "Time" };
@@ -213,6 +224,7 @@
     el.playing.hidden = !on;
     el.pad.hidden = !on;
     el.view.classList.toggle("in-game", on);
+    el.report.hidden = !(s && s.phase === "over");
     setText(el.pause, paused ? "Resume" : "Pause");
     el.pause.setAttribute("aria-pressed", String(paused));
     setText(el.begin, s ? "Play again" : "Start game");
@@ -225,7 +237,7 @@
       var t = s.stats;
       more = "Shots " + t.shots.us + " to " + t.shots.them + ". Saves by our goalie " + t.saves.us + ", by theirs " + t.saves.them +
         ". Offside: us " + t.offside.us + ", them " + t.offside.them + ". Icing: us " + t.icing.us + ", them " + t.icing.them +
-        ". Face-offs won: " + t.faceoffs.us + " of " + (t.faceoffs.us + t.faceoffs.them) + ".";
+        ". Your coach's report is under the rink.";
     } else if (paused) { kind = "Paused"; text = "The game waits for you."; go = "Resume"; }
     el.card.hidden = !kind;
     el.card.className = "game-card" + (s && s.phase === "over" ? (s.score.us > s.score.them ? " good" : s.score.us < s.score.them ? " far" : " close") : "");
@@ -241,8 +253,12 @@
 
   // ---------- What happened: the story, the whistle, the ring --------------------
   var callTimer = null;
+  var STORY = { goal: 1, save: 1, cover: 1, offside: 1, icing: 1, faceoff: 1, end: 1 };
   function tell(e) {
-    if (e.kind === "steal") return;                       // too many to read; you see them on the ice
+    // Your own take: say at once why it did not work.
+    if (e.kind === "take") flash = { text: e.result === "far" ? "Too far to take" : "Missed!", until: game.time + 1.1 };
+    if (e.kind === "steal" && e.team === "us" && e.role === game.you) flash = { text: "You took the puck!", until: game.time + 1.1 };
+    if (!STORY[e.kind]) return;                           // the rest are quiet notes for the coach's report
     addLog(e.text, e.kind + (e.team ? " " + e.kind + "-" + e.team : ""));
     if (e.kind === "save") ringAt(game.goalie[e.team]);
     if (!e.whistle) return;
@@ -271,28 +287,35 @@
     // The Game tab is not showing, or the whole page is hidden: the game waits.
     if (game && !paused && game.phase !== "over" && (el.view.hidden || document.hidden)) setPaused(true);
     var input = Keys.read(rink.upright);
-    if (input.pause && game && game.phase !== "over") { setPaused(!paused); input.pause = false; }
+    if (input.pause && game && game.phase !== "over" && Date.now() > pauseGuard) {
+      if (full) setFull(false);                              // Esc leaves full screen, and pauses
+      else setPaused(!paused);
+    }
     if (lastTime === null) lastTime = now;
     var passed = Math.min(0.1, (now - lastTime) / 1000);   // (never more than a tenth of a second at once)
     lastTime = now;
     if (!running()) { owed = 0; drawBars(); setText(el.info, statusLine()); return; }
     steer = input.move;
-    ["pass", "shoot", "call", "burst"].forEach(function (b) { if (input[b]) held[b] = true; });
+    ["pass", "shoot", "call", "burst", "take"].forEach(function (b) { if (input[b]) held[b] = true; });
     owed += passed;
     var changed = false;
     while (owed >= G.TICK) {
       owed -= G.TICK;
       // A button counts in ONE step; the steering counts in all of them.
-      var events = B.play(game, { move: input.move, pass: held.pass, shoot: held.shoot, call: held.call, burst: held.burst }, G.TICK, dice);
+      var events = B.play(game, { move: input.move, pass: held.pass, shoot: held.shoot, call: held.call, burst: held.burst, take: held.take }, G.TICK, dice);
       held = {};
+      if (notes) Report.watch(notes, game, events, G.TICK);
       events.forEach(tell);
       if (events.length) changed = true;
       if (game.phase === "over") break;
     }
+    if (game.phase === "over") finish();
     if (changed || game.phase === "over") refresh();
     setText(el.clock, clockText(game.clock));
     setText(el.info, statusLine());
-    setText(el.passBtn, game.puck.owner === "them" ? "Check" : "Pass");
+    // The button to reach for now is the bright one: Take when they have the puck, Pass otherwise.
+    var defend = game.puck.owner === "them";
+    if (defend !== el.takeBtn.classList.contains("main")) { el.takeBtn.classList.toggle("main", defend); el.passBtn.classList.toggle("main", !defend); }
     drawBars();
     draw();
   }
@@ -306,7 +329,8 @@
   }
   function newGame() {
     game = G.newGame({ you: role, age: Number(el.age.value), minutes: minutes });
-    paused = false; owed = 0; held = {}; barTall = 0;
+    paused = false; owed = 0; held = {}; barTall = 0; flash = null;
+    notes = Report ? Report.start(game) : null;
     el.log.textContent = "";
     addLog("A new game: ages " + game.lv.name + ", you are the " + P.ROLE_NAMES[role].toLowerCase() + ". Face-off at center.", "start");
     setText(el.clock, clockText(game.clock));
@@ -316,8 +340,73 @@
     // On a phone, bring the rink to the top so the rink and the controls are both on screen.
     if (tall.matches && el.view.scrollIntoView) el.view.scrollIntoView({ block: "start" });
   }
+  // The game is over: write the coach's report under the rink.
+  function finish() {
+    if (full) setFull(false);
+    if (!notes) return;
+    var r = Report.build(notes, game);
+    notes = null;
+    el.well.textContent = "";
+    r.well.forEach(function (line) { var li = document.createElement("li"); li.textContent = line; el.well.appendChild(li); });
+    setText(el.nextTitle, r.next.title);
+    setText(el.nextTip, r.next.tip);
+    el.cards.textContent = "";
+    r.cards.forEach(function (c) {
+      var box = document.createElement("div"), head = document.createElement("div"), name = document.createElement("span"),
+          chip = document.createElement("span"), line = document.createElement("p");
+      box.className = "report-card " + c.grade;
+      head.className = "pos-result-head";
+      name.className = "report-name"; name.textContent = c.title;
+      chip.className = "chip"; chip.textContent = c.word;
+      head.appendChild(name); head.appendChild(chip);
+      line.textContent = c.line;
+      box.appendChild(head); box.appendChild(line);
+      if (c.tip) { var tip = document.createElement("p"); tip.className = "small report-tip"; tip.textContent = c.tip; box.appendChild(tip); }
+      el.cards.appendChild(box);
+    });
+  }
+
+  // ---------- Full screen ---------------------------------------------------------------
+  // The button asks the browser to show only the game. A browser that
+  // does not allow that for a page (an iPhone) gets the next best
+  // thing: the game fills the whole window and covers the top bar and
+  // the tabs. Leaving full screen pauses the game (Esc does both).
+  var full = false, pauseGuard = 0;
+  function realFull() { return document.fullscreenElement || document.webkitFullscreenElement || null; }
+  function showFull(on) {
+    full = on;
+    barTall = 0;
+    el.board.classList.toggle("full", on);
+    document.documentElement.classList.toggle("game-full", on);
+    setText(el.full, on ? "Leave full screen" : "Full screen");
+    el.full.setAttribute("aria-pressed", String(on));
+  }
+  function setFull(on) {
+    if (on === full) return;
+    if (on) {
+      var ask = el.board.requestFullscreen || el.board.webkitRequestFullscreen;
+      showFull(true);
+      if (ask) { try { var wait = ask.call(el.board); if (wait && wait.catch) wait.catch(function () { /* not allowed: the window-filling way stays */ }); } catch (e) { /* the same */ } }
+    } else {
+      showFull(false);
+      var leave = document.exitFullscreen || document.webkitExitFullscreen;
+      if (realFull() && leave) { try { leave.call(document); } catch (e) { /* fine */ } }
+      if (game && game.phase !== "over") setPaused(true);
+      pauseGuard = Date.now() + 400;     // (the same Esc must not un-pause it again)
+    }
+  }
+  // The browser left full screen by itself (Esc, or a swipe on a tablet).
+  var wasReal = false;
+  function fullChanged() {
+    if (realFull()) { wasReal = true; return; }
+    if (wasReal) { wasReal = false; if (full) setFull(false); }
+  }
+  document.addEventListener("fullscreenchange", fullChanged);
+  document.addEventListener("webkitfullscreenchange", fullChanged);
+
   function endGame() {
-    game = null; paused = false;
+    game = null; paused = false; notes = null;
+    if (full) setFull(false);
     clearTimeout(callTimer);
     el.call.classList.remove("show");
     el.log.textContent = "";
@@ -351,6 +440,7 @@
   el.pause.addEventListener("click", function () { setPaused(!paused); });
   el.cardGo.addEventListener("click", function () { setPaused(false); });
   el.end.addEventListener("click", endGame);
+  el.full.addEventListener("click", function () { setFull(!full); });
   if (el.sound && Sound) {
     el.sound.addEventListener("click", function () { Sound.wake(); Sound.set(!Sound.on()); });
     Sound.onChange(showSound);
@@ -361,7 +451,7 @@
     // The keys and the touch buttons belong to the game while a game is on and this tab is showing.
     active: function () { return !!game && game.phase !== "over" && !el.view.hidden; },
     stickArea: $("game-stick"), base: $("game-stick-base"), knob: $("game-stick-knob"),
-    buttons: { pass: el.passBtn, shoot: $("game-btn-shoot"), call: $("game-btn-call"), burst: $("game-btn-burst") }
+    buttons: { pass: el.passBtn, shoot: $("game-btn-shoot"), call: $("game-btn-call"), burst: $("game-btn-burst"), take: el.takeBtn }
   });
   document.addEventListener("visibilitychange", function () { if (document.hidden) setPaused(true); });
 
@@ -375,5 +465,6 @@
   requestAnimationFrame(frame);
   // For checking in the browser.
   window.CoachGameUI = { state: function () { return game; }, paused: function () { return paused; },
-                         start: newGame, setDice: function (d) { dice = d; } };
+                         start: newGame, setDice: function (d) { dice = d; }, notes: function () { return notes; },
+                         full: function () { return full; } };
 })();

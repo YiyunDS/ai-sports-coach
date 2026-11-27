@@ -192,7 +192,9 @@ test("the same seed gives exactly the same game; another seed gives another game
 });
 
 test("whole games with only computer players, at every age: nothing breaks and every whistle is legal", function () {
-  var seen = { goal: 0, cover: 0, save: 0, offside: 0, icing: 0, faceoff: 0, steal: 0, end: 0 };
+  var seen = { goal: 0, cover: 0, save: 0, offside: 0, icing: 0, faceoff: 0, steal: 0, end: 0,
+               pass: 0, "catch": 0, shot: 0, wide: 0 };   // (the last four are quiet notes for the coach's report)
+  var QUIET = ["pass", "catch", "shot", "wide", "take"];
   var byAge = [];
   G.AGE_NAMES.forEach(function (name, age) {
     var goals = { us: 0, them: 0 };
@@ -208,7 +210,9 @@ test("whole games with only computer players, at every age: nothing breaks and e
         lastClock = s.clock;
         ev.forEach(function (e) {
           assert.ok(e.kind in seen, "a new kind of event: " + e.kind);
-          assert.ok(e.text.length > 5 && e.spot);
+          assert.ok(e.spot && isFinite(e.spot.a) && isFinite(e.spot.d), e.kind + " has no spot");
+          if (QUIET.indexOf(e.kind) < 0) assert.ok(e.text.length > 5, e.kind + " has no words");
+          else assert.ok(!e.text && !e.whistle, "a quiet note must not show in the play-by-play");
           seen[e.kind]++;
           if (e.kind === "goal") count[e.team]++;
           // Only these stop the play. Every stop leads to a face-off on a dot.

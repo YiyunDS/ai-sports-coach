@@ -402,8 +402,15 @@
 
   // ---------- The puck changes hands ------------------------------------
   // This skater now has the puck on the stick.
-  function gain(s, team, role) {
+  //   ev = the list of what happened in this step (may be left out)
+  function gain(s, team, role, ev) {
     var p = s.puck;
+    // A puck that was passed or shot has arrived somewhere: note who sent
+    // it and who got it (the coach's report reads these notes).
+    if (ev && p.sent) {
+      ev.push({ kind: "catch", team: team, role: role, sent: { team: p.sent.team, role: p.sent.role }, shot: !!p.shot,
+                meant: !!p.pass && p.pass.team === team && p.pass.to === role, spot: pt(p.a, p.d) });
+    }
     p.owner = team; p.carrier = role; p.last = team; s.side = team;
     p.pass = null; p.shot = null; p.sent = null; p.tried = {}; p.goalieTried = false;
     p.h = 0; p.vh = 0;
@@ -440,8 +447,10 @@
   // A pass to a teammate.  power, lift = 0 to 1 (the two bars)
   //   Aimed a little ahead of the teammate, where they will be.
   //   A lifted pass flies over sticks, but is harder to catch.
-  function launchPass(s, team, role, toRole, power, lift) {
+  function launchPass(s, team, role, toRole, power, lift, ev) {
     var p = s.puck, k = s[team][toRole], speed = passSpeed(power);
+    if (ev) ev.push({ kind: "pass", team: team, role: role, to: toRole, power: power, lift: lift,
+                      offside: passIsOffside(s, team, toRole), spot: pt(p.a, p.d) });
     var time = Math.min(feet(p, k) / speed, 1.2);
     var to = pt(k.a + k.va * time * 0.9, k.d + k.vd * time * 0.9);
     letGo(s);
@@ -454,8 +463,15 @@
   //   Harder shots are harder to stop but, past the green part of the
   //   bar, harder to aim. The height bar picks how high it arrives:
   //   past about three quarters it sails over the net.
-  function launchShot(s, team, role, power, lift, side, dice) {
+  function launchShot(s, team, role, power, lift, side, dice, ev) {
     var p = s.puck, from = see(team, p), goalie = see(team, s.goalie[other(team)]);
+    if (ev) {
+      // How good is this spot to shoot from? (The same chance the computer players use.)
+      var foes = {};
+      ROLES.forEach(function (r) { foes[r] = see(team, s[other(team)][r]); });
+      ev.push({ kind: "shot", team: team, role: role, power: power, lift: lift, feet: feet(from, GOAL),
+                chance: shotChance(from, foes, false), spot: pt(p.a, p.d) });
+    }
     if (!side) side = goalie.a > GOAL.a ? -1 : 1;
     var g = greens(s.lv, "shoot"), dist = feet(from, GOAL);
     var spread = (0.4 + dist * 0.028) * (power > g.power[1] ? 1.7 : 1);
@@ -475,28 +491,42 @@
     fly(s, see(team, to), speed, (lift || 0) * 10);
   }
 
-  // A stick check: poke the puck off the carrier's stick.
-  //   It works best from close and from the front. It hardly works
-  //   during the carrier's quick move. A miss leaves the checker slow
-  //   for a moment, so you cannot just hammer the button.
-  function tryCheck(s, team, role, dice, ev) {
+  // TAKE: poke the puck off the carrier's stick.
+  //   You must be really close: within TAKE_REACH feet. From farther
+  //   away nothing is taken. Close up it usually works: best from right
+  //   in front, less from behind, hardly at all during the carrier's
+  //   quick move. A miss leaves you slow for a moment, and there is a
+  //   short wait before the next try, so you cannot just hammer the key.
+  //   (The computer players use the same move, with a longer stick and
+  //   a chance that depends on the age group.)
+  var TAKE_REACH = 5;
+  function tryTake(s, team, role, dice, ev) {
     var p = s.puck, k = s[team][role];
     if (k.cool > 0 || p.owner !== other(team)) return;
     k.cool = 0.9;
-    var c = s[p.owner][p.carrier], dist = feet(k, c);
-    if (dist > 6.5) { k.slow = 0.35; return; }      // a swing at nothing
+    var mine = team === "us" && role === s.you && !s.auto;
+    var c = s[p.owner][p.carrier], from = p.carrier, dist = feet(k, c), reach = mine ? TAKE_REACH : 6.5;
+    function note(result) { if (mine) ev.push({ kind: "take", team: team, role: role, result: result, feet: dist, spot: pt(k.a, k.d) }); }
+    if (dist > reach) { k.slow = 0.35; note("far"); return; }   // a swing at nothing
     var front = ((k.a - c.a) * c.fa + (k.d - c.d) * c.fd) / Math.max(dist, 0.1);   // 1 = right in front, -1 = from behind
-    var skill = team === "them" ? s.lv.checkSkill / 0.34 : role === s.you ? 1.15 : 1;
-    var chance = clamp((0.22 + 0.2 * (front + 1) / 2 + 0.2 * (1 - dist / 6.5)) * skill * (c.burst > 0 ? 0.3 : 1), 0.04, 0.85);
-    if (dice() >= chance) { k.slow = 0.6; return; }
+    var chance = mine
+      ? 0.45 + 0.25 * (front + 1) / 2 + 0.2 * (1 - dist / reach)
+      : (0.22 + 0.2 * (front + 1) / 2 + 0.2 * (1 - dist / reach)) * (team === "them" ? s.lv.checkSkill / 0.34 : 1);
+    chance = clamp(chance * (c.burst > 0 ? 0.3 : 1), 0.04, 0.92);
+    if (dice() >= chance) { k.slow = 0.6; note("miss"); return; }
     s.stats.steals[team]++;
     c.miss = 0.7; c.slow = 0.4;
-    ev.push({ kind: "steal", team: team, spot: pt(p.a, p.d), text: does(nameOf(s, team, role), "take", "takes") + " the puck away." });
+    ev.push({ kind: "steal", team: team, role: role, from: from, spot: pt(p.a, p.d), text: does(nameOf(s, team, role), "take", "takes") + " the puck away." });
     if (dice() < 0.6) { gain(s, team, role); return; }
     // Knocked loose: it slides a few feet away.
     var turn = dice() * 6.283;
     p.owner = null; p.carrier = null; p.last = team; p.sent = null; p.pass = null; p.shot = null; p.tried = {};
     p.va = Math.cos(turn) * 14; p.vd = Math.sin(turn) * 14;
+  }
+  // Are you close enough to the puck carrier to take the puck?
+  function canTake(s) {
+    var p = s.puck;
+    return s.phase === "play" && p.owner === "them" && feet(s.us[s.you], s.them[p.carrier]) <= TAKE_REACH;
   }
 
   // Who would your pass go to? The teammate nearest to the way you are
@@ -532,7 +562,7 @@
   // ---------- Your own skater ---------------------------------------------
   var STILL = { move: { a: 0, d: 0 }, act: null };
   //   input.move  = { a, d }: which way to skate (no longer than 1)
-  //   input.pass, shoot, call, burst = true in the step where you pressed it
+  //   input.pass, shoot, call, burst, take = true in the step where you pressed it
   function yourWant(s, input, dt) {
     var act = null, move = input.move || STILL.move;
     var n = Math.sqrt(move.a * move.a + move.d * move.d);
@@ -553,17 +583,17 @@
       if (!act && input.burst) act = { kind: "burst" };
     } else {
       s.aim = null;
-      if (input.pass && s.puck.owner === "them") act = { kind: "check" };
+      if (input.take && s.puck.owner === "them") act = { kind: "check" };   // TAKE (only this button takes)
     }
     return { move: move, act: act };
   }
 
   function doAct(s, team, role, a, dice, ev) {
     var p = s.puck, k = s[team][role], has = p.owner === team && p.carrier === role;
-    if (a.kind === "check") { if (!has) tryCheck(s, team, role, dice, ev); return; }
+    if (a.kind === "check") { if (!has) tryTake(s, team, role, dice, ev); return; }
     if (!has) return;
-    if (a.kind === "pass") launchPass(s, team, role, a.to, a.power, a.lift || 0);
-    else if (a.kind === "shoot") launchShot(s, team, role, a.power, a.lift, a.side || 0, dice);
+    if (a.kind === "pass") launchPass(s, team, role, a.to, a.power, a.lift || 0, ev);
+    else if (a.kind === "shoot") launchShot(s, team, role, a.power, a.lift, a.side || 0, dice, ev);
     else if (a.kind === "send") launchTo(s, team, a.to, a.speed, a.lift);
     else if (a.kind === "burst" && k.burst <= 0 && k.tired <= 0) k.burst = 0.9;   // the quick move
   }
@@ -633,7 +663,7 @@
   // Does a skater get the free puck? Whoever it comes close to gets one
   // try. A slow puck is easy. A fast pass is easy for the player it was
   // meant for, hard for anyone else. A low shot can be blocked.
-  function takes(s, dice) {
+  function takes(s, dice, ev) {
     var p = s.puck;
     if (p.owner || p.h > 1.3) return;                    // too high: it flies over the sticks
     var v = speedOf(p), near = [];
@@ -654,7 +684,7 @@
       else if (p.shot) chance = p.h < 0.8 ? 0.22 : 0;                       // a block
       else chance = clamp(0.42 * (n.team === "them" ? s.lv.checkSkill / 0.34 : 1), 0.05, 0.8);   // picking off a pass
       p.tried[n.id] = true;
-      if (dice() < chance) { gain(s, n.team, n.role); return; }
+      if (dice() < chance) { gain(s, n.team, n.role, ev); return; }
       n.k.miss = 0.5;
     }
   }
@@ -678,8 +708,9 @@
       s.goalie[def] = see(att, g);
       if (s.phase !== "play") return;
       var faceOff = pt(q.a < W / 2 ? 20.5 : 64.5, 169), words = (def === "us" ? "Our" : "Their") + " goalie covers the puck.";
+      var by = p.sent ? { team: p.sent.team, role: p.sent.role } : null;   // who sent the puck
       function cover(text) {
-        whistle(s, ev, { kind: "cover", team: def, spot: pt(p.a, p.d), text: text }, see(att, faceOff), 1.5);
+        whistle(s, ev, { kind: "cover", team: def, by: by, spot: pt(p.a, p.d), text: text }, see(att, faceOff), 1.5);
         stopped = true;
       }
       // 2. A puck carrier who skates right into the goalie loses the puck.
@@ -712,7 +743,7 @@
           var turn = (dice() - 0.5) * 2.1, speed = 18 + 14 * dice(), sign = att === "us" ? 1 : -1;
           p.va = Math.sin(turn) * speed * sign; p.vd = -Math.cos(turn) * speed * sign;
           p.h = 0; p.vh = 0; p.sent = null; p.pass = null; p.shot = null; p.tried = {}; p.last = def; p.goalieTried = false;
-          ev.push({ kind: "save", team: def, spot: pt(p.a, p.d), text: "Save by " + (def === "us" ? "our" : "their") + " goalie. Rebound!" });
+          ev.push({ kind: "save", team: def, by: by, spot: pt(p.a, p.d), text: "Save by " + (def === "us" ? "our" : "their") + " goalie. Rebound!" });
         }
         return;
       }
@@ -752,6 +783,7 @@
           var name = nameOf(s, att, who.role), line = att === "us" ? "their" : "our";
           s.stats.offside[att]++;
           whistle(s, ev, { kind: "offside", team: att, role: who.role, spot: pt(p.a, p.d),
+            by: p.owner === att ? p.carrier : (p.sent && p.sent.team === att ? p.sent.role : null),   // who brought the puck in
             text: "Offside. " + name + (name === "You" ? " were" : " was") + " inside " + line + " blue line before the puck." +
                   (name === "You" ? " Wait at the line until the puck crosses." : "") },
             see(att, pt(now.a < W / 2 ? 20.5 : 64.5, 120)), 1.6);
@@ -766,18 +798,22 @@
           // GOAL!
           s.score[att]++;
           var scorer = p.sent && p.sent.team === att ? nameOf(s, att, p.sent.role) : (att === "us" ? "We" : "They");
-          whistle(s, ev, { kind: "goal", team: att, spot: pt(p.a, p.d),
+          whistle(s, ev, { kind: "goal", team: att, by: p.sent ? { team: p.sent.team, role: p.sent.role } : null, spot: pt(p.a, p.d),
             text: scorer === "You" ? "Goal! You score!" : scorer === "We" || scorer === "They" ? "Goal! " + scorer + " score." : "Goal! " + scorer + " scores." },
             pt(42.5, 100), 2.2);
           blew = true;
         } else if (p.sent && p.sent.team === att && see(att, p.sent.from).d < CENTER) {
           // ICING: sent from their own half, over the far goal line, untouched.
           s.stats.icing[att]++;
-          whistle(s, ev, { kind: "icing", team: att, spot: pt(p.a, p.d),
+          whistle(s, ev, { kind: "icing", team: att, by: p.sent.role, spot: pt(p.a, p.d),
             text: "Icing. " + (att === "us" ? "We" : "They") + " sent the puck from " + (att === "us" ? "our" : "their") +
                   " own half all the way over the far goal line, and nobody touched it." },
             see(att, pt(now.a < W / 2 ? 20.5 : 64.5, 31)), 1.6);
           blew = true;
+        } else if (p.shot && p.shot.team === att) {
+          // A shot that missed the net: wide, or over the top.
+          ev.push({ kind: "wide", team: att, role: p.shot.role, over: Math.abs(across - GOAL.a) < POST, spot: pt(p.a, p.d) });
+          p.shot = null;
         }
       }
     });
@@ -798,7 +834,8 @@
     eachSkater(s, function (k) { k.va = 0; k.vd = 0; k.burst = 0; k.tired = 0; k.slow = 0; k.miss = 0; k.cool = 0; });
   }
   // Somebody wins the face-off: their center draws the puck back to a defender.
-  function winFaceoff(s, team, ev, text) {
+  //   you = how YOU did, when you took the face-off: "won", "lost" or "early"
+  function winFaceoff(s, team, ev, text, you) {
     var p = s.puck;
     s.phase = "play"; s.stop = null;
     s.stats.faceoffs[team]++;
@@ -806,7 +843,7 @@
     p.pass = { team: team, to: "LD" }; p.tried = {}; p.goalieTried = false; p.sent = null; p.shot = null;
     s.us.C.miss = 0.5; s.them.C.miss = 0.5;
     fly(s, s[team].LD, 34, 0);
-    ev.push({ kind: "faceoff", team: team, spot: pt(p.a, p.d), text: text || (team === "us" ? "We win the face-off." : "They win the face-off.") });
+    ev.push({ kind: "faceoff", team: team, you: you || null, spot: pt(p.a, p.d), text: text || (team === "us" ? "We win the face-off." : "They win the face-off.") });
   }
   // What happens while play is stopped.
   function stoppage(s, input, dt, dice, ev) {
@@ -832,29 +869,45 @@
       if (input.pass && s.you === "C" && !input.auto) st.early = true;
       if (st.t < st.wait) return;
       if (s.you !== "C" || input.auto) { winFaceoff(s, dice() < 0.5 ? "us" : "them", ev); return; }
-      if (st.early) { winFaceoff(s, "them", ev, "You moved before the puck dropped. They win the face-off."); return; }
+      if (st.early) { winFaceoff(s, "them", ev, "You moved before the puck dropped. They win the face-off.", "early"); return; }
       s.phase = "draw"; st.t = 0; st.their = s.lv.faceoff * (0.75 + 0.5 * dice());
       return;
     }
     // "draw": you are the center. Tap Pass before their center does.
-    if (input.pass) winFaceoff(s, "us", ev, "You win the face-off!");
-    else if (st.t >= st.their) winFaceoff(s, "them", ev);
+    if (input.pass) winFaceoff(s, "us", ev, "You win the face-off!", "won");
+    else if (st.t >= st.their) winFaceoff(s, "them", ev, null, "lost");
   }
 
   // ---------- The referee ----------------------------------------------------------
-  // The referee skates along the boards, on the side away from the
-  // puck and a little behind the play. For an offside the referee
-  // stands on the blue line.
-  function refSpot(puck, last, reason) {
-    var side = last.a < W / 2 ? 6 : 79;
+  // WHILE THE PLAY GOES ON the referee skates along the boards, on the
+  // side away from the puck and a little behind the play.
+  // AFTER A WHISTLE the referee goes where a referee belongs:
+  //    offside            onto that blue line
+  //    a goal, or a save  beside that net, at the goal line
+  // and then TO THE FACE-OFF DOT, a step beside the two centers, to drop
+  // the puck. After icing the face-off is at the far other end of the
+  // rink, so the referee sets off for that dot at once. After the drop
+  // the referee backs away to the boards again.
+  //   puck = where the puck is, last = where the referee is now
+  //   stop = null while play goes on, or { phase, reason, spot }: the
+  //          part of the stoppage, why the whistle blew, the face-off dot
+  function refSpot(puck, last, stop) {
+    var side = last.a < W / 2 ? 6 : 79, far = puck.d > CENTER;
+    if (stop && stop.phase !== "dead") {
+      // The face-off: at the dot, on the side of the nearer boards.
+      return pt(stop.spot.a + (stop.spot.a > W / 2 ? 3.5 : -3.5), stop.spot.d);
+    }
+    if (stop && stop.reason === "offside") return pt(side, far ? 125.5 : 74.5);
+    if (stop && (stop.reason === "goal" || stop.reason === "cover")) return pt(GOAL.a + (side === 6 ? -16 : 16), far ? 187 : 13);
+    if (stop) return pt(stop.spot.a + (stop.spot.a > W / 2 ? 3.5 : -3.5), stop.spot.d);   // the start of the game
     if (Math.abs(puck.a - side) < 14) side = side === 6 ? 79 : 6;    // the play came too close: cross over
-    var d = clamp(puck.d + (puck.d > CENTER ? -10 : 10), 14, L - 14);
-    if (reason === "offside") d = puck.d > CENTER ? 125.5 : 74.5;
-    return pt(side, d);
+    return pt(side, clamp(puck.d + (far ? -10 : 10), 14, L - 14));
   }
   function moveRef(s, dt) {
-    var want = refSpot(s.puck, s.ref, s.stop && s.phase === "dead" ? s.stop.reason : null);
-    s.ref = toward(s.ref, want, 30 * dt);
+    var stopped = s.stop && s.phase !== "play";
+    var want = refSpot(s.puck, s.ref, stopped ? { phase: s.phase, reason: s.stop.reason, spot: s.stop.spot } : null);
+    // (During a stoppage the referee hurries, to be at the dot before the players are.)
+    s.ref = toward(s.ref, want, (stopped ? 80 : 30) * dt);
   }
 
   // =====================================================================
@@ -866,7 +919,9 @@
   //    dt      = how long the step is (1/60 of a second)
   //  Changes "s" and returns what happened in this step: a list of
   //  { kind, team, text, spot, whistle }.
-  //  kinds: goal, save, cover, offside, icing, faceoff, steal, end
+  //  kinds you read in the play-by-play: goal, save, cover, offside,
+  //  icing, faceoff, end. Quiet notes for the coach's report: pass,
+  //  catch, shot, wide, take, steal.
   // =====================================================================
   function tick(s, input, intents, dt, dice) {
     var ev = [];
@@ -909,7 +964,7 @@
     if (p.owner) hold(s); else slide(s, dt);
     // 5. The goalies, who gets a free puck, and the lines.
     if (goalies(s, dt, dice, ev)) return ev;
-    takes(s, dice);
+    takes(s, dice, ev);
     lines(s, before, ev);
     return ev;
   }
@@ -926,7 +981,8 @@
     AGE_NAMES: AGE_NAMES, DIALS: DIALS, levelFor: levelFor, barAt: barAt, greens: greens, passSpeed: passSpeed, shotSpeed: shotSpeed,
     // the game
     newGame: newGame, startPlay: startPlay, tick: tick, gain: gain, lineUp: lineUp, refSpot: refSpot,
-    youHavePuck: youHavePuck, passTarget: passTarget, passIsOffside: passIsOffside, bars: bars, nameOf: nameOf
+    youHavePuck: youHavePuck, passTarget: passTarget, passIsOffside: passIsOffside, bars: bars, nameOf: nameOf,
+    TAKE_REACH: TAKE_REACH, canTake: canTake
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.CoachGame = api;
