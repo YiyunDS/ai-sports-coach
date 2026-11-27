@@ -26,8 +26,8 @@
 
   var LEVELS = {
     1: "Rookie: the calls are plain to see.",
-    2: "Linesman: close calls at the blue line, and pucks that get touched, stop short or go in.",
-    3: "Pro: everything, faster, and teams that are short a player."
+    2: "Linesman: close calls at the blue line, the far winger, pucks that come back out, and long shots that get touched, stop short or go in.",
+    3: "Pro: everything, faster, teams that are short a player, and the rules that surprise people."
   };
 
   // What the game remembers.
@@ -38,7 +38,7 @@
   var phase = "idle";     // "playing" -> "ask" -> "answered"
   var picked = null;      // the call you made
   var score = { right: 0, total: 0, streak: 0, best: 0 };
-  var lastKind = null;
+  var deck = null;        // the shuffled deck of plays for this level (see "deal" in refplays.js)
   var rink = null, live = null;
   var run = 0;            // goes up every time a movie starts, so an old one stops itself
 
@@ -63,7 +63,8 @@
           shape("line", { x1: truth.from.d, y1: truth.from.a, x2: truth.spot.d, y2: truth.spot.a, class: "hl-path" }, live);
           shape("circle", { cx: truth.from.d, cy: truth.from.a, r: 2.2, class: "hl-ring" }, live);
         }
-        if (truth.reason !== "short" && truth.reason !== "touched") {
+        // The goal line too, but only if the puck got that far.
+        if (truth.spot.d >= F.GOAL_LINE) {
           shape("line", { x1: F.GOAL_LINE, y1: 5.8, x2: F.GOAL_LINE, y2: 79.2, class: "hl-line" }, live);
         }
       }
@@ -85,11 +86,12 @@
     shape("circle", { cx: now.puck.d, cy: now.puck.a, r: frozen && play.rule === "offside" ? 0.5 : 1.3, class: "puck" }, live);
   }
 
-  // Build the rink for this play. Offside plays happen at one end, so
-  // we only show that end (everything is bigger). Icing needs the length.
+  // Build the rink for this play. Plays at the blue line happen at one
+  // end, so we only show that end (everything is bigger). Long shots and
+  // long passes need the length. The play itself says which (play.from).
   function build() {
     if (!play) { rink = R.build(svg, { upright: tall.matches, ours: "", theirs: "" }); live = shape("g", {}, rink.root); return; }
-    var from = play.rule === "offside" ? 70 : 28;
+    var from = play.from;
     rink = R.build(svg, { upright: tall.matches, from: from, to: 200, ours: "", theirs: "" });
     // Words on the ice: which way blue is going. (On a phone they would
     // be too small to read, so the line above the buttons says it instead.)
@@ -134,8 +136,10 @@
   }
 
   function nextPlay() {
-    play = F.deal(level, dice, lastKind);
-    lastKind = play.kind;
+    // One deck per level: every kind of play comes up once before any
+    // comes back. A new level gets a new deck, which knows what you just saw.
+    if (!deck || deck.level !== level) deck = F.makeDeck(level, deck ? deck.recent : []);
+    play = F.deal(deck, dice);
     truth = F.judge(play);
     picked = null;
     build();
@@ -213,5 +217,5 @@
 
   build();
   refresh();
-  window.CoachRefUI = { state: function () { return { play: play, truth: truth, phase: phase, score: score, level: level }; } };
+  window.CoachRefUI = { state: function () { return { play: play, truth: truth, phase: phase, score: score, level: level, deck: deck }; } };
 })();
